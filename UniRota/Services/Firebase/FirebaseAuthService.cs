@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -15,6 +16,8 @@ public sealed class FirebaseAuthService : IAuthService
     private const string SecureTokenBaseUrl = "https://securetoken.googleapis.com/v1";
     private const string FirestoreBaseUrl = "https://firestore.googleapis.com/v1";
 
+    private static readonly TimeSpan TokenRefreshMargin = TimeSpan.FromMinutes(2);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -23,8 +26,10 @@ public sealed class FirebaseAuthService : IAuthService
     private readonly HttpClient _httpClient;
     private readonly ISecureStorage _secureStorage;
     private readonly FirebaseOptions _options;
+    private readonly SemaphoreSlim _tokenRefreshLock = new(1, 1);
     private string? _idToken;
     private string? _refreshToken;
+    private DateTimeOffset _idTokenExpiresAtUtc;
 
     public FirebaseAuthService(
         HttpClient httpClient,
@@ -71,9 +76,15 @@ public sealed class FirebaseAuthService : IAuthService
 
         var idToken = RequireResponseValue(authResponse.IdToken, "ID token");
         var refreshToken = RequireResponseValue(authResponse.RefreshToken, "refresh token");
+        var idTokenExpiresAtUtc = GetIdTokenExpiration(authResponse.ExpiresIn);
 
         await CreateUserProfileAsync(user, idToken, cancellationToken);
-        await SetCurrentSessionAsync(user, idToken, refreshToken, cancellationToken);
+        await SetCurrentSessionAsync(
+            user,
+            idToken,
+            refreshToken,
+            idTokenExpiresAtUtc,
+            cancellationToken);
 
         return user;
     }
@@ -101,10 +112,16 @@ public sealed class FirebaseAuthService : IAuthService
 
         var idToken = RequireResponseValue(authResponse.IdToken, "ID token");
         var refreshToken = RequireResponseValue(authResponse.RefreshToken, "refresh token");
+        var idTokenExpiresAtUtc = GetIdTokenExpiration(authResponse.ExpiresIn);
         var userId = RequireResponseValue(authResponse.LocalId, "identificador do usuário");
         var user = await GetUserProfileAsync(userId, idToken, cancellationToken);
 
-        await SetCurrentSessionAsync(user, idToken, refreshToken, cancellationToken);
+        await SetCurrentSessionAsync(
+            user,
+            idToken,
+            refreshToken,
+            idTokenExpiresAtUtc,
+            cancellationToken);
 
         return user;
     }
@@ -114,19 +131,7 @@ public sealed class FirebaseAuthService : IAuthService
         EnsureFirebaseIsConfigured();
         cancellationToken.ThrowIfCancellationRequested();
 
-        string? storedRefreshToken;
-
-        try
-        {
-            storedRefreshToken = await _secureStorage.GetAsync(RefreshTokenStorageKey);
-        }
-        catch (Exception exception)
-        {
-            ClearSessionInMemory();
-            throw new InvalidOperationException(
-                "Não foi possível acessar a sessão salva neste dispositivo.",
-                exception);
-        }
+        var storedRefreshToken = await GetStoredRefreshTokenAsync();
 
         if (string.IsNullOrWhiteSpace(storedRefreshToken))
         {
@@ -134,41 +139,106 @@ public sealed class FirebaseAuthService : IAuthService
             return null;
         }
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"{SecureTokenBaseUrl}/token?key={Escape(_options.ApiKey)}")
+        var refreshedTokens = await RefreshIdTokenAsync(
+            storedRefreshToken,
+            returnNullForInvalidSession: true,
+            cancellationToken);
+
+        if (refreshedTokens is null)
         {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["grant_type"] = "refresh_token",
-                ["refresh_token"] = storedRefreshToken
-            })
-        };
-
-        var response = await SendAsync(request, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var firebaseCode = ExtractFirebaseErrorCode(response.Content);
-
-            if (IsInvalidSessionError(firebaseCode))
-            {
-                ClearLocalSession();
-                return null;
-            }
-
-            throw CreateFirebaseException(firebaseCode, response.Content);
+            return null;
         }
 
-        var tokenResponse = DeserializeResponse<RefreshTokenResponseDto>(response.Content);
-        var idToken = RequireResponseValue(tokenResponse.IdToken, "ID token");
-        var refreshToken = RequireResponseValue(tokenResponse.RefreshToken, "refresh token");
-        var userId = RequireResponseValue(tokenResponse.UserId, "identificador do usuário");
-        var user = await GetUserProfileAsync(userId, idToken, cancellationToken);
+        var user = await GetUserProfileAsync(
+            refreshedTokens.UserId,
+            refreshedTokens.IdToken,
+            cancellationToken);
 
-        await SetCurrentSessionAsync(user, idToken, refreshToken, cancellationToken);
+        await SetCurrentSessionAsync(
+            user,
+            refreshedTokens.IdToken,
+            refreshedTokens.RefreshToken,
+            refreshedTokens.ExpiresAtUtc,
+            cancellationToken);
 
         return user;
+    }
+
+    public async Task<string> GetValidIdTokenAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsureFirebaseIsConfigured();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var currentUser = CurrentUser
+            ?? throw new InvalidOperationException(
+                "Não há uma sessão autenticada. Entre novamente para continuar.");
+
+        if (HasValidIdToken())
+        {
+            return _idToken!;
+        }
+
+        await _tokenRefreshLock.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (CurrentUser?.Id != currentUser.Id)
+            {
+                throw new InvalidOperationException(
+                    "A sessão autenticada foi alterada. Entre novamente para continuar.");
+            }
+
+            if (HasValidIdToken())
+            {
+                return _idToken!;
+            }
+
+            var refreshToken = _refreshToken;
+
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                refreshToken = await GetStoredRefreshTokenAsync();
+            }
+
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                ClearSessionInMemory();
+                throw new InvalidOperationException(
+                    "A sessão salva não está disponível. Entre novamente para continuar.");
+            }
+
+            var refreshedTokens = await RefreshIdTokenAsync(
+                refreshToken,
+                returnNullForInvalidSession: false,
+                cancellationToken)
+                ?? throw new InvalidOperationException(
+                    "Não foi possível renovar a sessão autenticada.");
+
+            if (!string.Equals(
+                    refreshedTokens.UserId,
+                    currentUser.Id,
+                    StringComparison.Ordinal)
+                || CurrentUser?.Id != currentUser.Id)
+            {
+                ClearLocalSession();
+                throw new InvalidOperationException(
+                    "A sessão autenticada não corresponde ao usuário atual. Entre novamente.");
+            }
+
+            await SetCurrentSessionAsync(
+                currentUser,
+                refreshedTokens.IdToken,
+                refreshedTokens.RefreshToken,
+                refreshedTokens.ExpiresAtUtc,
+                cancellationToken);
+
+            return refreshedTokens.IdToken;
+        }
+        finally
+        {
+            _tokenRefreshLock.Release();
+        }
     }
 
     public Task LogoutAsync()
@@ -230,6 +300,7 @@ public sealed class FirebaseAuthService : IAuthService
         User user,
         string idToken,
         string refreshToken,
+        DateTimeOffset idTokenExpiresAtUtc,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -249,7 +320,78 @@ public sealed class FirebaseAuthService : IAuthService
 
         _idToken = idToken;
         _refreshToken = refreshToken;
+        _idTokenExpiresAtUtc = idTokenExpiresAtUtc;
         CurrentUser = user;
+    }
+
+    private async Task<string?> GetStoredRefreshTokenAsync()
+    {
+        try
+        {
+            return await _secureStorage.GetAsync(RefreshTokenStorageKey);
+        }
+        catch (Exception exception)
+        {
+            ClearSessionInMemory();
+            throw new InvalidOperationException(
+                "Não foi possível acessar a sessão salva neste dispositivo.",
+                exception);
+        }
+    }
+
+    private async Task<RefreshedTokens?> RefreshIdTokenAsync(
+        string refreshToken,
+        bool returnNullForInvalidSession,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"{SecureTokenBaseUrl}/token?key={Escape(_options.ApiKey)}")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "refresh_token",
+                ["refresh_token"] = refreshToken
+            })
+        };
+
+        var response = await SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var firebaseCode = ExtractFirebaseErrorCode(response.Content);
+
+            if (IsInvalidSessionError(firebaseCode))
+            {
+                ClearLocalSession();
+
+                if (returnNullForInvalidSession)
+                {
+                    return null;
+                }
+
+                var invalidSessionException = new InvalidOperationException(
+                    "Sua sessão não é mais válida. Entre novamente para continuar.");
+                invalidSessionException.Data["FirebaseCode"] = firebaseCode;
+                throw invalidSessionException;
+            }
+
+            throw CreateFirebaseException(firebaseCode, response.Content);
+        }
+
+        var tokenResponse = DeserializeResponse<RefreshTokenResponseDto>(response.Content);
+
+        return new RefreshedTokens(
+            RequireResponseValue(tokenResponse.UserId, "identificador do usuário"),
+            RequireResponseValue(tokenResponse.IdToken, "ID token"),
+            RequireResponseValue(tokenResponse.RefreshToken, "refresh token"),
+            GetIdTokenExpiration(tokenResponse.ExpiresIn));
+    }
+
+    private bool HasValidIdToken()
+    {
+        return !string.IsNullOrWhiteSpace(_idToken)
+            && DateTimeOffset.UtcNow.Add(TokenRefreshMargin) < _idTokenExpiresAtUtc;
     }
 
     private async Task<T> PostJsonAsync<T>(
@@ -454,7 +596,24 @@ public sealed class FirebaseAuthService : IAuthService
     {
         _idToken = null;
         _refreshToken = null;
+        _idTokenExpiresAtUtc = default;
         CurrentUser = null;
+    }
+
+    private static DateTimeOffset GetIdTokenExpiration(string? expiresIn)
+    {
+        if (!long.TryParse(
+                expiresIn,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var expiresInSeconds)
+            || expiresInSeconds <= 0)
+        {
+            throw new InvalidOperationException(
+                "O Firebase não retornou a validade esperada para o ID token.");
+        }
+
+        return DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds);
     }
 
     private static void ValidateRequiredValue(string value, string parameterName)
@@ -477,6 +636,12 @@ public sealed class FirebaseAuthService : IAuthService
 
     private sealed record FirebaseHttpResponse(bool IsSuccessStatusCode, string Content);
 
+    private sealed record RefreshedTokens(
+        string UserId,
+        string IdToken,
+        string RefreshToken,
+        DateTimeOffset ExpiresAtUtc);
+
     private sealed class FirebaseAuthResponseDto
     {
         [JsonPropertyName("localId")]
@@ -490,6 +655,9 @@ public sealed class FirebaseAuthService : IAuthService
 
         [JsonPropertyName("refreshToken")]
         public string? RefreshToken { get; init; }
+
+        [JsonPropertyName("expiresIn")]
+        public string? ExpiresIn { get; init; }
     }
 
     private sealed class RefreshTokenResponseDto
@@ -502,6 +670,9 @@ public sealed class FirebaseAuthService : IAuthService
 
         [JsonPropertyName("refresh_token")]
         public string? RefreshToken { get; init; }
+
+        [JsonPropertyName("expires_in")]
+        public string? ExpiresIn { get; init; }
     }
 
     private sealed class FirestoreDocumentDto

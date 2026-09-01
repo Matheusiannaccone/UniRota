@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.Routes.NewRoutePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewModels="clr-namespace:UniRota.ViewModels"
+    Shell.NavBarIsVisible="True"
+    Title="{Binding PageTitle}">
+
+    <ScrollView VerticalScrollBarVisibility="Default">
+        <VerticalStackLayout
+            Padding="20,24,20,32"
+            MaximumWidthRequest="640"
+            HorizontalOptions="Fill"
+            Spacing="12">
+
+            <Label
+                Text="{Binding PageTitle}"
+                FontSize="28"
+                FontAttributes="Bold" />
+            <Label
+                Text="Preencha os dados da sua rotina semanal."
+                TextColor="#616161" />
+
+            <Label Text="Papel na rota" />
+            <Border Padding="8,0" Stroke="#E0E0E0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Picker
+                    Title="Selecione motorista ou passageiro"
+                    ItemsSource="{Binding RoleOptions}"
+                    ItemDisplayBinding="{Binding DisplayName}"
+                    SelectedItem="{Binding SelectedRole, Mode=TwoWay}"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label Text="Origem" />
+            <Border Padding="12,0" Stroke="#E0E0E0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Entry
+                    Text="{Binding Origin, Mode=TwoWay}"
+                    Placeholder="Ex.: Bairro Central"
+                    ReturnType="Next"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label Text="Destino" />
+            <Border Padding="12,0" Stroke="#E0E0E0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Entry
+                    Text="{Binding Destination, Mode=TwoWay}"
+                    Placeholder="Ex.: Facens"
+                    ReturnType="Next"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label Text="Dias da semana" />
+            <VerticalStackLayout
+                BindableLayout.ItemsSource="{Binding Days}"
+                IsEnabled="{Binding IsNotBusy}"
+                Spacing="4">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:SelectableDayViewModel">
+                        <Grid
+                            Padding="4,2"
+                            ColumnDefinitions="Auto,*"
+                            ColumnSpacing="8">
+                            <CheckBox
+                                Grid.Column="0"
+                                IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                VerticalOptions="Center" />
+                            <Label
+                                Grid.Column="1"
+                                Text="{Binding DisplayName}"
+                                VerticalOptions="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Label Text="Horário de saída" />
+            <Border Padding="12,0" Stroke="#E0E0E0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <TimePicker
+                    Time="{Binding DepartureTime, Mode=TwoWay}"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <VerticalStackLayout
+                Spacing="8"
+                IsVisible="{Binding IsDriver}">
+                <Label Text="Vagas disponíveis" />
+                <Border Padding="12,0" Stroke="#E0E0E0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10" />
+                    </Border.StrokeShape>
+                    <Entry
+                        Text="{Binding AvailableSeats, Mode=TwoWay}"
+                        Placeholder="Quantidade de vagas"
+                        Keyboard="Numeric"
+                        ReturnType="Done"
+                        IsEnabled="{Binding IsNotBusy}" />
+                </Border>
+            </VerticalStackLayout>
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+            <Label
+                Text="{Binding SuccessMessage}"
+                IsVisible="{Binding HasSavedSuccessfully}"
+                TextColor="#2E7D32"
+                HorizontalTextAlignment="Center" />
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Button
+                    Grid.Column="0"
+                    Text="{Binding ActionButtonText}"
+                    Command="{Binding SaveCommand}"
+                    IsEnabled="{Binding IsNotBusy}" />
+                <ActivityIndicator
+                    Grid.Column="1"
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    VerticalOptions="Center" />
+            </Grid>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

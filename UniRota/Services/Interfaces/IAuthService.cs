@@ -19,5 +19,7 @@ public interface IAuthService
 
     Task<User?> RestoreSessionAsync(CancellationToken cancellationToken = default);
 
+    Task<string> GetValidIdTokenAsync(CancellationToken cancellationToken = default);
+
     Task LogoutAsync();
 }
