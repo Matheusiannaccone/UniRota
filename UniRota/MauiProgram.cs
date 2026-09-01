@@ -42,6 +42,8 @@ namespace UniRota
             builder.Services.AddTransient<LoginViewModel>();
             builder.Services.AddTransient<RegisterViewModel>();
             builder.Services.AddTransient<HomeViewModel>();
+            builder.Services.AddTransient<NewRouteViewModel>();
+            builder.Services.AddTransient<MyRoutesViewModel>();
             builder.Services.AddTransient<StartupPage>();
             builder.Services.AddTransient<LoginPage>();
             builder.Services.AddTransient<RegisterPage>();
