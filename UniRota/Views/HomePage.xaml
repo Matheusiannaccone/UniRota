@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.HomePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Início">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="24,48,24,32"
+            MaximumWidthRequest="480"
+            HorizontalOptions="Fill"
+            Spacing="20">
+            <Label
+                Text="{Binding WelcomeMessage}"
+                Style="{StaticResource Headline}" />
+            <Label
+                Text="{Binding Email}"
+                HorizontalTextAlignment="Center"
+                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+
+            <Border Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="8">
+                    <Label
+                        Text="Autenticação concluída"
+                        FontAttributes="Bold"
+                        FontSize="18" />
+                    <Label Text="Sua área autenticada está pronta. As próximas funcionalidades serão adicionadas em incrementos futuros." />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Button
+                    Grid.Column="0"
+                    Text="Sair"
+                    Command="{Binding LogoutCommand}"
+                    IsEnabled="{Binding IsNotBusy}" />
+                <ActivityIndicator
+                    Grid.Column="1"
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    VerticalOptions="Center" />
+            </Grid>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.Auth.RegisterPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Criar conta">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="24,32"
+            MaximumWidthRequest="480"
+            HorizontalOptions="Fill"
+            Spacing="12">
+            <Label
+                Text="Criar conta"
+                Style="{StaticResource Headline}" />
+            <Label
+                Text="Preencha seus dados para começar"
+                HorizontalTextAlignment="Center"
+                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+
+            <Label Text="Nome" />
+            <Border Padding="12,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Entry
+                    Text="{Binding Name}"
+                    Placeholder="Seu nome"
+                    ReturnType="Next"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label Text="E-mail" />
+            <Border Padding="12,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Entry
+                    Text="{Binding Email}"
+                    Placeholder="seuemail@exemplo.com"
+                    Keyboard="Email"
+                    ReturnType="Next"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label Text="Senha" />
+            <Border Padding="12,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Entry
+                    Text="{Binding Password}"
+                    Placeholder="Mínimo de 6 caracteres"
+                    IsPassword="True"
+                    ReturnType="Next"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label Text="Confirmar senha" />
+            <Border Padding="12,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Entry
+                    Text="{Binding ConfirmPassword}"
+                    Placeholder="Digite a senha novamente"
+                    IsPassword="True"
+                    ReturnType="Go"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Button
+                    Grid.Column="0"
+                    Text="Criar conta"
+                    Command="{Binding RegisterCommand}"
+                    IsEnabled="{Binding IsNotBusy}" />
+                <ActivityIndicator
+                    Grid.Column="1"
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    VerticalOptions="Center" />
+            </Grid>
+
+            <Button
+                Text="Já tenho uma conta"
+                Command="{Binding GoToLoginCommand}"
+                IsEnabled="{Binding IsNotBusy}"
+                BackgroundColor="Transparent"
+                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

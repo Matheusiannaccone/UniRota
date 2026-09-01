@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.Auth.LoginPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Entrar">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="24,48,24,32"
+            MaximumWidthRequest="480"
+            HorizontalOptions="Fill"
+            VerticalOptions="Center"
+            Spacing="16">
+            <Label
+                Text="UniRota"
+                Style="{StaticResource Headline}" />
+            <Label
+                Text="Entre para continuar"
+                Style="{StaticResource SubHeadline}" />
+
+            <Label Text="E-mail" />
+            <Border Padding="12,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Entry
+                    Text="{Binding Email}"
+                    Placeholder="seuemail@exemplo.com"
+                    Keyboard="Email"
+                    ReturnType="Next"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label Text="Senha" />
+            <Border Padding="12,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10" />
+                </Border.StrokeShape>
+                <Entry
+                    Text="{Binding Password}"
+                    Placeholder="Sua senha"
+                    IsPassword="True"
+                    ReturnType="Go"
+                    IsEnabled="{Binding IsNotBusy}" />
+            </Border>
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Button
+                    Grid.Column="0"
+                    Text="Entrar"
+                    Command="{Binding LoginCommand}"
+                    IsEnabled="{Binding IsNotBusy}" />
+                <ActivityIndicator
+                    Grid.Column="1"
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    VerticalOptions="Center" />
+            </Grid>
+
+            <Button
+                Text="Ainda não tenho conta"
+                Command="{Binding GoToRegisterCommand}"
+                IsEnabled="{Binding IsNotBusy}"
+                BackgroundColor="Transparent"
+                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

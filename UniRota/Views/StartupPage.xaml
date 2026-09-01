@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.StartupPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Inicialização">
+
+    <Grid Padding="32">
+        <VerticalStackLayout
+            MaximumWidthRequest="480"
+            HorizontalOptions="Fill"
+            VerticalOptions="Center"
+            Spacing="16">
+            <Label
+                Text="UniRota"
+                Style="{StaticResource Headline}" />
+            <Label
+                Text="Caronas para a comunidade acadêmica"
+                HorizontalTextAlignment="Center"
+                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                HorizontalOptions="Center" />
+            <Label
+                Text="{Binding StatusMessage}"
+                HorizontalTextAlignment="Center"
+                IsVisible="{Binding IsBusy}" />
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+            <Button
+                Text="Tentar novamente"
+                Command="{Binding InitializeCommand}"
+                IsEnabled="{Binding IsNotBusy}"
+                IsVisible="{Binding HasError}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
