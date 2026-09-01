@@ -27,6 +27,8 @@ public partial class MyRoutesViewModel : ObservableObject
         _routeService = routeService;
     }
 
+    public event Action<WeeklyRouteItemViewModel>? EditRequested;
+
     public ObservableCollection<WeeklyRouteItemViewModel> Routes { get; } = [];
 
     public bool IsNotBusy => !IsBusy;
@@ -78,7 +80,54 @@ public partial class MyRoutesViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            SetError(exception.Message);
+            SetError(
+                exception.Message,
+                "Não foi possível carregar suas rotas. Tente novamente.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void Edit(WeeklyRouteItemViewModel? route)
+    {
+        if (route is null || IsBusy)
+        {
+            return;
+        }
+
+        EditRequested?.Invoke(route);
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task DeleteAsync(
+        WeeklyRouteItemViewModel? route,
+        CancellationToken cancellationToken)
+    {
+        if (route is null || IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ClearError();
+
+        try
+        {
+            await _routeService.DeleteAsync(route.Route.Id, cancellationToken);
+            Routes.Remove(route);
+            IsEmpty = Routes.Count == 0;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            SetError(
+                exception.Message,
+                "Não foi possível excluir a rota. Tente novamente.");
         }
         finally
         {
@@ -92,10 +141,10 @@ public partial class MyRoutesViewModel : ObservableObject
         HasError = false;
     }
 
-    private void SetError(string message)
+    private void SetError(string message, string fallbackMessage)
     {
         ErrorMessage = string.IsNullOrWhiteSpace(message)
-            ? "Não foi possível carregar suas rotas. Tente novamente."
+            ? fallbackMessage
             : message;
         HasError = true;
     }

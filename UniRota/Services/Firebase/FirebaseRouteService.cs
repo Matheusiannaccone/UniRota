@@ -40,7 +40,11 @@ public sealed class FirebaseRouteService : IRouteService
         EnsureFirebaseIsConfigured();
 
         var userId = GetAuthenticatedUserId();
-        var normalizedRoute = NormalizeAndValidateRoute(route, userId);
+        var normalizedRoute = NormalizeAndValidateRoute(
+            route,
+            userId,
+            string.Empty,
+            DateTimeOffset.UtcNow);
         var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
         EnsureCurrentUserHasNotChanged(userId);
 
@@ -64,6 +68,95 @@ public sealed class FirebaseRouteService : IRouteService
 
         EnsureRouteBelongsToUser(createdRoute, userId);
         return createdRoute;
+    }
+
+    public async Task<WeeklyRoute> UpdateAsync(
+        WeeklyRoute route,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+        EnsureFirebaseIsConfigured();
+
+        var routeId = GetRequiredRouteId(route.Id);
+        var userId = GetAuthenticatedUserId();
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var existingDocument = await GetRouteDocumentAsync(
+            routeId,
+            idToken,
+            cancellationToken);
+        var existingRoute = ConvertDocument(existingDocument);
+        EnsureRouteBelongsToUser(existingRoute, userId);
+
+        var normalizedRoute = NormalizeAndValidateRoute(
+            route,
+            userId,
+            existingRoute.Id,
+            existingRoute.CreatedAtUtc);
+
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var requestBody = new
+        {
+            fields = CreateEditableFirestoreFields(normalizedRoute)
+        };
+
+        using var request = CreateJsonRequest(
+            HttpMethod.Patch,
+            BuildUpdateDocumentUrl(
+                routeId,
+                GetRequiredUpdateTime(existingDocument)),
+            requestBody);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", idToken);
+
+        var response = await SendAsync(request, cancellationToken);
+        EnsureSuccess(response);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var updatedDocument = DeserializeResponse<FirestoreDocumentDto>(response.Content);
+        var updatedRoute = ConvertDocument(updatedDocument);
+
+        EnsureRouteBelongsToUser(updatedRoute, userId);
+
+        if (!string.Equals(updatedRoute.Id, routeId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "O Firebase retornou um identificador inesperado para a rota atualizada.");
+        }
+
+        return updatedRoute;
+    }
+
+    public async Task DeleteAsync(
+        string routeId,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureFirebaseIsConfigured();
+
+        var normalizedRouteId = GetRequiredRouteId(routeId);
+        var userId = GetAuthenticatedUserId();
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var existingDocument = await GetRouteDocumentAsync(
+            normalizedRouteId,
+            idToken,
+            cancellationToken);
+        var existingRoute = ConvertDocument(existingDocument);
+        EnsureRouteBelongsToUser(existingRoute, userId);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Delete,
+            BuildDeleteDocumentUrl(
+                normalizedRouteId,
+                GetRequiredUpdateTime(existingDocument)));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", idToken);
+
+        var response = await SendAsync(request, cancellationToken);
+        EnsureSuccess(response);
+        EnsureCurrentUserHasNotChanged(userId);
     }
 
     public async Task<IReadOnlyList<WeeklyRoute>> GetMyRoutesAsync(
@@ -127,7 +220,9 @@ public sealed class FirebaseRouteService : IRouteService
 
     private static WeeklyRoute NormalizeAndValidateRoute(
         WeeklyRoute route,
-        string userId)
+        string userId,
+        string routeId,
+        DateTimeOffset createdAtUtc)
     {
         if (!Enum.IsDefined(typeof(RouteRole), route.Role))
         {
@@ -191,6 +286,7 @@ public sealed class FirebaseRouteService : IRouteService
 
         return new WeeklyRoute
         {
+            Id = routeId,
             UserId = userId,
             Role = route.Role,
             Origin = origin,
@@ -200,15 +296,27 @@ public sealed class FirebaseRouteService : IRouteService
             AvailableSeats = route.Role == RouteRole.Driver
                 ? route.AvailableSeats
                 : null,
-            CreatedAtUtc = DateTimeOffset.UtcNow
+            CreatedAtUtc = createdAtUtc
         };
     }
 
     private static Dictionary<string, object> CreateFirestoreFields(WeeklyRoute route)
     {
+        var fields = CreateEditableFirestoreFields(route);
+        fields["userId"] = new { stringValue = route.UserId };
+        fields["createdAtUtc"] = new
+        {
+            timestampValue = route.CreatedAtUtc.ToUniversalTime().ToString("O")
+        };
+
+        return fields;
+    }
+
+    private static Dictionary<string, object> CreateEditableFirestoreFields(
+        WeeklyRoute route)
+    {
         return new Dictionary<string, object>
         {
-            ["userId"] = new { stringValue = route.UserId },
             ["role"] = new { stringValue = SerializeRole(route.Role) },
             ["origin"] = new { stringValue = route.Origin },
             ["destination"] = new { stringValue = route.Destination },
@@ -232,11 +340,7 @@ public sealed class FirebaseRouteService : IRouteService
                     integerValue = route.AvailableSeats.Value.ToString(
                         CultureInfo.InvariantCulture)
                 }
-                : new { nullValue = (object?)null },
-            ["createdAtUtc"] = new
-            {
-                timestampValue = route.CreatedAtUtc.ToUniversalTime().ToString("O")
-            }
+                : new { nullValue = (object?)null }
         };
     }
 
@@ -285,6 +389,22 @@ public sealed class FirebaseRouteService : IRouteService
         };
     }
 
+    private async Task<FirestoreDocumentDto> GetRouteDocumentAsync(
+        string routeId,
+        string idToken,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            BuildDocumentUrl(routeId));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", idToken);
+
+        var response = await SendAsync(request, cancellationToken);
+        EnsureSuccess(response);
+
+        return DeserializeResponse<FirestoreDocumentDto>(response.Content);
+    }
+
     private string GetAuthenticatedUserId()
     {
         var user = _authService.CurrentUser
@@ -321,6 +441,28 @@ public sealed class FirebaseRouteService : IRouteService
             throw new InvalidOperationException(
                 "O Firebase retornou uma rota que não pertence ao usuário autenticado.");
         }
+    }
+
+    private static string GetRequiredRouteId(string? routeId)
+    {
+        var normalizedRouteId = routeId?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(normalizedRouteId))
+        {
+            throw new ArgumentException(
+                "Informe o identificador da rota.",
+                nameof(routeId));
+        }
+
+        return normalizedRouteId;
+    }
+
+    private static string GetRequiredUpdateTime(FirestoreDocumentDto document)
+    {
+        return !string.IsNullOrWhiteSpace(document.UpdateTime)
+            ? document.UpdateTime
+            : throw new InvalidOperationException(
+                "O Firebase não retornou a versão esperada para a rota.");
     }
 
     private static string SerializeRole(RouteRole role)
@@ -523,7 +665,9 @@ public sealed class FirebaseRouteService : IRouteService
             "UNAUTHENTICATED" =>
                 "Sua sessão não é válida. Entre novamente para continuar.",
             "NOT_FOUND" =>
-                "A coleção de rotas semanais não foi encontrada no Firebase.",
+                "A rota semanal não foi encontrada no Firebase.",
+            "FAILED_PRECONDITION" =>
+                "A rota foi alterada por outra operação. Recarregue a lista e tente novamente.",
             _ => "Não foi possível concluir a operação de rotas no Firebase."
         };
 
@@ -585,6 +729,37 @@ public sealed class FirebaseRouteService : IRouteService
         return BuildDocumentsBaseUrl() + ":runQuery";
     }
 
+    private string BuildDocumentUrl(string routeId)
+    {
+        return BuildCollectionUrl() + $"/{Escape(routeId)}";
+    }
+
+    private string BuildUpdateDocumentUrl(string routeId, string updateTime)
+    {
+        var editableFields = new[]
+        {
+            "role",
+            "origin",
+            "destination",
+            "daysOfWeek",
+            "departureTimeMinutes",
+            "availableSeats"
+        };
+        var updateMask = string.Join(
+            "&",
+            editableFields.Select(
+                field => $"updateMask.fieldPaths={Escape(field)}"));
+
+        return $"{BuildDocumentUrl(routeId)}?{updateMask}" +
+               $"&currentDocument.updateTime={Escape(updateTime)}";
+    }
+
+    private string BuildDeleteDocumentUrl(string routeId, string updateTime)
+    {
+        return $"{BuildDocumentUrl(routeId)}" +
+               $"?currentDocument.updateTime={Escape(updateTime)}";
+    }
+
     private string BuildDocumentsBaseUrl()
     {
         return $"{FirestoreBaseUrl}/projects/{Escape(_options.ProjectId)}" +
@@ -617,6 +792,9 @@ public sealed class FirebaseRouteService : IRouteService
 
         [JsonPropertyName("fields")]
         public Dictionary<string, FirestoreValueDto> Fields { get; init; } = [];
+
+        [JsonPropertyName("updateTime")]
+        public string? UpdateTime { get; init; }
     }
 
     private sealed class FirestoreValueDto

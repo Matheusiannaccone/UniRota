@@ -1,10 +1,13 @@
 using System.ComponentModel;
+using UniRota.Models;
 using UniRota.ViewModels;
 
 namespace UniRota.Views.Routes;
 
-public partial class NewRoutePage : ContentPage
+public partial class NewRoutePage : ContentPage, IQueryAttributable
 {
+    public const string RouteParameterName = "Route";
+
     private readonly NewRouteViewModel _viewModel;
     private bool _isReturningToRoutes;
 
@@ -14,6 +17,18 @@ public partial class NewRoutePage : ContentPage
         _viewModel = viewModel;
         BindingContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    public void ApplyQueryAttributes(IDictionary<string, object> query)
+    {
+        if (query.TryGetValue(RouteParameterName, out var value)
+            && value is WeeklyRoute route)
+        {
+            _viewModel.BeginEdit(route);
+            return;
+        }
+
+        _viewModel.BeginCreate();
     }
 
     private async void OnViewModelPropertyChanged(

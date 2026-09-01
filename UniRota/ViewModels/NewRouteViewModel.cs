@@ -10,6 +10,7 @@ public partial class NewRouteViewModel : ObservableObject
     private static readonly TimeSpan DefaultDepartureTime = new(7, 0, 0);
 
     private readonly IRouteService _routeService;
+    private WeeklyRoute? _routeBeingEdited;
 
     [ObservableProperty]
     private RouteRoleOption? selectedRole;
@@ -41,6 +42,9 @@ public partial class NewRouteViewModel : ObservableObject
     [ObservableProperty]
     private bool hasSavedSuccessfully;
 
+    [ObservableProperty]
+    private bool isEditing;
+
     public NewRouteViewModel(IRouteService routeService)
     {
         _routeService = routeService;
@@ -71,6 +75,11 @@ public partial class NewRouteViewModel : ObservableObject
 
     public bool IsNotBusy => !IsBusy;
 
+    public string PageTitle => IsEditing ? "Editar rota" : "Nova rota";
+
+    public string ActionButtonText =>
+        IsEditing ? "Salvar alterações" : "Salvar rota";
+
     partial void OnSelectedRoleChanged(RouteRoleOption? value)
     {
         OnPropertyChanged(nameof(IsDriver));
@@ -84,6 +93,52 @@ public partial class NewRouteViewModel : ObservableObject
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(IsNotBusy));
+    }
+
+    partial void OnIsEditingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PageTitle));
+        OnPropertyChanged(nameof(ActionButtonText));
+    }
+
+    public void BeginCreate()
+    {
+        ClearFeedback();
+        ResetForm();
+    }
+
+    public void BeginEdit(WeeklyRoute route)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+
+        if (string.IsNullOrWhiteSpace(route.Id))
+        {
+            throw new ArgumentException(
+                "A rota selecionada não possui um identificador válido.",
+                nameof(route));
+        }
+
+        var roleOption = RoleOptions.FirstOrDefault(
+            option => option.Role == route.Role)
+            ?? throw new ArgumentException(
+                "A rota selecionada possui um papel inválido.",
+                nameof(route));
+
+        ClearFeedback();
+        _routeBeingEdited = route;
+        IsEditing = true;
+        SelectedRole = roleOption;
+        Origin = route.Origin;
+        Destination = route.Destination;
+        DepartureTime = TimeSpan.FromMinutes(route.DepartureTimeMinutes);
+        AvailableSeats = route.Role == RouteRole.Driver
+            ? route.AvailableSeats
+            : null;
+
+        foreach (var day in Days)
+        {
+            day.IsSelected = route.DaysOfWeek.Contains(day.Day);
+        }
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]
@@ -105,9 +160,21 @@ public partial class NewRouteViewModel : ObservableObject
 
         try
         {
-            await _routeService.CreateAsync(route, cancellationToken);
+            var wasEditing = IsEditing;
+
+            if (wasEditing)
+            {
+                await _routeService.UpdateAsync(route, cancellationToken);
+            }
+            else
+            {
+                await _routeService.CreateAsync(route, cancellationToken);
+            }
+
             ResetForm();
-            SuccessMessage = "Rota cadastrada com sucesso.";
+            SuccessMessage = wasEditing
+                ? "Rota atualizada com sucesso."
+                : "Rota cadastrada com sucesso.";
             HasSavedSuccessfully = true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -185,6 +252,7 @@ public partial class NewRouteViewModel : ObservableObject
 
         route = new WeeklyRoute
         {
+            Id = _routeBeingEdited?.Id ?? string.Empty,
             Role = SelectedRole.Role,
             Origin = normalizedOrigin,
             Destination = normalizedDestination,
@@ -200,6 +268,8 @@ public partial class NewRouteViewModel : ObservableObject
 
     private void ResetForm()
     {
+        _routeBeingEdited = null;
+        IsEditing = false;
         SelectedRole = null;
         Origin = string.Empty;
         Destination = string.Empty;
@@ -223,7 +293,9 @@ public partial class NewRouteViewModel : ObservableObject
     private void SetError(string message)
     {
         ErrorMessage = string.IsNullOrWhiteSpace(message)
-            ? "Não foi possível cadastrar a rota. Tente novamente."
+            ? IsEditing
+                ? "Não foi possível atualizar a rota. Tente novamente."
+                : "Não foi possível cadastrar a rota. Tente novamente."
             : message;
         HasError = true;
     }

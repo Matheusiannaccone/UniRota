@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
     Shell.NavBarIsVisible="True"
-    Title="Nova rota">
+    Title="{Binding PageTitle}">
 
     <ScrollView VerticalScrollBarVisibility="Default">
         <VerticalStackLayout
@@ -15,11 +15,11 @@
             Spacing="12">
 
             <Label
-                Text="Nova rota"
+                Text="{Binding PageTitle}"
                 FontSize="28"
                 FontAttributes="Bold" />
             <Label
-                Text="Cadastre sua rotina semanal de ida para a faculdade."
+                Text="Preencha os dados da sua rotina semanal."
                 TextColor="#616161" />
 
             <Label Text="Papel na rota" />
@@ -124,7 +124,7 @@
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <Button
                     Grid.Column="0"
-                    Text="Salvar rota"
+                    Text="{Binding ActionButtonText}"
                     Command="{Binding SaveCommand}"
                     IsEnabled="{Binding IsNotBusy}" />
                 <ActivityIndicator

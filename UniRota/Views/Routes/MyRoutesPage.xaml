@@ -97,6 +97,19 @@
                                         IsVisible="{Binding HasAvailableSeats}"
                                         HorizontalOptions="End" />
                                 </Grid>
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                    <Button
+                                        Grid.Column="0"
+                                        Text="Editar"
+                                        Clicked="OnEditRouteClicked"
+                                        CommandParameter="{Binding .}" />
+                                    <Button
+                                        Grid.Column="1"
+                                        Text="Excluir"
+                                        Clicked="OnDeleteRouteClicked"
+                                        CommandParameter="{Binding .}"
+                                        BackgroundColor="#B3261E" />
+                                </Grid>
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>
