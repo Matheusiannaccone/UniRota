@@ -31,9 +31,22 @@ public partial class MyRoutesViewModel : ObservableObject
 
     public bool IsNotBusy => !IsBusy;
 
+    public bool ShowEmptyState => IsEmpty && !HasError && !IsBusy;
+
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(IsNotBusy));
+        OnPropertyChanged(nameof(ShowEmptyState));
+    }
+
+    partial void OnHasErrorChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowEmptyState));
+    }
+
+    partial void OnIsEmptyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowEmptyState));
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]

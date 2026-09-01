@@ -6,6 +6,7 @@ using UniRota.Services.Interfaces;
 using UniRota.ViewModels;
 using UniRota.Views;
 using UniRota.Views.Auth;
+using UniRota.Views.Routes;
 
 namespace UniRota
 {
@@ -48,6 +49,8 @@ namespace UniRota
             builder.Services.AddTransient<LoginPage>();
             builder.Services.AddTransient<RegisterPage>();
             builder.Services.AddTransient<HomePage>();
+            builder.Services.AddTransient<MyRoutesPage>();
+            builder.Services.AddTransient<NewRoutePage>();
 
             return builder.Build();
         }

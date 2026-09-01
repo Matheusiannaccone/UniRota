@@ -10,6 +10,13 @@
         {
             InitializeComponent();
 
+            Routing.RegisterRoute(
+                nameof(Views.Routes.MyRoutesPage),
+                typeof(Views.Routes.MyRoutesPage));
+            Routing.RegisterRoute(
+                nameof(Views.Routes.NewRoutePage),
+                typeof(Views.Routes.NewRoutePage));
+
             StartupContent.Content = startupPage;
             LoginContent.Content = loginPage;
             RegisterContent.Content = registerPage;

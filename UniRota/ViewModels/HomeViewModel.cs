@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using UniRota.Services.Interfaces;
+using UniRota.Views.Routes;
 
 namespace UniRota.ViewModels;
 
@@ -52,6 +53,33 @@ public partial class HomeViewModel : ObservableObject
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task GoToMyRoutesAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ClearError();
+
+        try
+        {
+            await Shell.Current.GoToAsync(nameof(MyRoutesPage));
+        }
+        catch (Exception exception)
+        {
+            SetError(
+                exception.Message,
+                "Não foi possível abrir suas rotas. Tente novamente.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
     private async Task LogoutAsync()
     {
         if (IsBusy)
@@ -69,7 +97,7 @@ public partial class HomeViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            SetError(exception.Message);
+            SetError(exception.Message, "Não foi possível sair. Tente novamente.");
         }
         finally
         {
@@ -83,10 +111,10 @@ public partial class HomeViewModel : ObservableObject
         HasError = false;
     }
 
-    private void SetError(string message)
+    private void SetError(string message, string fallbackMessage)
     {
         ErrorMessage = string.IsNullOrWhiteSpace(message)
-            ? "Não foi possível sair. Tente novamente."
+            ? fallbackMessage
             : message;
         HasError = true;
     }
