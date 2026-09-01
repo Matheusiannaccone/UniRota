@@ -35,6 +35,7 @@ namespace UniRota
             builder.Services.AddSingleton(new HttpClient());
             builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
             builder.Services.AddSingleton<IAuthService, FirebaseAuthService>();
+            builder.Services.AddSingleton<IRouteService, FirebaseRouteService>();
 
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<StartupViewModel>();
