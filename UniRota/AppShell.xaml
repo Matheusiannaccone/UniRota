@@ -3,13 +3,28 @@
     x:Class="UniRota.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:UniRota"
     Shell.FlyoutBehavior="Disabled"
+    Shell.NavBarIsVisible="False"
     Title="UniRota">
 
     <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+        x:Name="StartupContent"
+        Title="Inicialização"
+        Route="startup" />
+
+    <ShellContent
+        x:Name="LoginContent"
+        Title="Entrar"
+        Route="login" />
+
+    <ShellContent
+        x:Name="RegisterContent"
+        Title="Criar conta"
+        Route="register" />
+
+    <ShellContent
+        x:Name="HomeContent"
+        Title="Início"
+        Route="home" />
 
 </Shell>

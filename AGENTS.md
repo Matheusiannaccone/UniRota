@@ -193,3 +193,16 @@ feat(routes): add weekly route registration
 feat(matching): add deterministic matching rules
 feat(pricing): add suggested price calculation
 ```
+
+## Plataformas prioritárias
+
+O UniRota é um aplicativo mobile-first.
+
+Prioridades:
+
+1. Android — plataforma principal de desenvolvimento e demonstração.
+2. iOS — plataforma alvo e deve permanecer compatível.
+3. Windows/MacCatalyst — não são prioridade do MVP.
+
+Não tomar decisões arquiteturais ou adicionar complexidade apenas para suportar desktop.
+A interface deve ser projetada prioritariamente para uso em smartphones.
