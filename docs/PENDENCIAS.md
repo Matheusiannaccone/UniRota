@@ -161,6 +161,37 @@ Os arquivos relevantes já existem atualizados na branch atual, portanto isso n�
 - fazer merge/rebase conforme apropriado;
 - garantir que nenhuma documentação seja perdida.
 
+
+---
+
+## Incremento 2 — Rotas semanais
+
+### 1. Revisar Firestore Security Rules antes da validação com usuários reais
+**Status:** Pendente  
+**Prioridade:** Alta
+
+Durante o desenvolvimento, as Firestore Security Rules foram temporariamente configuradas para permitir leitura e escrita sem restrições:
+
+```text
+match /{document=**} {
+  allow read, write: if true;
+}
+```
+
+### 2. Limitar quantidade máxima de vagas oferecidas
+
+Status: Pendente
+Prioridade: Baixa
+
+Atualmente, o cadastro de uma rota de motorista valida apenas que a quantidade de vagas seja maior que zero. Isso permite informar valores incompatíveis com um veículo de passeio, como dezenas ou centenas de vagas.
+
+O comportamento não impede o funcionamento do MVP, mas deve ser refinado antes de uma versão mais próxima de uso real.
+
+Possíveis ações futuras:
+- definir um limite máximo simples para o MVP, por exemplo entre 1 e 7 vagas;
+- validar o limite tanto no ViewModel quanto no serviço;
+- futuramente, caso dados de veículo sejam adicionados, relacionar a quantidade máxima de vagas à capacidade cadastrada do veículo.
+
 ---
 
 ## Critério para revisão final
