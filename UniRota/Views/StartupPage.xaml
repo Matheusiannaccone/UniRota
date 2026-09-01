@@ -14,11 +14,14 @@
             Spacing="16">
             <Label
                 Text="UniRota"
-                Style="{StaticResource Headline}" />
+                FontSize="32"
+                FontAttributes="Bold"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center" />
             <Label
                 Text="Caronas para a comunidade acadêmica"
                 HorizontalTextAlignment="Center"
-                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                TextColor="#616161" />
             <ActivityIndicator
                 IsRunning="{Binding IsBusy}"
                 IsVisible="{Binding IsBusy}"

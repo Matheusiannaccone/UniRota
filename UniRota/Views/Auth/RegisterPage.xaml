@@ -14,11 +14,14 @@
             Spacing="12">
             <Label
                 Text="Criar conta"
-                Style="{StaticResource Headline}" />
+                FontSize="32"
+                FontAttributes="Bold"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center" />
             <Label
                 Text="Preencha seus dados para começar"
                 HorizontalTextAlignment="Center"
-                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                TextColor="#616161" />
 
             <Label Text="Nome" />
             <Border Padding="12,0">
@@ -95,7 +98,7 @@
                 Command="{Binding GoToLoginCommand}"
                 IsEnabled="{Binding IsNotBusy}"
                 BackgroundColor="Transparent"
-                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" />
+                TextColor="#512BD4" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>
