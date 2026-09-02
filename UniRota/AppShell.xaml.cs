@@ -25,6 +25,12 @@
             Routing.RegisterRoute(
                 nameof(Views.Matching.RideRequestPage),
                 typeof(Views.Matching.RideRequestPage));
+            Routing.RegisterRoute(
+                nameof(Views.Matching.AwaitingApprovalPage),
+                typeof(Views.Matching.AwaitingApprovalPage));
+            Routing.RegisterRoute(
+                nameof(Views.Matching.ReceivedRequestsPage),
+                typeof(Views.Matching.ReceivedRequestsPage));
 
             StartupContent.Content = startupPage;
             LoginContent.Content = loginPage;

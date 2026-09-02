@@ -80,4 +80,45 @@ public sealed class RideRequestRulesTests
                 new DateOnly(2026, 9, 4),
                 CurrentDate));
     }
+
+    [Fact]
+    public void EnsurePending_AcceptsPendingStatus()
+    {
+        RideRequestRules.EnsurePending(RideRequestStatus.Pending);
+    }
+
+    [Theory]
+    [InlineData(RideRequestStatus.Accepted)]
+    [InlineData(RideRequestStatus.Rejected)]
+    public void EnsurePending_RejectsProcessedStatus(RideRequestStatus status)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => RideRequestRules.EnsurePending(status));
+
+        Assert.Equal("Esta solicitação já foi processada.", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(2, 1)]
+    [InlineData(3, 2)]
+    public void GetRemainingSeatsAfterAcceptance_DecrementsExactlyOneSeat(
+        int availableSeats,
+        int expectedRemainingSeats)
+    {
+        Assert.Equal(
+            expectedRemainingSeats,
+            RideRequestRules.GetRemainingSeatsAfterAcceptance(availableSeats));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void GetRemainingSeatsAfterAcceptance_RejectsUnavailableSeats(
+        int? availableSeats)
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            RideRequestRules.GetRemainingSeatsAfterAcceptance(availableSeats));
+    }
 }

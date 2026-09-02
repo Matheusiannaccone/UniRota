@@ -323,6 +323,7 @@ public sealed class FirebaseRouteService : IRouteService
             AvailableSeats = route.Role == RouteRole.Driver
                 ? route.AvailableSeats
                 : null,
+            RequestRevision = 0,
             CreatedAtUtc = createdAtUtc
         };
     }
@@ -332,6 +333,11 @@ public sealed class FirebaseRouteService : IRouteService
         var fields = CreateEditableFirestoreFields(route);
         fields["userId"] = new { stringValue = route.UserId };
         fields["userName"] = new { stringValue = route.UserName };
+        fields["requestRevision"] = new
+        {
+            integerValue = route.RequestRevision.ToString(
+                CultureInfo.InvariantCulture)
+        };
         fields["createdAtUtc"] = new
         {
             timestampValue = route.CreatedAtUtc.ToUniversalTime().ToString("O")
@@ -395,11 +401,11 @@ public sealed class FirebaseRouteService : IRouteService
         {
             availableSeats = GetRequiredInt32Field(fields, "availableSeats");
 
-            if (availableSeats <= 0)
+            if (availableSeats < 0)
             {
                 throw CreateInvalidDocumentException(
                     id,
-                    "o campo 'availableSeats' deve ser maior que zero para motorista");
+                    "o campo 'availableSeats' não pode ser negativo para motorista");
             }
         }
 
@@ -414,6 +420,10 @@ public sealed class FirebaseRouteService : IRouteService
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = departureTimeMinutes,
             AvailableSeats = availableSeats,
+            RequestRevision = GetOptionalNonNegativeInt64Field(
+                fields,
+                "requestRevision",
+                id),
             CreatedAtUtc = GetRequiredTimestampField(fields, "createdAtUtc")
         };
     }
@@ -645,6 +655,53 @@ public sealed class FirebaseRouteService : IRouteService
         }
 
         return (int)parsedValue;
+    }
+
+    private static long GetOptionalNonNegativeInt64Field(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string fieldName,
+        string documentId)
+    {
+        if (!fields.TryGetValue(fieldName, out var field))
+        {
+            return 0;
+        }
+
+        var integerValue = field.IntegerValue;
+        long parsedValue;
+
+        if (integerValue.ValueKind == JsonValueKind.String)
+        {
+            if (!long.TryParse(
+                    integerValue.GetString(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out parsedValue))
+            {
+                throw CreateInvalidDocumentException(
+                    documentId,
+                    $"o campo '{fieldName}' contém um inteiro inválido");
+            }
+        }
+        else if (integerValue.ValueKind == JsonValueKind.Number
+                 && integerValue.TryGetInt64(out parsedValue))
+        {
+        }
+        else
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' não contém um inteiro válido");
+        }
+
+        if (parsedValue < 0)
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' não pode ser negativo");
+        }
+
+        return parsedValue;
     }
 
     private static DateTimeOffset GetRequiredTimestampField(

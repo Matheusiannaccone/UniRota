@@ -20,5 +20,7 @@ public sealed class WeeklyRoute
 
     public int? AvailableSeats { get; init; }
 
+    public long RequestRevision { get; init; }
+
     public DateTimeOffset CreatedAtUtc { get; init; }
 }

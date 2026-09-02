@@ -111,9 +111,9 @@ public partial class MatchResultsViewModel : ObservableObject
             var matches = _matchingService.FindMatches(
                 _passengerRoute,
                 driverRoutes);
-            var pendingRequests = await _rideRequestService
-                .GetMyPendingRequestsAsync(cancellationToken);
-            var unavailableDriverRouteIds = pendingRequests
+            var activeRequests = await _rideRequestService
+                .GetMyActiveRequestsAsync(cancellationToken);
+            var unavailableDriverRouteIds = activeRequests
                 .Where(request => string.Equals(
                     request.PassengerRouteId,
                     _passengerRoute.Id,

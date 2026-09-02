@@ -12,6 +12,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
 {
     private const string FirestoreBaseUrl = "https://firestore.googleapis.com/v1";
     private const string CollectionName = "rideRequests";
+    private const int MaxConcurrencyAttempts = 3;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -22,7 +23,6 @@ public sealed class FirebaseRideRequestService : IRideRequestService
     private readonly FirebaseOptions _options;
     private readonly IAuthService _authService;
     private readonly IRouteService _routeService;
-    private readonly SemaphoreSlim _createLock = new(1, 1);
 
     public FirebaseRideRequestService(
         HttpClient httpClient,
@@ -67,18 +67,44 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             requestedDate,
             DateOnly.FromDateTime(DateTime.Today));
 
-        await _createLock.WaitAsync(cancellationToken);
+        await EnsurePassengerRouteBelongsToUserAsync(
+            normalizedPassengerRouteId,
+            userId,
+            cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
 
-        try
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var requestToCreate = new RideRequest
         {
-            await EnsurePassengerRouteBelongsToUserAsync(
-                normalizedPassengerRouteId,
-                userId,
-                cancellationToken);
+            Id = Guid.NewGuid().ToString("N"),
+            PassengerUserId = userId,
+            PassengerUserName = user.Name,
+            DriverUserId = driverRoute.UserId,
+            DriverUserName = driverRoute.UserName?.Trim() ?? string.Empty,
+            PassengerRouteId = normalizedPassengerRouteId,
+            DriverRouteId = normalizedDriverRouteId,
+            CompatibleDays = compatibleDays,
+            Type = type,
+            Status = RideRequestStatus.Pending,
+            RequestedDate = requestedDate,
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        for (var attempt = 1; attempt <= MaxConcurrencyAttempts; attempt++)
+        {
             EnsureCurrentUserHasNotChanged(userId);
 
-            var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
-            EnsureCurrentUserHasNotChanged(userId);
+            var routeDocument = await GetDocumentAsync(
+                BuildWeeklyRouteDocumentUrl(normalizedDriverRouteId),
+                idToken,
+                cancellationToken);
+            var routeSnapshot = ConvertDriverRouteSnapshot(routeDocument);
+            ValidateDriverRouteSnapshot(
+                routeSnapshot,
+                driverRoute,
+                userId);
 
             var pendingRequests = await GetMyPendingRequestsCoreAsync(
                 userId,
@@ -95,50 +121,39 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                     "Já existe uma solicitação pendente para estas rotas.");
             }
 
-            var requestToCreate = new RideRequest
+            var nextRevision = GetNextRequestRevision(
+                routeSnapshot.RequestRevision);
+            var writes = new object[]
             {
-                PassengerUserId = userId,
-                PassengerUserName = user.Name,
-                DriverUserId = driverRoute.UserId,
-                DriverUserName = driverRoute.UserName?.Trim() ?? string.Empty,
-                PassengerRouteId = normalizedPassengerRouteId,
-                DriverRouteId = normalizedDriverRouteId,
-                CompatibleDays = compatibleDays,
-                Type = type,
-                Status = RideRequestStatus.Pending,
-                RequestedDate = requestedDate,
-                CreatedAtUtc = DateTimeOffset.UtcNow
+                CreateNewRideRequestWrite(requestToCreate),
+                CreateRouteRevisionWrite(routeSnapshot, nextRevision)
             };
+            var response = await CommitAsync(
+                writes,
+                idToken,
+                cancellationToken);
 
-            var requestBody = new
+            if (response.IsSuccessStatusCode)
             {
-                fields = CreateFirestoreFields(requestToCreate)
-            };
+                EnsureCurrentUserHasNotChanged(userId);
+                return requestToCreate;
+            }
 
-            using var httpRequest = CreateJsonRequest(
-                HttpMethod.Post,
-                BuildCollectionUrl(),
-                requestBody);
-            httpRequest.Headers.Authorization =
-                new AuthenticationHeaderValue("Bearer", idToken);
+            if (IsConcurrencyConflict(response) && attempt < MaxConcurrencyAttempts)
+            {
+                await DelayBeforeRetryAsync(attempt, cancellationToken);
+                continue;
+            }
 
-            var response = await SendAsync(httpRequest, cancellationToken);
+            if (IsConcurrencyConflict(response))
+            {
+                throw CreateConcurrencyException();
+            }
+
             EnsureSuccess(response);
-            EnsureCurrentUserHasNotChanged(userId);
-
-            var document = DeserializeResponse<FirestoreDocumentDto>(response.Content);
-            var createdRequest = ConvertDocument(document);
-            EnsureCreatedRequestMatches(
-                createdRequest,
-                requestToCreate,
-                userId);
-
-            return createdRequest;
         }
-        finally
-        {
-            _createLock.Release();
-        }
+
+        throw CreateConcurrencyException();
     }
 
     public async Task<bool> HasPendingRequestAsync(
@@ -185,6 +200,206 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<RideRequest>> GetMyActiveRequestsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsureFirebaseIsConfigured();
+
+        var userId = GetAuthenticatedUser().Id;
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var requestBody = CreatePassengerActiveRequestsQuery(userId);
+        var requests = await RunRideRequestQueryAsync(
+            requestBody,
+            idToken,
+            userId,
+            cancellationToken);
+
+        foreach (var request in requests)
+        {
+            if (!string.Equals(
+                    request.PassengerUserId,
+                    userId,
+                    StringComparison.Ordinal)
+                || request.Status is not (
+                    RideRequestStatus.Pending or RideRequestStatus.Accepted))
+            {
+                throw new InvalidOperationException(
+                    "O Firebase retornou uma solicitação indisponível para o passageiro autenticado.");
+            }
+        }
+
+        return OrderRequests(requests);
+    }
+
+    public async Task<IReadOnlyList<RideRequest>> GetReceivedPendingRequestsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsureFirebaseIsConfigured();
+
+        var userId = GetAuthenticatedUser().Id;
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var requests = await GetDriverPendingRequestsCoreAsync(
+            userId,
+            idToken,
+            cancellationToken);
+
+        return OrderRequests(requests);
+    }
+
+    public async Task RejectAsync(
+        string requestId,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureFirebaseIsConfigured();
+
+        var normalizedRequestId = GetRequiredRequestId(requestId);
+        var userId = GetAuthenticatedUser().Id;
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        for (var attempt = 1; attempt <= MaxConcurrencyAttempts; attempt++)
+        {
+            var document = await GetDocumentAsync(
+                BuildRideRequestDocumentUrl(normalizedRequestId),
+                idToken,
+                cancellationToken);
+            var rideRequest = ConvertDocument(document);
+            EnsureDriverCanProcessRequest(rideRequest, userId);
+            EnsureCurrentUserHasNotChanged(userId);
+
+            var response = await CommitAsync(
+                [CreateStatusWrite(
+                    document,
+                    RideRequestStatus.Rejected)],
+                idToken,
+                cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                EnsureCurrentUserHasNotChanged(userId);
+                return;
+            }
+
+            if (IsConcurrencyConflict(response) && attempt < MaxConcurrencyAttempts)
+            {
+                await DelayBeforeRetryAsync(attempt, cancellationToken);
+                continue;
+            }
+
+            if (IsConcurrencyConflict(response))
+            {
+                throw CreateConcurrencyException();
+            }
+
+            EnsureSuccess(response);
+        }
+
+        throw CreateConcurrencyException();
+    }
+
+    public async Task AcceptAsync(
+        string requestId,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureFirebaseIsConfigured();
+
+        var normalizedRequestId = GetRequiredRequestId(requestId);
+        var userId = GetAuthenticatedUser().Id;
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        for (var attempt = 1; attempt <= MaxConcurrencyAttempts; attempt++)
+        {
+            var requestDocument = await GetDocumentAsync(
+                BuildRideRequestDocumentUrl(normalizedRequestId),
+                idToken,
+                cancellationToken);
+            var rideRequest = ConvertDocument(requestDocument);
+            EnsureDriverCanProcessRequest(rideRequest, userId);
+
+            var routeDocument = await GetDocumentAsync(
+                BuildWeeklyRouteDocumentUrl(rideRequest.DriverRouteId),
+                idToken,
+                cancellationToken);
+            var routeSnapshot = ConvertDriverRouteSnapshot(routeDocument);
+            ValidateDriverRouteForAcceptance(
+                routeSnapshot,
+                rideRequest,
+                userId);
+
+            var remainingSeats = RideRequestRules
+                .GetRemainingSeatsAfterAcceptance(routeSnapshot.AvailableSeats);
+            var pendingRouteRequests = await GetPendingRequestsForRouteAsync(
+                rideRequest.DriverRouteId,
+                userId,
+                idToken,
+                cancellationToken);
+
+            var selectedDocument = pendingRouteRequests.FirstOrDefault(
+                item => string.Equals(
+                    GetDocumentId(item.Name),
+                    normalizedRequestId,
+                    StringComparison.Ordinal));
+
+            if (selectedDocument is null)
+            {
+                throw new InvalidOperationException(
+                    "Esta solicitação já foi processada.");
+            }
+
+            var writes = new List<object>
+            {
+                CreateStatusWrite(
+                    selectedDocument,
+                    RideRequestStatus.Accepted),
+                CreateAvailableSeatsWrite(routeSnapshot, remainingSeats)
+            };
+
+            if (remainingSeats == 0)
+            {
+                writes.AddRange(
+                    pendingRouteRequests
+                        .Where(document => !string.Equals(
+                            GetDocumentId(document.Name),
+                            normalizedRequestId,
+                            StringComparison.Ordinal))
+                        .Select(document => CreateStatusWrite(
+                            document,
+                            RideRequestStatus.Rejected)));
+            }
+
+            var response = await CommitAsync(
+                writes,
+                idToken,
+                cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                EnsureCurrentUserHasNotChanged(userId);
+                return;
+            }
+
+            if (IsConcurrencyConflict(response) && attempt < MaxConcurrencyAttempts)
+            {
+                await DelayBeforeRetryAsync(attempt, cancellationToken);
+                continue;
+            }
+
+            if (IsConcurrencyConflict(response))
+            {
+                throw CreateConcurrencyException();
+            }
+
+            EnsureSuccess(response);
+        }
+
+        throw CreateConcurrencyException();
+    }
+
     private async Task<IReadOnlyList<RideRequest>> GetMyPendingRequestsCoreAsync(
         string userId,
         string idToken,
@@ -229,6 +444,106 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             }
         };
 
+        var requests = await RunRideRequestQueryAsync(
+            requestBody,
+            idToken,
+            userId,
+            cancellationToken);
+
+        foreach (var rideRequest in requests)
+        {
+            EnsurePendingRequestBelongsToUser(rideRequest, userId);
+        }
+
+        return OrderRequests(requests);
+    }
+
+    private async Task<IReadOnlyList<RideRequest>> GetDriverPendingRequestsCoreAsync(
+        string userId,
+        string idToken,
+        CancellationToken cancellationToken)
+    {
+        var requests = await RunRideRequestQueryAsync(
+            CreatePendingRequestsQuery("driverUserId", userId),
+            idToken,
+            userId,
+            cancellationToken);
+
+        foreach (var request in requests)
+        {
+            if (!string.Equals(
+                    request.DriverUserId,
+                    userId,
+                    StringComparison.Ordinal)
+                || request.Status != RideRequestStatus.Pending)
+            {
+                throw new InvalidOperationException(
+                    "O Firebase retornou uma solicitação que não pertence ao motorista autenticado.");
+            }
+        }
+
+        return requests;
+    }
+
+    private async Task<IReadOnlyList<FirestoreDocumentDto>>
+        GetPendingRequestsForRouteAsync(
+            string driverRouteId,
+            string driverUserId,
+            string idToken,
+            CancellationToken cancellationToken)
+    {
+        var documents = await RunRideRequestDocumentQueryAsync(
+            CreatePendingRequestsQuery("driverRouteId", driverRouteId),
+            idToken,
+            driverUserId,
+            cancellationToken);
+
+        foreach (var document in documents)
+        {
+            var request = ConvertDocument(document);
+
+            if (!string.Equals(
+                    request.DriverRouteId,
+                    driverRouteId,
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    request.DriverUserId,
+                    driverUserId,
+                    StringComparison.Ordinal)
+                || request.Status != RideRequestStatus.Pending)
+            {
+                throw new InvalidOperationException(
+                    "O Firebase retornou uma solicitação incompatível com a rota do motorista.");
+            }
+        }
+
+        return documents;
+    }
+
+    private async Task<IReadOnlyList<RideRequest>> RunRideRequestQueryAsync(
+        object requestBody,
+        string idToken,
+        string expectedUserId,
+        CancellationToken cancellationToken)
+    {
+        var documents = await RunRideRequestDocumentQueryAsync(
+            requestBody,
+            idToken,
+            expectedUserId,
+            cancellationToken);
+
+        return documents
+            .Select(ConvertDocument)
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<FirestoreDocumentDto>>
+        RunRideRequestDocumentQueryAsync(
+            object requestBody,
+            string idToken,
+            string expectedUserId,
+            CancellationToken cancellationToken)
+    {
         using var request = CreateJsonRequest(
             HttpMethod.Post,
             BuildRunQueryUrl(),
@@ -238,22 +553,100 @@ public sealed class FirebaseRideRequestService : IRideRequestService
 
         var response = await SendAsync(request, cancellationToken);
         EnsureSuccess(response);
-        EnsureCurrentUserHasNotChanged(userId);
+        EnsureCurrentUserHasNotChanged(expectedUserId);
 
-        var queryResults = DeserializeResponse<List<RunQueryResultDto>>(
-            response.Content);
-        var requests = queryResults
+        return DeserializeResponse<List<RunQueryResultDto>>(response.Content)
             .Where(result => result.Document is not null)
-            .Select(result => ConvertDocument(result.Document!))
+            .Select(result => result.Document!)
             .ToArray();
+    }
 
-        foreach (var rideRequest in requests)
+    private static object CreatePendingRequestsQuery(
+        string ownerField,
+        string ownerValue)
+    {
+        return CreateRequestQuery(
+            new
+            {
+                fieldFilter = new
+                {
+                    field = new { fieldPath = ownerField },
+                    op = "EQUAL",
+                    value = new { stringValue = ownerValue }
+                }
+            },
+            new
+            {
+                fieldFilter = new
+                {
+                    field = new { fieldPath = "status" },
+                    op = "EQUAL",
+                    value = new { stringValue = "pending" }
+                }
+            });
+    }
+
+    private static object CreatePassengerActiveRequestsQuery(string userId)
+    {
+        return CreateRequestQuery(
+            new
+            {
+                fieldFilter = new
+                {
+                    field = new { fieldPath = "passengerUserId" },
+                    op = "EQUAL",
+                    value = new { stringValue = userId }
+                }
+            },
+            new
+            {
+                fieldFilter = new
+                {
+                    field = new { fieldPath = "status" },
+                    op = "IN",
+                    value = new
+                    {
+                        arrayValue = new
+                        {
+                            values = new[]
+                            {
+                                new { stringValue = "pending" },
+                                new { stringValue = "accepted" }
+                            }
+                        }
+                    }
+                }
+            });
+    }
+
+    private static object CreateRequestQuery(params object[] filters)
+    {
+        return new
         {
-            EnsurePendingRequestBelongsToUser(rideRequest, userId);
-        }
+            structuredQuery = new
+            {
+                from = new[]
+                {
+                    new { collectionId = CollectionName }
+                },
+                where = new
+                {
+                    compositeFilter = new
+                    {
+                        op = "AND",
+                        filters
+                    }
+                }
+            }
+        };
+    }
 
+    private static IReadOnlyList<RideRequest> OrderRequests(
+        IEnumerable<RideRequest> requests)
+    {
         return requests
             .OrderByDescending(request => request.CreatedAtUtc)
+            .ThenBy(request => request.Id, StringComparer.Ordinal)
             .ToArray();
     }
 
@@ -312,6 +705,181 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             throw new InvalidOperationException(
                 "Não é possível solicitar carona para uma rota do próprio usuário.");
         }
+    }
+
+    private static void ValidateDriverRouteSnapshot(
+        DriverRouteSnapshot snapshot,
+        WeeklyRoute expectedRoute,
+        string passengerUserId)
+    {
+        if (snapshot.Role != RouteRole.Driver
+            || !string.Equals(
+                snapshot.Id,
+                expectedRoute.Id,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                snapshot.UserId,
+                expectedRoute.UserId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "A rota de motorista selecionada foi alterada ou não é mais válida.");
+        }
+
+        if (string.Equals(
+                snapshot.UserId,
+                passengerUserId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Não é possível solicitar carona para uma rota do próprio usuário.");
+        }
+
+        if (snapshot.AvailableSeats <= 0)
+        {
+            throw new InvalidOperationException(
+                "A rota selecionada não possui mais vagas disponíveis.");
+        }
+    }
+
+    private static void ValidateDriverRouteForAcceptance(
+        DriverRouteSnapshot snapshot,
+        RideRequest request,
+        string driverUserId)
+    {
+        if (!string.Equals(
+                snapshot.Id,
+                request.DriverRouteId,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                snapshot.UserId,
+                driverUserId,
+                StringComparison.Ordinal)
+            || snapshot.Role != RouteRole.Driver)
+        {
+            throw new InvalidOperationException(
+                "A rota da solicitação não pertence ao motorista autenticado.");
+        }
+    }
+
+    private static void EnsureDriverCanProcessRequest(
+        RideRequest request,
+        string driverUserId)
+    {
+        if (!string.Equals(
+                request.DriverUserId,
+                driverUserId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Esta solicitação não pertence ao motorista autenticado.");
+        }
+
+        RideRequestRules.EnsurePending(request.Status);
+    }
+
+    private static long GetNextRequestRevision(long currentRevision)
+    {
+        try
+        {
+            return checked(currentRevision + 1);
+        }
+        catch (OverflowException exception)
+        {
+            throw new InvalidOperationException(
+                "A rota atingiu o limite técnico de solicitações suportadas.",
+                exception);
+        }
+    }
+
+    private object CreateNewRideRequestWrite(RideRequest request)
+    {
+        return new
+        {
+            update = new
+            {
+                name = BuildRideRequestDocumentName(request.Id),
+                fields = CreateFirestoreFields(request)
+            },
+            currentDocument = new { exists = false }
+        };
+    }
+
+    private static object CreateRouteRevisionWrite(
+        DriverRouteSnapshot route,
+        long requestRevision)
+    {
+        return new
+        {
+            update = new
+            {
+                name = route.DocumentName,
+                fields = new Dictionary<string, object>
+                {
+                    ["requestRevision"] = new
+                    {
+                        integerValue = requestRevision.ToString(
+                            CultureInfo.InvariantCulture)
+                    }
+                }
+            },
+            updateMask = new
+            {
+                fieldPaths = new[] { "requestRevision" }
+            },
+            currentDocument = new { updateTime = route.UpdateTime }
+        };
+    }
+
+    private static object CreateAvailableSeatsWrite(
+        DriverRouteSnapshot route,
+        int availableSeats)
+    {
+        return new
+        {
+            update = new
+            {
+                name = route.DocumentName,
+                fields = new Dictionary<string, object>
+                {
+                    ["availableSeats"] = new
+                    {
+                        integerValue = availableSeats.ToString(
+                            CultureInfo.InvariantCulture)
+                    }
+                }
+            },
+            updateMask = new
+            {
+                fieldPaths = new[] { "availableSeats" }
+            },
+            currentDocument = new { updateTime = route.UpdateTime }
+        };
+    }
+
+    private static object CreateStatusWrite(
+        FirestoreDocumentDto document,
+        RideRequestStatus status)
+    {
+        return new
+        {
+            update = new
+            {
+                name = GetRequiredDocumentName(document),
+                fields = new Dictionary<string, object>
+                {
+                    ["status"] = new { stringValue = SerializeStatus(status) }
+                }
+            },
+            updateMask = new
+            {
+                fieldPaths = new[] { "status" }
+            },
+            currentDocument = new
+            {
+                updateTime = GetRequiredUpdateTime(document)
+            }
+        };
     }
 
     private static bool IsSameRoutePair(
@@ -413,6 +981,32 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 "createdAtUtc",
                 id)
         };
+    }
+
+    private static DriverRouteSnapshot ConvertDriverRouteSnapshot(
+        FirestoreDocumentDto document)
+    {
+        var id = GetDocumentId(document.Name);
+        var fields = document.Fields;
+        var role = ParseRouteRole(
+            GetRequiredStringField(fields, "role", id),
+            id);
+        var availableSeats = GetRequiredInt32Field(
+            fields,
+            "availableSeats",
+            id);
+
+        return new DriverRouteSnapshot(
+            id,
+            GetRequiredStringField(fields, "userId", id),
+            role,
+            availableSeats,
+            GetOptionalNonNegativeInt64Field(
+                fields,
+                "requestRevision",
+                id),
+            GetRequiredDocumentName(document),
+            GetRequiredUpdateTime(document));
     }
 
     private static void ValidatePersistedTypeAndDate(
@@ -544,6 +1138,78 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             $"o campo obrigatório '{fieldName}' está ausente");
     }
 
+    private static int GetRequiredInt32Field(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string fieldName,
+        string documentId)
+    {
+        var value = GetRequiredInt64Field(fields, fieldName, documentId);
+
+        if (value is < int.MinValue or > int.MaxValue)
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' excede o intervalo suportado");
+        }
+
+        return (int)value;
+    }
+
+    private static long GetOptionalNonNegativeInt64Field(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string fieldName,
+        string documentId)
+    {
+        if (!fields.ContainsKey(fieldName))
+        {
+            return 0;
+        }
+
+        var value = GetRequiredInt64Field(fields, fieldName, documentId);
+
+        if (value < 0)
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' não pode ser negativo");
+        }
+
+        return value;
+    }
+
+    private static long GetRequiredInt64Field(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string fieldName,
+        string documentId)
+    {
+        if (!fields.TryGetValue(fieldName, out var field))
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo obrigatório '{fieldName}' está ausente");
+        }
+
+        if (field.IntegerValue.ValueKind == JsonValueKind.String
+            && long.TryParse(
+                field.IntegerValue.GetString(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var stringValue))
+        {
+            return stringValue;
+        }
+
+        if (field.IntegerValue.ValueKind == JsonValueKind.Number
+            && field.IntegerValue.TryGetInt64(out var numericValue))
+        {
+            return numericValue;
+        }
+
+        throw CreateInvalidDocumentException(
+            documentId,
+            $"o campo '{fieldName}' não contém um inteiro válido");
+    }
+
     private static string SerializeType(RideRequestType type)
     {
         return type switch
@@ -592,28 +1258,16 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         };
     }
 
-    private static void EnsureCreatedRequestMatches(
-        RideRequest createdRequest,
-        RideRequest expectedRequest,
-        string expectedUserId)
+    private static RouteRole ParseRouteRole(string value, string documentId)
     {
-        if (!string.Equals(
-                createdRequest.PassengerUserId,
-                expectedUserId,
-                StringComparison.Ordinal)
-            || !string.Equals(
-                createdRequest.PassengerRouteId,
-                expectedRequest.PassengerRouteId,
-                StringComparison.Ordinal)
-            || !string.Equals(
-                createdRequest.DriverRouteId,
-                expectedRequest.DriverRouteId,
-                StringComparison.Ordinal)
-            || createdRequest.Status != RideRequestStatus.Pending)
+        return value.ToLowerInvariant() switch
         {
-            throw new InvalidOperationException(
-                "O Firebase retornou dados inesperados para a solicitação criada.");
-        }
+            "driver" => RouteRole.Driver,
+            "passenger" => RouteRole.Passenger,
+            _ => throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo 'role' contém o valor inválido '{value}'")
+        };
     }
 
     private static void EnsurePendingRequestBelongsToUser(
@@ -674,6 +1328,36 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         return normalizedRouteId;
     }
 
+    private static string GetRequiredRequestId(string? requestId)
+    {
+        var normalizedRequestId = requestId?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(normalizedRequestId))
+        {
+            throw new ArgumentException(
+                "Informe o identificador da solicitação.",
+                nameof(requestId));
+        }
+
+        return normalizedRequestId;
+    }
+
+    private static string GetRequiredDocumentName(FirestoreDocumentDto document)
+    {
+        return !string.IsNullOrWhiteSpace(document.Name)
+            ? document.Name
+            : throw new InvalidOperationException(
+                "O Firebase não retornou o caminho esperado para o documento.");
+    }
+
+    private static string GetRequiredUpdateTime(FirestoreDocumentDto document)
+    {
+        return !string.IsNullOrWhiteSpace(document.UpdateTime)
+            ? document.UpdateTime
+            : throw new InvalidOperationException(
+                "O Firebase não retornou a versão esperada para o documento.");
+    }
+
     private static string GetDocumentId(string? documentName)
     {
         if (!string.IsNullOrWhiteSpace(documentName))
@@ -696,6 +1380,62 @@ public sealed class FirebaseRideRequestService : IRideRequestService
     {
         return new InvalidOperationException(
             $"O documento de solicitação '{documentId}' é inválido: {reason}.");
+    }
+
+    private async Task<FirestoreDocumentDto> GetDocumentAsync(
+        string url,
+        string idToken,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue("Bearer", idToken);
+
+        var response = await SendAsync(request, cancellationToken);
+        EnsureSuccess(response);
+
+        return DeserializeResponse<FirestoreDocumentDto>(response.Content);
+    }
+
+    private async Task<FirebaseHttpResponse> CommitAsync(
+        IEnumerable<object> writes,
+        string idToken,
+        CancellationToken cancellationToken)
+    {
+        using var request = CreateJsonRequest(
+            HttpMethod.Post,
+            BuildCommitUrl(),
+            new { writes = writes.ToArray() });
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue("Bearer", idToken);
+
+        return await SendAsync(request, cancellationToken);
+    }
+
+    private static bool IsConcurrencyConflict(FirebaseHttpResponse response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return false;
+        }
+
+        var code = ExtractFirebaseErrorCode(response.Content);
+        return code is "ABORTED" or "FAILED_PRECONDITION";
+    }
+
+    private static Task DelayBeforeRetryAsync(
+        int completedAttempt,
+        CancellationToken cancellationToken)
+    {
+        return Task.Delay(
+            TimeSpan.FromMilliseconds(100 * completedAttempt),
+            cancellationToken);
+    }
+
+    private static InvalidOperationException CreateConcurrencyException()
+    {
+        return new InvalidOperationException(
+            "A solicitação foi alterada por outra operação. Recarregue a lista e tente novamente.");
     }
 
     private async Task<FirebaseHttpResponse> SendAsync(
@@ -746,6 +1486,10 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 "Sua sessão não é válida. Entre novamente para continuar.",
             "FAILED_PRECONDITION" =>
                 "A consulta de solicitações requer configuração adicional no Firebase.",
+            "ABORTED" =>
+                "A solicitação foi alterada por outra operação. Recarregue e tente novamente.",
+            "NOT_FOUND" =>
+                "A solicitação ou rota relacionada não foi encontrada.",
             _ => "Não foi possível concluir a operação de solicitação no Firebase."
         };
 
@@ -807,10 +1551,35 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         return BuildDocumentsBaseUrl() + ":runQuery";
     }
 
+    private string BuildCommitUrl()
+    {
+        return BuildDocumentsBaseUrl() + ":commit";
+    }
+
+    private string BuildRideRequestDocumentUrl(string requestId)
+    {
+        return BuildCollectionUrl() + $"/{Escape(requestId)}";
+    }
+
+    private string BuildWeeklyRouteDocumentUrl(string routeId)
+    {
+        return BuildDocumentsBaseUrl() + $"/weeklyRoutes/{Escape(routeId)}";
+    }
+
+    private string BuildRideRequestDocumentName(string requestId)
+    {
+        return BuildDatabaseName()
+               + $"/documents/{CollectionName}/{Escape(requestId)}";
+    }
+
     private string BuildDocumentsBaseUrl()
     {
-        return $"{FirestoreBaseUrl}/projects/{Escape(_options.ProjectId)}"
-               + "/databases/(default)/documents";
+        return $"{FirestoreBaseUrl}/{BuildDatabaseName()}/documents";
+    }
+
+    private string BuildDatabaseName()
+    {
+        return $"projects/{Escape(_options.ProjectId)}/databases/(default)";
     }
 
     private void EnsureFirebaseIsConfigured()
@@ -841,12 +1610,18 @@ public sealed class FirebaseRideRequestService : IRideRequestService
 
         [JsonPropertyName("fields")]
         public Dictionary<string, FirestoreValueDto> Fields { get; init; } = [];
+
+        [JsonPropertyName("updateTime")]
+        public string? UpdateTime { get; init; }
     }
 
     private sealed class FirestoreValueDto
     {
         [JsonPropertyName("stringValue")]
         public string? StringValue { get; init; }
+
+        [JsonPropertyName("integerValue")]
+        public JsonElement IntegerValue { get; init; }
 
         [JsonPropertyName("timestampValue")]
         public DateTimeOffset? TimestampValue { get; init; }
@@ -860,4 +1635,13 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         [JsonPropertyName("values")]
         public List<FirestoreValueDto> Values { get; init; } = [];
     }
+
+    private sealed record DriverRouteSnapshot(
+        string Id,
+        string UserId,
+        RouteRole Role,
+        int AvailableSeats,
+        long RequestRevision,
+        string DocumentName,
+        string UpdateTime);
 }

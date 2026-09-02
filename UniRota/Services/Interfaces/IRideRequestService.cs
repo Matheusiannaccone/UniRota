@@ -18,4 +18,18 @@ public interface IRideRequestService
 
     Task<IReadOnlyList<RideRequest>> GetMyPendingRequestsAsync(
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RideRequest>> GetMyActiveRequestsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RideRequest>> GetReceivedPendingRequestsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task AcceptAsync(
+        string requestId,
+        CancellationToken cancellationToken = default);
+
+    Task RejectAsync(
+        string requestId,
+        CancellationToken cancellationToken = default);
 }

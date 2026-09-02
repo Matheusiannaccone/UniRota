@@ -4,6 +4,26 @@ namespace UniRota.Services;
 
 public static class RideRequestRules
 {
+    public static void EnsurePending(RideRequestStatus status)
+    {
+        if (status != RideRequestStatus.Pending)
+        {
+            throw new InvalidOperationException(
+                "Esta solicitação já foi processada.");
+        }
+    }
+
+    public static int GetRemainingSeatsAfterAcceptance(int? availableSeats)
+    {
+        if (availableSeats is null or <= 0)
+        {
+            throw new InvalidOperationException(
+                "Não há vagas disponíveis para aceitar esta solicitação.");
+        }
+
+        return availableSeats.Value - 1;
+    }
+
     public static IReadOnlyList<DayOfWeek> ValidateForCreation(
         RideRequestType type,
         IEnumerable<DayOfWeek> compatibleDays,
