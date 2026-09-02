@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using UniRota.Services.Interfaces;
+using UniRota.Views.Matching;
 using UniRota.Views.Routes;
 
 namespace UniRota.ViewModels;
@@ -50,6 +51,33 @@ public partial class HomeViewModel : ObservableObject
 
         WelcomeMessage = $"Olá, {user.Name}!";
         Email = user.Email;
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task GoToFindRideAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ClearError();
+
+        try
+        {
+            await Shell.Current.GoToAsync(nameof(FindRidePage));
+        }
+        catch (Exception exception)
+        {
+            SetError(
+                exception.Message,
+                "Não foi possível abrir a busca de caronas. Tente novamente.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]

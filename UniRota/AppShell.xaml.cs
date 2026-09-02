@@ -16,6 +16,15 @@
             Routing.RegisterRoute(
                 nameof(Views.Routes.NewRoutePage),
                 typeof(Views.Routes.NewRoutePage));
+            Routing.RegisterRoute(
+                nameof(Views.Matching.FindRidePage),
+                typeof(Views.Matching.FindRidePage));
+            Routing.RegisterRoute(
+                nameof(Views.Matching.MatchResultsPage),
+                typeof(Views.Matching.MatchResultsPage));
+            Routing.RegisterRoute(
+                nameof(Views.Matching.RideRequestPage),
+                typeof(Views.Matching.RideRequestPage));
 
             StartupContent.Content = startupPage;
             LoginContent.Content = loginPage;

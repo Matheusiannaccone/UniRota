@@ -37,6 +37,11 @@
             </Border>
 
             <Button
+                Text="Encontrar carona"
+                Command="{Binding GoToFindRideCommand}"
+                IsEnabled="{Binding IsNotBusy}" />
+
+            <Button
                 Text="Minhas rotas"
                 Command="{Binding GoToMyRoutesCommand}"
                 IsEnabled="{Binding IsNotBusy}" />

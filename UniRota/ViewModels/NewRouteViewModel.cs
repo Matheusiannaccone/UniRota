@@ -323,31 +323,3 @@ public partial class SelectableDayViewModel : ObservableObject
 
     public string DisplayName { get; }
 }
-
-internal static class RoutePresentationText
-{
-    public static string GetRoleName(RouteRole role)
-    {
-        return role switch
-        {
-            RouteRole.Driver => "Motorista",
-            RouteRole.Passenger => "Passageiro",
-            _ => string.Empty
-        };
-    }
-
-    public static string GetDayName(DayOfWeek day)
-    {
-        return day switch
-        {
-            DayOfWeek.Monday => "Segunda-feira",
-            DayOfWeek.Tuesday => "Terça-feira",
-            DayOfWeek.Wednesday => "Quarta-feira",
-            DayOfWeek.Thursday => "Quinta-feira",
-            DayOfWeek.Friday => "Sexta-feira",
-            DayOfWeek.Saturday => "Sábado",
-            DayOfWeek.Sunday => "Domingo",
-            _ => string.Empty
-        };
-    }
-}
