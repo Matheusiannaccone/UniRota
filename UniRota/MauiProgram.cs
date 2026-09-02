@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 
 using Microsoft.Maui.Storage;
+using UniRota.Services;
 using UniRota.Services.Firebase;
 using UniRota.Services.Interfaces;
 using UniRota.ViewModels;
@@ -37,6 +38,7 @@ namespace UniRota
             builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
             builder.Services.AddSingleton<IAuthService, FirebaseAuthService>();
             builder.Services.AddSingleton<IRouteService, FirebaseRouteService>();
+            builder.Services.AddSingleton<IMatchingService, MatchingService>();
 
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddTransient<StartupViewModel>();
