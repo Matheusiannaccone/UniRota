@@ -18,4 +18,7 @@ public interface IRouteService
 
     Task<IReadOnlyList<WeeklyRoute>> GetMyRoutesAsync(
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<WeeklyRoute>> GetDriverRoutesAsync(
+        CancellationToken cancellationToken = default);
 }
