@@ -102,6 +102,7 @@
                         <RoundRectangle CornerRadius="10" />
                     </Border.StrokeShape>
                     <Entry
+                        x:Name="EstimatedDistanceEntry"
                         Text="{Binding EstimatedDistanceKmText, Mode=TwoWay}"
                         Placeholder="Ex.: 12,5"
                         Keyboard="Numeric"
