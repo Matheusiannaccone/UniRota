@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.Matching.FindRidePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewModels="clr-namespace:UniRota.ViewModels"
+    Shell.NavBarIsVisible="True"
+    Title="Encontrar carona">
+
+    <Grid
+        Padding="20,24,20,20"
+        MaximumWidthRequest="640"
+        HorizontalOptions="Fill"
+        RowDefinitions="Auto,Auto,Auto,*"
+        RowSpacing="16">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="6">
+            <Label
+                Text="Encontrar carona"
+                FontSize="28"
+                FontAttributes="Bold" />
+            <Label
+                Text="Escolha uma de suas rotas de passageiro."
+                TextColor="#616161" />
+        </VerticalStackLayout>
+
+        <ActivityIndicator
+            Grid.Row="1"
+            IsRunning="{Binding IsBusy}"
+            IsVisible="{Binding IsBusy}"
+            HorizontalOptions="Center" />
+
+        <VerticalStackLayout
+            Grid.Row="2"
+            Spacing="8"
+            IsVisible="{Binding HasError}">
+            <Label
+                Text="{Binding ErrorMessage}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+            <Button
+                Text="Tentar novamente"
+                Command="{Binding LoadCommand}"
+                IsEnabled="{Binding IsNotBusy}"
+                HorizontalOptions="Center" />
+        </VerticalStackLayout>
+
+        <Grid Grid.Row="3">
+            <Label
+                Text="Você ainda não possui uma rota de passageiro cadastrada."
+                IsVisible="{Binding ShowEmptyState}"
+                TextColor="#616161"
+                HorizontalTextAlignment="Center"
+                VerticalOptions="Center" />
+
+            <CollectionView
+                ItemsSource="{Binding PassengerRoutes}"
+                SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:WeeklyRouteItemViewModel">
+                        <Border
+                            Margin="0,0,0,12"
+                            Padding="16"
+                            Stroke="#E0E0E0"
+                            BackgroundColor="#FAFAFA">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="12" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="8">
+                                <Label
+                                    Text="{Binding OriginDestinationText}"
+                                    FontSize="17"
+                                    FontAttributes="Bold"
+                                    LineBreakMode="WordWrap" />
+                                <Label
+                                    Text="{Binding DaysText}"
+                                    TextColor="#616161"
+                                    LineBreakMode="WordWrap" />
+                                <Label
+                                    Text="{Binding DepartureTimeText, StringFormat='Horário: {0}'}" />
+                                <Button
+                                    Text="Ver rotas compatíveis"
+                                    Clicked="OnFindMatchesClicked"
+                                    CommandParameter="{Binding .}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+    </Grid>
+</ContentPage>

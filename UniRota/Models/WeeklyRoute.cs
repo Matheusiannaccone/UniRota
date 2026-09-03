@@ -6,6 +6,8 @@ public sealed class WeeklyRoute
 
     public string UserId { get; init; } = string.Empty;
 
+    public string UserName { get; init; } = string.Empty;
+
     public RouteRole Role { get; init; }
 
     public string Origin { get; init; } = string.Empty;
@@ -17,6 +19,8 @@ public sealed class WeeklyRoute
     public int DepartureTimeMinutes { get; init; }
 
     public int? AvailableSeats { get; init; }
+
+    public long RequestRevision { get; init; }
 
     public DateTimeOffset CreatedAtUtc { get; init; }
 }

@@ -37,6 +37,26 @@
             </Border>
 
             <Button
+                Text="Encontrar carona"
+                Command="{Binding GoToFindRideCommand}"
+                IsEnabled="{Binding IsNotBusy}" />
+
+            <Button
+                Text="Aguardando aceite"
+                Command="{Binding GoToAwaitingApprovalCommand}"
+                IsEnabled="{Binding IsNotBusy}" />
+
+            <Button
+                Text="Solicitações recebidas"
+                Command="{Binding GoToReceivedRequestsCommand}"
+                IsEnabled="{Binding IsNotBusy}" />
+
+            <Button
+                Text="Rotas confirmadas"
+                Command="{Binding GoToConfirmedRoutesCommand}"
+                IsEnabled="{Binding IsNotBusy}" />
+
+            <Button
                 Text="Minhas rotas"
                 Command="{Binding GoToMyRoutesCommand}"
                 IsEnabled="{Binding IsNotBusy}" />

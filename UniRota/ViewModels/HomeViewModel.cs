@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using UniRota.Services.Interfaces;
+using UniRota.Views.Matching;
 using UniRota.Views.Routes;
 
 namespace UniRota.ViewModels;
@@ -53,6 +54,57 @@ public partial class HomeViewModel : ObservableObject
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task GoToFindRideAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ClearError();
+
+        try
+        {
+            await Shell.Current.GoToAsync(nameof(FindRidePage));
+        }
+        catch (Exception exception)
+        {
+            SetError(
+                exception.Message,
+                "Não foi possível abrir a busca de caronas. Tente novamente.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task GoToAwaitingApprovalAsync()
+    {
+        await NavigateAsync(
+            nameof(AwaitingApprovalPage),
+            "Não foi possível abrir suas solicitações pendentes. Tente novamente.");
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task GoToReceivedRequestsAsync()
+    {
+        await NavigateAsync(
+            nameof(ReceivedRequestsPage),
+            "Não foi possível abrir as solicitações recebidas. Tente novamente.");
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task GoToConfirmedRoutesAsync()
+    {
+        await NavigateAsync(
+            nameof(ConfirmedRoutesPage),
+            "Não foi possível abrir suas rotas confirmadas. Tente novamente.");
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
     private async Task GoToMyRoutesAsync()
     {
         if (IsBusy)
@@ -98,6 +150,30 @@ public partial class HomeViewModel : ObservableObject
         catch (Exception exception)
         {
             SetError(exception.Message, "Não foi possível sair. Tente novamente.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task NavigateAsync(string route, string fallbackMessage)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ClearError();
+
+        try
+        {
+            await Shell.Current.GoToAsync(route);
+        }
+        catch (Exception exception)
+        {
+            SetError(exception.Message, fallbackMessage);
         }
         finally
         {

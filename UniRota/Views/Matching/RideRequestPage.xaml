@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.Matching.RideRequestPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="True"
+    Title="Solicitar carona">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="20,24,20,20"
+            MaximumWidthRequest="640"
+            HorizontalOptions="Fill"
+            Spacing="16">
+
+            <VerticalStackLayout Spacing="6">
+                <Label
+                    Text="Solicitar carona"
+                    FontSize="28"
+                    FontAttributes="Bold" />
+                <Label
+                    Text="Escolha como deseja realizar esta carona."
+                    TextColor="#616161" />
+            </VerticalStackLayout>
+
+            <Border
+                Padding="14"
+                Stroke="#E0E0E0"
+                BackgroundColor="#FAFAFA">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="6">
+                    <Label
+                        Text="Motorista"
+                        TextColor="#616161" />
+                    <Label
+                        Text="{Binding DriverNameText}"
+                        FontSize="18"
+                        FontAttributes="Bold" />
+                    <Label
+                        Text="{Binding OriginDestinationText}"
+                        FontAttributes="Bold"
+                        LineBreakMode="WordWrap" />
+                    <Label
+                        Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}"
+                        TextColor="#616161"
+                        LineBreakMode="WordWrap" />
+                </VerticalStackLayout>
+            </Border>
+
+            <VerticalStackLayout Spacing="8">
+                <Label
+                    Text="Tipo da solicitação"
+                    FontAttributes="Bold" />
+                <Picker
+                    Title="Selecione uma opção"
+                    ItemsSource="{Binding RequestTypes}"
+                    ItemDisplayBinding="{Binding DisplayName}"
+                    SelectedItem="{Binding SelectedRequestType}" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout
+                Spacing="8"
+                IsVisible="{Binding IsOnceSelected}">
+                <Label
+                    Text="Data da carona"
+                    FontAttributes="Bold" />
+                <DatePicker
+                    Date="{Binding RequestedDate}"
+                    MinimumDate="{Binding MinimumDate}"
+                    Format="dd/MM/yyyy" />
+                <Label
+                    Text="A data precisa corresponder a um dos dias compatíveis."
+                    FontSize="13"
+                    TextColor="#616161" />
+            </VerticalStackLayout>
+
+            <Border
+                Padding="14"
+                Stroke="#E0E0E0"
+                BackgroundColor="#FAFAFA"
+                IsVisible="{Binding IsWeeklySelected}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="4">
+                    <Label
+                        Text="Compromisso semanal"
+                        FontAttributes="Bold" />
+                    <Label
+                        Text="Todos os dias compatíveis serão incluídos:" />
+                    <Label
+                        Text="{Binding CompatibleDaysText}"
+                        TextColor="#616161"
+                        LineBreakMode="WordWrap" />
+                </VerticalStackLayout>
+            </Border>
+
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                HorizontalOptions="Center" />
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+
+            <Button
+                Text="Confirmar solicitação"
+                Clicked="OnConfirmRequestClicked"
+                IsEnabled="{Binding CanSubmit}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

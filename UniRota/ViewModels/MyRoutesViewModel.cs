@@ -161,28 +161,17 @@ public sealed class WeeklyRouteItemViewModel
 
     public string RoleText => RoutePresentationText.GetRoleName(Route.Role);
 
-    public string OriginDestinationText => $"{Route.Origin} → {Route.Destination}";
+    public string OriginDestinationText =>
+        RoutePresentationText.GetOriginDestinationText(Route);
 
-    public string DaysText => string.Join(
-        ", ",
-        Route.DaysOfWeek.Select(RoutePresentationText.GetDayName));
+    public string DaysText => RoutePresentationText.GetDaysText(Route.DaysOfWeek);
 
-    public string DepartureTimeText
-    {
-        get
-        {
-            var departureTime = TimeSpan.FromMinutes(Route.DepartureTimeMinutes);
-            return $"{(int)departureTime.TotalHours:00}:{departureTime.Minutes:00}";
-        }
-    }
+    public string DepartureTimeText =>
+        RoutePresentationText.GetDepartureTimeText(Route.DepartureTimeMinutes);
 
     public bool HasAvailableSeats =>
         Route.Role == RouteRole.Driver && Route.AvailableSeats is > 0;
 
-    public string AvailableSeatsText => Route.AvailableSeats switch
-    {
-        1 => "1 vaga",
-        > 1 => $"{Route.AvailableSeats} vagas",
-        _ => string.Empty
-    };
+    public string AvailableSeatsText =>
+        RoutePresentationText.GetAvailableSeatsText(Route.AvailableSeats);
 }

@@ -5,6 +5,8 @@ VisualStudioVersion = 17.13.35931.197 d17.13
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UniRota", "UniRota\UniRota.csproj", "{AA197310-442C-4DB4-87DB-087748D8A8F8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UniRota.Tests", "UniRota.Tests\UniRota.Tests.csproj", "{1F3E9B42-A59D-4FB7-9B4C-5D8B03A0A7C1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,6 +19,10 @@ Global
 		{AA197310-442C-4DB4-87DB-087748D8A8F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AA197310-442C-4DB4-87DB-087748D8A8F8}.Release|Any CPU.Build.0 = Release|Any CPU
 		{AA197310-442C-4DB4-87DB-087748D8A8F8}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{1F3E9B42-A59D-4FB7-9B4C-5D8B03A0A7C1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F3E9B42-A59D-4FB7-9B4C-5D8B03A0A7C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F3E9B42-A59D-4FB7-9B4C-5D8B03A0A7C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F3E9B42-A59D-4FB7-9B4C-5D8B03A0A7C1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

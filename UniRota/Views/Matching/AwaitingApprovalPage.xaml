@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.Matching.AwaitingApprovalPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewModels="clr-namespace:UniRota.ViewModels"
+    Shell.NavBarIsVisible="True"
+    Title="Aguardando aceite">
+
+    <Grid
+        Padding="20,24,20,20"
+        MaximumWidthRequest="640"
+        HorizontalOptions="Fill"
+        RowDefinitions="Auto,Auto,Auto,*"
+        RowSpacing="16">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="6">
+            <Label
+                Text="Aguardando aceite"
+                FontSize="28"
+                FontAttributes="Bold" />
+            <Label
+                Text="Solicitações enviadas que ainda aguardam o motorista."
+                TextColor="#616161" />
+        </VerticalStackLayout>
+
+        <ActivityIndicator
+            Grid.Row="1"
+            IsRunning="{Binding IsBusy}"
+            IsVisible="{Binding IsBusy}"
+            HorizontalOptions="Center" />
+
+        <VerticalStackLayout
+            Grid.Row="2"
+            Spacing="8"
+            IsVisible="{Binding HasError}">
+            <Label
+                Text="{Binding ErrorMessage}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+            <Button
+                Text="Tentar novamente"
+                Command="{Binding LoadCommand}"
+                IsEnabled="{Binding IsNotBusy}"
+                HorizontalOptions="Center" />
+        </VerticalStackLayout>
+
+        <Grid Grid.Row="3">
+            <Label
+                Text="Você não possui solicitações aguardando aceite."
+                IsVisible="{Binding ShowEmptyState}"
+                TextColor="#616161"
+                HorizontalTextAlignment="Center"
+                VerticalOptions="Center" />
+
+            <CollectionView
+                ItemsSource="{Binding Requests}"
+                SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:RideRequestItemViewModel">
+                        <Border
+                            Margin="0,0,0,12"
+                            Padding="16"
+                            Stroke="#E0E0E0"
+                            BackgroundColor="#FAFAFA">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="12" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="7">
+                                <Label
+                                    Text="{Binding CounterpartyNameText}"
+                                    FontSize="18"
+                                    FontAttributes="Bold" />
+                                <Label
+                                    Text="{Binding TypeText, StringFormat='Tipo: {0}'}" />
+                                <Label
+                                    Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}"
+                                    TextColor="#616161"
+                                    LineBreakMode="WordWrap" />
+                                <Label
+                                    Text="{Binding RequestedDateText, StringFormat='Data: {0}'}"
+                                    IsVisible="{Binding HasRequestedDate}" />
+                                <Label
+                                    Text="{Binding StatusText}"
+                                    FontAttributes="Bold"
+                                    TextColor="#8A5A00" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniRota.Views.Matching.MatchResultsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewModels="clr-namespace:UniRota.ViewModels"
+    Shell.NavBarIsVisible="True"
+    Title="Rotas compatíveis">
+
+    <Grid
+        Padding="20,24,20,20"
+        MaximumWidthRequest="640"
+        HorizontalOptions="Fill"
+        RowDefinitions="Auto,Auto,Auto,Auto,*"
+        RowSpacing="16">
+
+        <Label
+            Grid.Row="0"
+            Text="Rotas compatíveis"
+            FontSize="28"
+            FontAttributes="Bold" />
+
+        <Border
+            Grid.Row="1"
+            Padding="14"
+            Stroke="#E0E0E0"
+            BackgroundColor="#FAFAFA">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12" />
+            </Border.StrokeShape>
+            <VerticalStackLayout Spacing="4">
+                <Label
+                    Text="Sua rota de passageiro"
+                    FontAttributes="Bold" />
+                <Label
+                    Text="{Binding PassengerRouteText}"
+                    LineBreakMode="WordWrap" />
+                <Label
+                    Text="{Binding PassengerRouteDetailsText}"
+                    TextColor="#616161"
+                    LineBreakMode="WordWrap" />
+            </VerticalStackLayout>
+        </Border>
+
+        <ActivityIndicator
+            Grid.Row="2"
+            IsRunning="{Binding IsBusy}"
+            IsVisible="{Binding IsBusy}"
+            HorizontalOptions="Center" />
+
+        <VerticalStackLayout
+            Grid.Row="3"
+            Spacing="8"
+            IsVisible="{Binding HasError}">
+            <Label
+                Text="{Binding ErrorMessage}"
+                TextColor="#B3261E"
+                HorizontalTextAlignment="Center" />
+            <Button
+                Text="Tentar novamente"
+                Command="{Binding LoadCommand}"
+                IsEnabled="{Binding IsNotBusy}"
+                HorizontalOptions="Center" />
+        </VerticalStackLayout>
+
+        <Grid Grid.Row="4">
+            <Label
+                Text="Nenhuma rota compatível foi encontrada."
+                IsVisible="{Binding ShowEmptyState}"
+                TextColor="#616161"
+                HorizontalTextAlignment="Center"
+                VerticalOptions="Center" />
+
+            <CollectionView
+                ItemsSource="{Binding Results}"
+                SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:MatchResultItemViewModel">
+                        <Border
+                            Margin="0,0,0,12"
+                            Padding="16"
+                            Stroke="#E0E0E0"
+                            BackgroundColor="#FAFAFA">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="12" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="8">
+                                <Label
+                                    Text="{Binding DriverNameText}"
+                                    FontSize="18"
+                                    FontAttributes="Bold" />
+                                <Label
+                                    Text="{Binding OriginDestinationText}"
+                                    FontSize="16"
+                                    FontAttributes="Bold"
+                                    LineBreakMode="WordWrap" />
+                                <Label
+                                    Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}"
+                                    TextColor="#616161"
+                                    LineBreakMode="WordWrap" />
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                                    <Label
+                                        Grid.Column="0"
+                                        Text="{Binding DepartureTimeText, StringFormat='Saída: {0}'}" />
+                                    <Label
+                                        Grid.Column="1"
+                                        Text="{Binding AvailableSeatsText}"
+                                        HorizontalOptions="End" />
+                                </Grid>
+                                <Button
+                                    Text="Solicitar carona"
+                                    Clicked="OnRequestRideClicked"
+                                    CommandParameter="{Binding .}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+    </Grid>
+</ContentPage>

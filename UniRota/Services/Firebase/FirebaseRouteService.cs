@@ -39,10 +39,12 @@ public sealed class FirebaseRouteService : IRouteService
         ArgumentNullException.ThrowIfNull(route);
         EnsureFirebaseIsConfigured();
 
-        var userId = GetAuthenticatedUserId();
+        var user = GetAuthenticatedUser();
+        var userId = user.Id;
         var normalizedRoute = NormalizeAndValidateRoute(
             route,
             userId,
+            user.Name,
             string.Empty,
             DateTimeOffset.UtcNow);
         var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
@@ -92,6 +94,7 @@ public sealed class FirebaseRouteService : IRouteService
         var normalizedRoute = NormalizeAndValidateRoute(
             route,
             userId,
+            existingRoute.UserName,
             existingRoute.Id,
             existingRoute.CreatedAtUtc);
 
@@ -188,29 +191,15 @@ public sealed class FirebaseRouteService : IRouteService
             }
         };
 
-        using var request = CreateJsonRequest(
-            HttpMethod.Post,
-            BuildRunQueryUrl(),
-            requestBody);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", idToken);
+        var routes = await RunRouteQueryAsync(
+            requestBody,
+            idToken,
+            userId,
+            cancellationToken);
 
-        var response = await SendAsync(request, cancellationToken);
-        EnsureSuccess(response);
-        EnsureCurrentUserHasNotChanged(userId);
-
-        var queryResults = DeserializeResponse<List<RunQueryResultDto>>(response.Content);
-        var routes = new List<WeeklyRoute>();
-
-        foreach (var queryResult in queryResults)
+        foreach (var route in routes)
         {
-            if (queryResult.Document is null)
-            {
-                continue;
-            }
-
-            var route = ConvertDocument(queryResult.Document);
             EnsureRouteBelongsToUser(route, userId);
-            routes.Add(route);
         }
 
         return routes
@@ -218,9 +207,46 @@ public sealed class FirebaseRouteService : IRouteService
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<WeeklyRoute>> GetDriverRoutesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsureFirebaseIsConfigured();
+
+        var userId = GetAuthenticatedUserId();
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var requestBody = new
+        {
+            structuredQuery = new
+            {
+                from = new[]
+                {
+                    new { collectionId = CollectionName }
+                },
+                where = new
+                {
+                    fieldFilter = new
+                    {
+                        field = new { fieldPath = "role" },
+                        op = "EQUAL",
+                        value = new { stringValue = "driver" }
+                    }
+                }
+            }
+        };
+
+        return await RunRouteQueryAsync(
+            requestBody,
+            idToken,
+            userId,
+            cancellationToken);
+    }
+
     private static WeeklyRoute NormalizeAndValidateRoute(
         WeeklyRoute route,
         string userId,
+        string userName,
         string routeId,
         DateTimeOffset createdAtUtc)
     {
@@ -288,6 +314,7 @@ public sealed class FirebaseRouteService : IRouteService
         {
             Id = routeId,
             UserId = userId,
+            UserName = userName,
             Role = route.Role,
             Origin = origin,
             Destination = destination,
@@ -296,6 +323,7 @@ public sealed class FirebaseRouteService : IRouteService
             AvailableSeats = route.Role == RouteRole.Driver
                 ? route.AvailableSeats
                 : null,
+            RequestRevision = 0,
             CreatedAtUtc = createdAtUtc
         };
     }
@@ -304,6 +332,12 @@ public sealed class FirebaseRouteService : IRouteService
     {
         var fields = CreateEditableFirestoreFields(route);
         fields["userId"] = new { stringValue = route.UserId };
+        fields["userName"] = new { stringValue = route.UserName };
+        fields["requestRevision"] = new
+        {
+            integerValue = route.RequestRevision.ToString(
+                CultureInfo.InvariantCulture)
+        };
         fields["createdAtUtc"] = new
         {
             timestampValue = route.CreatedAtUtc.ToUniversalTime().ToString("O")
@@ -367,11 +401,11 @@ public sealed class FirebaseRouteService : IRouteService
         {
             availableSeats = GetRequiredInt32Field(fields, "availableSeats");
 
-            if (availableSeats <= 0)
+            if (availableSeats < 0)
             {
                 throw CreateInvalidDocumentException(
                     id,
-                    "o campo 'availableSeats' deve ser maior que zero para motorista");
+                    "o campo 'availableSeats' não pode ser negativo para motorista");
             }
         }
 
@@ -379,14 +413,43 @@ public sealed class FirebaseRouteService : IRouteService
         {
             Id = id,
             UserId = GetRequiredStringField(fields, "userId"),
+            UserName = GetOptionalStringField(fields, "userName"),
             Role = role,
             Origin = GetRequiredStringField(fields, "origin"),
             Destination = GetRequiredStringField(fields, "destination"),
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = departureTimeMinutes,
             AvailableSeats = availableSeats,
+            RequestRevision = GetOptionalNonNegativeInt64Field(
+                fields,
+                "requestRevision",
+                id),
             CreatedAtUtc = GetRequiredTimestampField(fields, "createdAtUtc")
         };
+    }
+
+    private async Task<IReadOnlyList<WeeklyRoute>> RunRouteQueryAsync(
+        object requestBody,
+        string idToken,
+        string expectedUserId,
+        CancellationToken cancellationToken)
+    {
+        using var request = CreateJsonRequest(
+            HttpMethod.Post,
+            BuildRunQueryUrl(),
+            requestBody);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", idToken);
+
+        var response = await SendAsync(request, cancellationToken);
+        EnsureSuccess(response);
+        EnsureCurrentUserHasNotChanged(expectedUserId);
+
+        var queryResults = DeserializeResponse<List<RunQueryResultDto>>(response.Content);
+
+        return queryResults
+            .Where(result => result.Document is not null)
+            .Select(result => ConvertDocument(result.Document!))
+            .ToArray();
     }
 
     private async Task<FirestoreDocumentDto> GetRouteDocumentAsync(
@@ -407,6 +470,11 @@ public sealed class FirebaseRouteService : IRouteService
 
     private string GetAuthenticatedUserId()
     {
+        return GetAuthenticatedUser().Id;
+    }
+
+    private User GetAuthenticatedUser()
+    {
         var user = _authService.CurrentUser
             ?? throw new InvalidOperationException(
                 "Não há uma sessão autenticada. Entre novamente para continuar.");
@@ -417,7 +485,7 @@ public sealed class FirebaseRouteService : IRouteService
                 "A sessão autenticada não contém um identificador de usuário válido.");
         }
 
-        return user.Id;
+        return user;
     }
 
     private void EnsureCurrentUserHasNotChanged(string expectedUserId)
@@ -536,6 +604,15 @@ public sealed class FirebaseRouteService : IRouteService
             $"O documento de rota não contém o campo obrigatório '{fieldName}'.");
     }
 
+    private static string GetOptionalStringField(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string fieldName)
+    {
+        return fields.TryGetValue(fieldName, out var field)
+            ? field.StringValue ?? string.Empty
+            : string.Empty;
+    }
+
     private static int GetRequiredInt32Field(
         IReadOnlyDictionary<string, FirestoreValueDto> fields,
         string fieldName)
@@ -578,6 +655,53 @@ public sealed class FirebaseRouteService : IRouteService
         }
 
         return (int)parsedValue;
+    }
+
+    private static long GetOptionalNonNegativeInt64Field(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string fieldName,
+        string documentId)
+    {
+        if (!fields.TryGetValue(fieldName, out var field))
+        {
+            return 0;
+        }
+
+        var integerValue = field.IntegerValue;
+        long parsedValue;
+
+        if (integerValue.ValueKind == JsonValueKind.String)
+        {
+            if (!long.TryParse(
+                    integerValue.GetString(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out parsedValue))
+            {
+                throw CreateInvalidDocumentException(
+                    documentId,
+                    $"o campo '{fieldName}' contém um inteiro inválido");
+            }
+        }
+        else if (integerValue.ValueKind == JsonValueKind.Number
+                 && integerValue.TryGetInt64(out parsedValue))
+        {
+        }
+        else
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' não contém um inteiro válido");
+        }
+
+        if (parsedValue < 0)
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' não pode ser negativo");
+        }
+
+        return parsedValue;
     }
 
     private static DateTimeOffset GetRequiredTimestampField(
