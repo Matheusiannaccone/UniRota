@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using UniRota.Models;
@@ -8,6 +9,10 @@ namespace UniRota.ViewModels;
 public partial class NewRouteViewModel : ObservableObject
 {
     private static readonly TimeSpan DefaultDepartureTime = new(7, 0, 0);
+    private static readonly CultureInfo PtBrCulture =
+        CultureInfo.GetCultureInfo("pt-BR");
+    private const NumberStyles DistanceNumberStyles =
+        NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint;
 
     private readonly IRouteService _routeService;
     private WeeklyRoute? _routeBeingEdited;
@@ -26,6 +31,9 @@ public partial class NewRouteViewModel : ObservableObject
 
     [ObservableProperty]
     private int? availableSeats;
+
+    [ObservableProperty]
+    private string estimatedDistanceKmText = string.Empty;
 
     [ObservableProperty]
     private bool isBusy;
@@ -87,6 +95,7 @@ public partial class NewRouteViewModel : ObservableObject
         if (!IsDriver)
         {
             AvailableSeats = null;
+            EstimatedDistanceKmText = string.Empty;
         }
     }
 
@@ -134,6 +143,11 @@ public partial class NewRouteViewModel : ObservableObject
         AvailableSeats = route.Role == RouteRole.Driver
             ? route.AvailableSeats
             : null;
+        EstimatedDistanceKmText = route.Role == RouteRole.Driver
+            ? route.EstimatedDistanceKm.ToString(
+                "0.############################",
+                PtBrCulture)
+            : string.Empty;
 
         foreach (var day in Days)
         {
@@ -250,6 +264,37 @@ public partial class NewRouteViewModel : ObservableObject
             return false;
         }
 
+        var estimatedDistanceKm = 0m;
+
+        if (SelectedRole.Role == RouteRole.Driver)
+        {
+            var normalizedDistance = EstimatedDistanceKmText?.Trim()
+                ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(normalizedDistance))
+            {
+                SetError("Informe a distância estimada da rota.");
+                return false;
+            }
+
+            if (!decimal.TryParse(
+                    normalizedDistance,
+                    DistanceNumberStyles,
+                    PtBrCulture,
+                    out estimatedDistanceKm))
+            {
+                SetError(
+                    "Informe a distância estimada em um formato válido, como 8,5.");
+                return false;
+            }
+
+            if (estimatedDistanceKm <= 0m)
+            {
+                SetError("A distância estimada deve ser maior que zero.");
+                return false;
+            }
+        }
+
         route = new WeeklyRoute
         {
             Id = _routeBeingEdited?.Id ?? string.Empty,
@@ -260,7 +305,8 @@ public partial class NewRouteViewModel : ObservableObject
             DepartureTimeMinutes = (int)DepartureTime.TotalMinutes,
             AvailableSeats = SelectedRole.Role == RouteRole.Driver
                 ? AvailableSeats
-                : null
+                : null,
+            EstimatedDistanceKm = estimatedDistanceKm
         };
 
         return true;
@@ -275,6 +321,7 @@ public partial class NewRouteViewModel : ObservableObject
         Destination = string.Empty;
         DepartureTime = DefaultDepartureTime;
         AvailableSeats = null;
+        EstimatedDistanceKmText = string.Empty;
 
         foreach (var day in Days)
         {

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -152,6 +153,9 @@ public partial class MyRoutesViewModel : ObservableObject
 
 public sealed class WeeklyRouteItemViewModel
 {
+    private static readonly CultureInfo PtBrCulture =
+        CultureInfo.GetCultureInfo("pt-BR");
+
     public WeeklyRouteItemViewModel(WeeklyRoute route)
     {
         Route = route ?? throw new ArgumentNullException(nameof(route));
@@ -174,4 +178,12 @@ public sealed class WeeklyRouteItemViewModel
 
     public string AvailableSeatsText =>
         RoutePresentationText.GetAvailableSeatsText(Route.AvailableSeats);
+
+    public bool HasEstimatedDistance => Route.Role == RouteRole.Driver;
+
+    public string EstimatedDistanceText => HasEstimatedDistance
+        ? $"Distância estimada: {Route.EstimatedDistanceKm.ToString(
+            "0.############################",
+            PtBrCulture)} km"
+        : string.Empty;
 }
