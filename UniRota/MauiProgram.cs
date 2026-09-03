@@ -54,6 +54,7 @@ namespace UniRota
             builder.Services.AddTransient<RideRequestViewModel>();
             builder.Services.AddTransient<AwaitingApprovalViewModel>();
             builder.Services.AddTransient<ReceivedRequestsViewModel>();
+            builder.Services.AddTransient<ConfirmedRoutesViewModel>();
             builder.Services.AddTransient<StartupPage>();
             builder.Services.AddTransient<LoginPage>();
             builder.Services.AddTransient<RegisterPage>();
@@ -65,6 +66,7 @@ namespace UniRota
             builder.Services.AddTransient<RideRequestPage>();
             builder.Services.AddTransient<AwaitingApprovalPage>();
             builder.Services.AddTransient<ReceivedRequestsPage>();
+            builder.Services.AddTransient<ConfirmedRoutesPage>();
 
             return builder.Build();
         }

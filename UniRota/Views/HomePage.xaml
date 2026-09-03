@@ -52,6 +52,11 @@
                 IsEnabled="{Binding IsNotBusy}" />
 
             <Button
+                Text="Rotas confirmadas"
+                Command="{Binding GoToConfirmedRoutesCommand}"
+                IsEnabled="{Binding IsNotBusy}" />
+
+            <Button
                 Text="Minhas rotas"
                 Command="{Binding GoToMyRoutesCommand}"
                 IsEnabled="{Binding IsNotBusy}" />

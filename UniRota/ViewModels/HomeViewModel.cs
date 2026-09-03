@@ -97,6 +97,14 @@ public partial class HomeViewModel : ObservableObject
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task GoToConfirmedRoutesAsync()
+    {
+        await NavigateAsync(
+            nameof(ConfirmedRoutesPage),
+            "Não foi possível abrir suas rotas confirmadas. Tente novamente.");
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
     private async Task GoToMyRoutesAsync()
     {
         if (IsBusy)

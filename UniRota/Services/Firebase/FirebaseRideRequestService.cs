@@ -250,6 +250,61 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         return OrderRequests(requests);
     }
 
+    public async Task<IReadOnlyList<RideRequest>> GetMyAcceptedRequestsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsureFirebaseIsConfigured();
+
+        var userId = GetAuthenticatedUser().Id;
+        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var passengerRequests = await RunRideRequestQueryAsync(
+            CreateOwnedStatusRequestsQuery(
+                "passengerUserId",
+                userId,
+                "accepted"),
+            idToken,
+            userId,
+            cancellationToken);
+
+        EnsureCurrentUserHasNotChanged(userId);
+
+        var driverRequests = await RunRideRequestQueryAsync(
+            CreateOwnedStatusRequestsQuery(
+                "driverUserId",
+                userId,
+                "accepted"),
+            idToken,
+            userId,
+            cancellationToken);
+
+        var requests = passengerRequests
+            .Concat(driverRequests)
+            .DistinctBy(request => request.Id, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var request in requests)
+        {
+            var belongsToUser = string.Equals(
+                                    request.PassengerUserId,
+                                    userId,
+                                    StringComparison.Ordinal)
+                                || string.Equals(
+                                    request.DriverUserId,
+                                    userId,
+                                    StringComparison.Ordinal);
+
+            if (!belongsToUser || request.Status != RideRequestStatus.Accepted)
+            {
+                throw new InvalidOperationException(
+                    "O Firebase retornou uma solicitação confirmada que não pertence ao usuário autenticado.");
+            }
+        }
+
+        return OrderRequests(requests);
+    }
+
     public async Task RejectAsync(
         string requestId,
         CancellationToken cancellationToken = default)
@@ -565,6 +620,17 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         string ownerField,
         string ownerValue)
     {
+        return CreateOwnedStatusRequestsQuery(
+            ownerField,
+            ownerValue,
+            "pending");
+    }
+
+    private static object CreateOwnedStatusRequestsQuery(
+        string ownerField,
+        string ownerValue,
+        string statusValue)
+    {
         return CreateRequestQuery(
             new
             {
@@ -581,7 +647,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 {
                     field = new { fieldPath = "status" },
                     op = "EQUAL",
-                    value = new { stringValue = "pending" }
+                    value = new { stringValue = statusValue }
                 }
             });
     }

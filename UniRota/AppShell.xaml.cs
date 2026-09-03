@@ -31,6 +31,9 @@
             Routing.RegisterRoute(
                 nameof(Views.Matching.ReceivedRequestsPage),
                 typeof(Views.Matching.ReceivedRequestsPage));
+            Routing.RegisterRoute(
+                nameof(Views.Matching.ConfirmedRoutesPage),
+                typeof(Views.Matching.ConfirmedRoutesPage));
 
             StartupContent.Content = startupPage;
             LoginContent.Content = loginPage;
