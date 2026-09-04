@@ -97,6 +97,10 @@
                                         IsVisible="{Binding HasAvailableSeats}"
                                         HorizontalOptions="End" />
                                 </Grid>
+                                <Label
+                                    Text="{Binding EstimatedDistanceText}"
+                                    IsVisible="{Binding HasEstimatedDistance}"
+                                    TextColor="#616161" />
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                     <Button
                                         Grid.Column="0"
