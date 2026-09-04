@@ -41,10 +41,18 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         MatchResult match,
         RideRequestType type,
         DateOnly? requestedDate,
+        decimal suggestedPrice,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(match);
         EnsureFirebaseIsConfigured();
+
+        if (suggestedPrice <= 0m)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(suggestedPrice),
+                "O preço sugerido deve ser maior que zero.");
+        }
 
         var user = GetAuthenticatedUser();
         var userId = user.Id;
@@ -89,6 +97,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             Type = type,
             Status = RideRequestStatus.Pending,
             RequestedDate = requestedDate,
+            SuggestedPrice = suggestedPrice,
             CreatedAtUtc = DateTimeOffset.UtcNow
         };
 
@@ -993,6 +1002,10 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                         CultureInfo.InvariantCulture)
                 }
                 : new { nullValue = (object?)null },
+            ["suggestedPrice"] = new
+            {
+                doubleValue = (double)request.SuggestedPrice
+            },
             ["createdAtUtc"] = new
             {
                 timestampValue = request.CreatedAtUtc
@@ -1042,6 +1055,10 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 GetRequiredStringField(fields, "status", id),
                 id),
             RequestedDate = requestedDate,
+            SuggestedPrice = GetRequiredPositiveDecimalField(
+                fields,
+                "suggestedPrice",
+                id),
             CreatedAtUtc = GetRequiredTimestampField(
                 fields,
                 "createdAtUtc",
@@ -1219,6 +1236,30 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         }
 
         return (int)value;
+    }
+
+    private static decimal GetRequiredPositiveDecimalField(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string fieldName,
+        string documentId)
+    {
+        if (!fields.TryGetValue(fieldName, out var field)
+            || field.DoubleValue.ValueKind != JsonValueKind.Number
+            || !field.DoubleValue.TryGetDecimal(out var value))
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' não contém um número decimal válido");
+        }
+
+        if (value <= 0m)
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' deve ser maior que zero");
+        }
+
+        return value;
     }
 
     private static long GetOptionalNonNegativeInt64Field(
@@ -1688,6 +1729,9 @@ public sealed class FirebaseRideRequestService : IRideRequestService
 
         [JsonPropertyName("integerValue")]
         public JsonElement IntegerValue { get; init; }
+
+        [JsonPropertyName("doubleValue")]
+        public JsonElement DoubleValue { get; init; }
 
         [JsonPropertyName("timestampValue")]
         public DateTimeOffset? TimestampValue { get; init; }

@@ -305,6 +305,14 @@ public sealed class FirebaseRouteService : IRouteService
                 nameof(route));
         }
 
+        if (route.Role == RouteRole.Driver
+            && route.EstimatedDistanceKm <= 0m)
+        {
+            throw new ArgumentException(
+                "Uma rota de motorista deve possuir distância estimada maior que zero.",
+                nameof(route));
+        }
+
         var daysOfWeek = route.DaysOfWeek
             .Distinct()
             .OrderBy(day => day)
@@ -323,6 +331,9 @@ public sealed class FirebaseRouteService : IRouteService
             AvailableSeats = route.Role == RouteRole.Driver
                 ? route.AvailableSeats
                 : null,
+            EstimatedDistanceKm = route.Role == RouteRole.Driver
+                ? route.EstimatedDistanceKm
+                : 0m,
             RequestRevision = 0,
             CreatedAtUtc = createdAtUtc
         };
@@ -374,7 +385,11 @@ public sealed class FirebaseRouteService : IRouteService
                     integerValue = route.AvailableSeats.Value.ToString(
                         CultureInfo.InvariantCulture)
                 }
-                : new { nullValue = (object?)null }
+                : new { nullValue = (object?)null },
+            ["estimatedDistanceKm"] = new
+            {
+                doubleValue = (double)route.EstimatedDistanceKm
+            }
         };
     }
 
@@ -396,6 +411,7 @@ public sealed class FirebaseRouteService : IRouteService
         }
 
         int? availableSeats = null;
+        var estimatedDistanceKm = 0m;
 
         if (role == RouteRole.Driver)
         {
@@ -407,6 +423,11 @@ public sealed class FirebaseRouteService : IRouteService
                     id,
                     "o campo 'availableSeats' não pode ser negativo para motorista");
             }
+
+            estimatedDistanceKm = GetRequiredPositiveDecimalField(
+                fields,
+                "estimatedDistanceKm",
+                id);
         }
 
         return new WeeklyRoute
@@ -420,6 +441,7 @@ public sealed class FirebaseRouteService : IRouteService
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = departureTimeMinutes,
             AvailableSeats = availableSeats,
+            EstimatedDistanceKm = estimatedDistanceKm,
             RequestRevision = GetOptionalNonNegativeInt64Field(
                 fields,
                 "requestRevision",
@@ -657,6 +679,30 @@ public sealed class FirebaseRouteService : IRouteService
         return (int)parsedValue;
     }
 
+    private static decimal GetRequiredPositiveDecimalField(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string fieldName,
+        string documentId)
+    {
+        if (!fields.TryGetValue(fieldName, out var field)
+            || field.DoubleValue.ValueKind != JsonValueKind.Number
+            || !field.DoubleValue.TryGetDecimal(out var value))
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' não contém um número decimal válido");
+        }
+
+        if (value <= 0m)
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' deve ser maior que zero para motorista");
+        }
+
+        return value;
+    }
+
     private static long GetOptionalNonNegativeInt64Field(
         IReadOnlyDictionary<string, FirestoreValueDto> fields,
         string fieldName,
@@ -867,7 +913,8 @@ public sealed class FirebaseRouteService : IRouteService
             "destination",
             "daysOfWeek",
             "departureTimeMinutes",
-            "availableSeats"
+            "availableSeats",
+            "estimatedDistanceKm"
         };
         var updateMask = string.Join(
             "&",
@@ -928,6 +975,9 @@ public sealed class FirebaseRouteService : IRouteService
 
         [JsonPropertyName("integerValue")]
         public JsonElement IntegerValue { get; init; }
+
+        [JsonPropertyName("doubleValue")]
+        public JsonElement DoubleValue { get; init; }
 
         [JsonPropertyName("timestampValue")]
         public DateTimeOffset? TimestampValue { get; init; }

@@ -40,6 +40,7 @@ namespace UniRota
             builder.Services.AddSingleton<IAuthService, FirebaseAuthService>();
             builder.Services.AddSingleton<IRouteService, FirebaseRouteService>();
             builder.Services.AddSingleton<IMatchingService, MatchingService>();
+            builder.Services.AddSingleton<IPricingService, PricingService>();
             builder.Services.AddSingleton<IRideRequestService, FirebaseRideRequestService>();
 
             builder.Services.AddSingleton<AppShell>();

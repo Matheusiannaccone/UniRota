@@ -18,6 +18,19 @@ public sealed class ConfirmedRideItemViewModelTests
     }
 
     [Fact]
+    public void Passenger_UsesSuggestedPriceSnapshotFormattedPerTrip()
+    {
+        var request = CreateRequest(suggestedPrice: 7.89m);
+
+        var item = new ConfirmedRideItemViewModel(
+            request,
+            request.PassengerUserId);
+
+        Assert.Equal(7.89m, item.SuggestedPrice);
+        Assert.Equal("Preço sugerido: R$ 7,89 por viagem", item.SuggestedPriceText);
+    }
+
+    [Fact]
     public void Constructor_IdentifiesDriverByUserId()
     {
         var request = CreateRequest();
@@ -27,6 +40,21 @@ public sealed class ConfirmedRideItemViewModelTests
             request.DriverUserId);
 
         Assert.Equal("Você é o motorista", item.CurrentUserRoleText);
+    }
+
+    [Fact]
+    public void Driver_UsesSuggestedPriceSnapshotAsEstimatedAmountPerTrip()
+    {
+        var request = CreateRequest(suggestedPrice: 7.89m);
+
+        var item = new ConfirmedRideItemViewModel(
+            request,
+            request.DriverUserId);
+
+        Assert.Equal(7.89m, item.SuggestedPrice);
+        Assert.Equal(
+            "Valor estimado a receber: R$ 7,89 por viagem",
+            item.SuggestedPriceText);
     }
 
     [Fact]
@@ -69,6 +97,7 @@ public sealed class ConfirmedRideItemViewModelTests
         Assert.True(item.HasRequestedDate);
         Assert.Equal("04/09/2026", item.RequestedDateText);
         Assert.Equal(requestedDate, item.Request.RequestedDate);
+        Assert.Equal("Preço sugerido: R$ 3,45 por viagem", item.SuggestedPriceText);
     }
 
     [Fact]
@@ -84,6 +113,9 @@ public sealed class ConfirmedRideItemViewModelTests
         Assert.Equal("Semanal", item.TypeText);
         Assert.Equal("Segunda-feira, Sexta-feira", item.CompatibleDaysText);
         Assert.False(item.HasRequestedDate);
+        Assert.Equal(
+            "Valor estimado a receber: R$ 3,45 por viagem",
+            item.SuggestedPriceText);
         Assert.Equal("Confirmada", item.StatusText);
     }
 
@@ -92,7 +124,8 @@ public sealed class ConfirmedRideItemViewModelTests
         string driverUserName = "Bruno",
         IReadOnlyList<DayOfWeek>? compatibleDays = null,
         RideRequestType type = RideRequestType.Weekly,
-        DateOnly? requestedDate = null)
+        DateOnly? requestedDate = null,
+        decimal suggestedPrice = 3.45m)
     {
         return new RideRequest
         {
@@ -107,6 +140,7 @@ public sealed class ConfirmedRideItemViewModelTests
             Type = type,
             Status = RideRequestStatus.Accepted,
             RequestedDate = requestedDate,
+            SuggestedPrice = suggestedPrice,
             CreatedAtUtc = new DateTimeOffset(
                 2026,
                 9,

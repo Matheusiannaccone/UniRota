@@ -9,6 +9,7 @@ public interface IRideRequestService
         MatchResult match,
         RideRequestType type,
         DateOnly? requestedDate,
+        decimal suggestedPrice,
         CancellationToken cancellationToken = default);
 
     Task<bool> HasPendingRequestAsync(

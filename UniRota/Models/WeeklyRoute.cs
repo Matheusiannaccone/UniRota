@@ -20,6 +20,8 @@ public sealed class WeeklyRoute
 
     public int? AvailableSeats { get; init; }
 
+    public decimal EstimatedDistanceKm { get; init; }
+
     public long RequestRevision { get; init; }
 
     public DateTimeOffset CreatedAtUtc { get; init; }
