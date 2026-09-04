@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using UniRota.Models;
@@ -9,8 +10,13 @@ namespace UniRota.ViewModels;
 public partial class RideRequestViewModel : ObservableObject
 {
     private readonly IRideRequestService _rideRequestService;
+    private readonly IPricingService _pricingService;
     private WeeklyRoute? _passengerRoute;
     private MatchResult? _match;
+    private PricingResult? _pricingResult;
+
+    private static readonly CultureInfo PtBrCulture =
+        CultureInfo.GetCultureInfo("pt-BR");
 
     [ObservableProperty]
     private bool isBusy;
@@ -37,11 +43,20 @@ public partial class RideRequestViewModel : ObservableObject
     private string compatibleDaysText = string.Empty;
 
     [ObservableProperty]
+    private string suggestedPriceText = string.Empty;
+
+    [ObservableProperty]
+    private bool hasSuggestedPrice;
+
+    [ObservableProperty]
     private bool hasSubmittedSuccessfully;
 
-    public RideRequestViewModel(IRideRequestService rideRequestService)
+    public RideRequestViewModel(
+        IRideRequestService rideRequestService,
+        IPricingService pricingService)
     {
         _rideRequestService = rideRequestService;
+        _pricingService = pricingService;
     }
 
     public IReadOnlyList<RideRequestTypeOption> RequestTypes { get; } =
@@ -86,9 +101,12 @@ public partial class RideRequestViewModel : ObservableObject
     {
         _passengerRoute = passengerRoute;
         _match = match;
+        _pricingResult = null;
         SelectedRequestType = null;
         RequestedDate = DateTime.Today;
         HasSubmittedSuccessfully = false;
+        HasSuggestedPrice = false;
+        SuggestedPriceText = string.Empty;
         ClearError();
 
         DriverNameText = match is null
@@ -101,6 +119,33 @@ public partial class RideRequestViewModel : ObservableObject
         CompatibleDaysText = match is null
             ? string.Empty
             : RoutePresentationText.GetDaysText(match.CompatibleDays);
+
+        if (match is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var pricingResult = _pricingService.Calculate(
+                match.DriverRoute.EstimatedDistanceKm);
+
+            if (pricingResult.SuggestedPrice <= 0m)
+            {
+                SetInvalidPricingError();
+                return;
+            }
+
+            _pricingResult = pricingResult;
+            SuggestedPriceText = $"Preço sugerido: R$ {pricingResult.SuggestedPrice.ToString(
+                "N2",
+                PtBrCulture)} por viagem";
+            HasSuggestedPrice = true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            SetInvalidPricingError();
+        }
     }
 
     public bool TryGetConfirmationMessage(out string message)
@@ -113,6 +158,12 @@ public partial class RideRequestViewModel : ObservableObject
             SetError(
                 "Não foi possível identificar as rotas selecionadas.",
                 "Volte e selecione novamente uma rota compatível.");
+            return false;
+        }
+
+        if (_pricingResult is null || _pricingResult.SuggestedPrice <= 0m)
+        {
+            SetInvalidPricingError();
             return false;
         }
 
@@ -169,6 +220,12 @@ public partial class RideRequestViewModel : ObservableObject
             return;
         }
 
+        if (_pricingResult is null || _pricingResult.SuggestedPrice <= 0m)
+        {
+            SetInvalidPricingError();
+            return;
+        }
+
         IsBusy = true;
         ClearError();
 
@@ -182,6 +239,7 @@ public partial class RideRequestViewModel : ObservableObject
                 _match,
                 type,
                 requestedDate,
+                _pricingResult.SuggestedPrice,
                 cancellationToken);
 
             HasSubmittedSuccessfully = true;
@@ -220,6 +278,13 @@ public partial class RideRequestViewModel : ObservableObject
             ? fallbackMessage
             : message;
         HasError = true;
+    }
+
+    private void SetInvalidPricingError()
+    {
+        SetError(
+            "A rota do motorista não possui uma distância estimada válida para calcular o preço sugerido.",
+            "Não foi possível calcular o preço sugerido para esta rota.");
     }
 }
 

@@ -24,5 +24,7 @@ public sealed class RideRequest
 
     public DateOnly? RequestedDate { get; init; }
 
+    public decimal SuggestedPrice { get; init; }
+
     public DateTimeOffset CreatedAtUtc { get; init; }
 }

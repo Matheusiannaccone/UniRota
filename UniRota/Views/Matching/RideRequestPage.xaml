@@ -49,6 +49,21 @@
                 </VerticalStackLayout>
             </Border>
 
+            <Border
+                Padding="14"
+                Stroke="#E0E0E0"
+                BackgroundColor="#FAFAFA"
+                IsVisible="{Binding HasSuggestedPrice}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <Label
+                    Text="{Binding SuggestedPriceText}"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    HorizontalTextAlignment="Center" />
+            </Border>
+
             <VerticalStackLayout Spacing="8">
                 <Label
                     Text="Tipo da solicitação"
