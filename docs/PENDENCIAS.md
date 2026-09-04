@@ -1,16 +1,44 @@
-# UniRota — Pendências não bloqueantes
+# UniRota — Pendências e fechamento do MVP
 
-Este arquivo registra itens que ficaram pendentes durante os incrementos do MVP, mas que **não impedem o avanço do desenvolvimento**.
+Este arquivo registra itens que permaneceram pendentes após a conclusão funcional dos incrementos do MVP do UniRota.
 
-A ideia é continuar priorizando o fluxo principal do MVP e retornar a esta lista somente depois que todos os incrementos obrigatórios estiverem concluídos e validados.
+O fluxo principal do MVP está concluído e validado manualmente no Android:
+
+`autenticação → rotas → matching → solicitação Once/Weekly → aceite/rejeição → consumo de vagas → rotas confirmadas → preço sugerido`
+
+As pendências abaixo não exigem novos incrementos funcionais para o MVP. Elas devem ser tratadas conforme a prioridade, principalmente antes de validação com usuários reais ou de uma entrega mais formal.
 
 ## Regras de uso
 
-- Adicionar aqui somente itens que não bloqueiam o incremento atual.
-- Não interromper um incremento concluído apenas para resolver itens desta lista.
-- Revisar esta lista ao final de todos os incrementos.
-- Resolver primeiro itens que afetem demonstração, estabilidade, segurança ou documentação.
-- Se o tempo não permitir, registrar claramente o que ficou como evolução futura.
+- Priorizar primeiro segurança, consistência de dados e configuração de entrega.
+- Não alterar regras funcionais já validadas sem necessidade concreta.
+- Manter separado o que é obrigatório antes de usuários reais do que é evolução futura.
+- Resolver melhorias visuais e refatorações somente depois dos riscos técnicos prioritários.
+- Registrar como evolução futura qualquer item que não seja necessário para uma demonstração estável e coerente.
+
+---
+
+## Situação atual do MVP
+
+**Status funcional:** Concluído  
+**Plataforma validada:** Android
+
+### Obrigatório antes de validação com usuários reais
+
+1. Revisar e fechar as Firestore Security Rules.
+2. Validar e documentar os índices compostos necessários.
+3. Revisar a configuração final do Firebase/Firestore e remover dados de teste ou documentos incompatíveis.
+4. Revisar restrições da Web API Key quando aplicável.
+
+### Desejável antes da entrega formal
+
+- revisar identificador definitivo do aplicativo;
+- organizar configuração Firebase que ainda está hardcoded;
+- executar uma rodada final de testes automatizados e build;
+- revisar documentação de configuração e execução;
+- aplicar acabamento visual mínimo se houver tempo.
+
+As demais pendências deste documento podem permanecer como evolução futura sem impedir a conclusão do MVP acadêmico atual.
 
 ---
 
@@ -57,7 +85,7 @@ No momento, isso continua aceitável porque mantém a implementação coesa e ev
 **Não fazer apenas para reduzir número de linhas.**
 
 ### 4. Revisar o uso de `CreatedAtUtc` baseado no relógio do dispositivo
-**Status:** Pendente  
+**Status:** Pendente / evolução futura  
 **Prioridade:** Baixa
 
 Campos de criação usam `DateTimeOffset.UtcNow` no dispositivo.
@@ -65,7 +93,7 @@ Campos de criação usam `DateTimeOffset.UtcNow` no dispositivo.
 Isso é suficiente para o MVP, mas futuramente pode ser substituído por timestamp gerado pelo servidor/Firestore para maior confiabilidade e ordenação consistente entre dispositivos.
 
 ### 5. Tratar conta criada no Authentication sem perfil no Firestore
-**Status:** Pendente  
+**Status:** Pendente / evolução futura  
 **Prioridade:** Baixa
 
 Se o Firebase Authentication criar a conta e a gravação de `users/{uid}` falhar, a conta poderá permanecer sem documento de perfil.
@@ -91,10 +119,10 @@ O projeto mantém target iOS e usa código compartilhado, mas a validação comp
 - SecureStorage e restauração de sessão;
 - logout;
 - Firestore via REST;
-- rotas, matching e solicitações.
+- rotas, matching, solicitações e preço sugerido.
 
 ### 7. Melhorar acabamento visual das telas
-**Status:** Pendente  
+**Status:** Pendente / desejável  
 **Prioridade:** Baixa
 
 As telas foram implementadas com foco em funcionalidade e estabilidade.
@@ -109,10 +137,8 @@ As telas foram implementadas com foco em funcionalidade e estabilidade.
 - acessibilidade;
 - refinamento de estados vazios, loading e mensagens.
 
-Fazer somente depois que o fluxo principal do MVP estiver completo.
-
 ### 8. Centralizar estilos e cores do aplicativo
-**Status:** Pendente  
+**Status:** Pendente / evolução futura  
 **Prioridade:** Baixa
 
 Durante o desenvolvimento, parte dos estilos e cores ficou definida localmente nas páginas.
@@ -126,7 +152,7 @@ No futuro, pode ser útil criar estilos globais próprios e garantidamente carre
 - evitar dependência de estilos do template padrão do MAUI.
 
 ### 9. Revisar identificador definitivo do aplicativo
-**Status:** Pendente  
+**Status:** Pendente / desejável antes da entrega formal  
 **Prioridade:** Média
 
 O projeto ainda utiliza o identificador padrão/placeholder:
@@ -140,7 +166,7 @@ Antes de uma distribuição mais formal, esse identificador deve ser substituíd
 ## Incremento 2 — Rotas semanais
 
 ### 1. Revisar Firestore Security Rules antes da validação com usuários reais
-**Status:** Pendente  
+**Status:** Pendente / obrigatório antes de usuários reais  
 **Prioridade:** Alta
 
 Durante o desenvolvimento, as Firestore Security Rules foram temporariamente configuradas de forma aberta.
@@ -155,23 +181,24 @@ Antes de qualquer validação com usuários reais, as regras devem proteger pelo
 - decisão de solicitações somente pelo `driverUserId`;
 - alterações permitidas em `AvailableSeats`;
 - incremento controlado de `requestRevision`;
+- campos de preço e distância que não podem ser alterados arbitrariamente;
 - campos que não podem ser alterados arbitrariamente pelo cliente.
 
 A implementação cliente já faz verificações de propriedade, mas isso **não substitui** regras de segurança no Firestore.
 
 ### 2. Limitar quantidade máxima de vagas oferecidas
-**Status:** Pendente  
+**Status:** Pendente / evolução futura  
 **Prioridade:** Baixa
 
 Atualmente, o cadastro de uma rota de motorista valida apenas que a quantidade de vagas seja maior que zero. Isso permite informar valores incompatíveis com um veículo de passeio, como dezenas ou centenas de vagas.
 
 **Possíveis ações futuras:**
-- definir um limite máximo simples para o MVP, por exemplo entre 1 e 7 vagas;
+- definir um limite máximo simples, por exemplo entre 1 e 7 vagas;
 - validar o limite tanto no ViewModel quanto no serviço;
 - futuramente relacionar a quantidade máxima de vagas à capacidade cadastrada do veículo.
 
 ### 3. Tratar redução de vagas abaixo da quantidade já ocupada
-**Status:** Pendente  
+**Status:** Pendente / evolução futura importante  
 **Prioridade:** Alta
 
 Atualmente, um motorista pode editar a quantidade de vagas da `WeeklyRoute` sem uma regra específica que considere passageiros já aceitos.
@@ -193,7 +220,7 @@ Essa regra não deve ser implementada de forma silenciosa.
 ## Incremento 3 — Matching e solicitações de carona
 
 ### 1. Adicionar cooldown após uma solicitação rejeitada
-**Status:** Pendente  
+**Status:** Pendente / evolução futura  
 **Prioridade:** Média
 
 Atualmente, quando o motorista rejeita uma solicitação, o par `PassengerRouteId + DriverRouteId` volta a aparecer imediatamente em “Rotas compatíveis”.
@@ -211,7 +238,7 @@ Para o MVP atual, `Rejected` não bloqueia uma nova solicitação.
 - texto apresentado ao usuário durante o bloqueio.
 
 ### 2. Evoluir capacidade de vagas por ocorrência/data
-**Status:** Pendente  
+**Status:** Pendente / evolução futura  
 **Prioridade:** Média
 
 No modelo atual, `AvailableSeats` pertence à `WeeklyRoute` inteira.
@@ -232,7 +259,7 @@ Isso é aceitável para o MVP, mas não representa com precisão cenários reais
 - regras de consumo/restauração de vaga por ocorrência.
 
 ### 3. Definir cancelamento/desistência de carona confirmada
-**Status:** Pendente  
+**Status:** Pendente / evolução futura  
 **Prioridade:** Média
 
 O MVP permite aceitar e visualizar caronas confirmadas, mas não permite cancelar/desistir depois do aceite.
@@ -274,7 +301,7 @@ Futuramente pode ser útil permitir consulta a:
 Não é necessário para o fluxo principal atual.
 
 ### 6. Revisar prevenção de duplicidade de solicitações em concorrência distribuída
-**Status:** Pendente para revisão técnica  
+**Status:** Pendente para revisão técnica antes de uso mais amplo  
 **Prioridade:** Média
 
 A criação de `rideRequest` usa commit coordenado com `requestRevision`, e o fluxo atual protege a consistência necessária entre criação e aceite.
@@ -288,8 +315,8 @@ e confirmar por teste concorrente que nunca permanecem duas solicitações `Pend
 Se necessário, reforçar a estratégia de coordenação sem introduzir uma solução que quebre o fluxo atômico já existente.
 
 ### 7. Validar e documentar índices compostos do Firestore
-**Status:** Pendente  
-**Prioridade:** Média
+**Status:** Pendente / obrigatório antes de usuários reais  
+**Prioridade:** Alta
 
 O fluxo de matching e solicitações utiliza consultas compostas em `rideRequests`, incluindo combinações de:
 - `passengerUserId` + `status`;
@@ -299,8 +326,8 @@ O fluxo de matching e solicitações utiliza consultas compostas em `rideRequest
 
 Dependendo da configuração do projeto, o Firestore pode exigir índices compostos.
 
-**Antes da entrega:**
-- validar todas as queries no projeto Firebase real;
+**Antes da validação externa:**
+- executar todos os fluxos no projeto Firebase real;
 - criar os índices exigidos;
 - documentar quais índices fazem parte da configuração necessária do UniRota.
 
@@ -310,7 +337,7 @@ Dependendo da configuração do projeto, o Firestore pode exigir índices compos
 
 `WeeklyRoute` e `RideRequest` armazenam nomes como snapshots para evitar leituras adicionais.
 
-Rotas antigas sem `userName` continuam funcionando usando fallback visual, e alterações futuras no nome do usuário não atualizam automaticamente snapshots históricos.
+Alterações futuras no nome do usuário não atualizam automaticamente snapshots históricos.
 
 Isso é intencional no MVP.
 
@@ -337,7 +364,7 @@ A divergência não bloqueou os incrementos atuais.
 Não remover ou enfraquecer testes para contornar o problema.
 
 ### 10. Testar concorrência real em múltiplos dispositivos
-**Status:** Pendente  
+**Status:** Pendente antes de uso mais amplo  
 **Prioridade:** Média
 
 O aceite usa `documents:commit`, `updateTime`, retry e `requestRevision` para impedir consumo incorreto da última vaga.
@@ -381,10 +408,86 @@ Futuramente definir:
 
 ---
 
+## Incremento 4 — Preço sugerido
+
+### 1. Substituir distância manual por distância calculada/geográfica
+**Status:** Pendente / evolução futura  
+**Prioridade:** Média
+
+No MVP, `EstimatedDistanceKm` é informado manualmente pelo motorista e representa a distância estimada usada no cálculo daquela rota.
+
+Essa decisão evita dependência de mapas, geocodificação ou APIs externas durante o MVP.
+
+**Possíveis evoluções futuras:**
+- calcular distância automaticamente a partir de origem/destino;
+- integrar serviço de mapas/rotas;
+- considerar desvios, pontos de embarque e trajeto real;
+- validar limites plausíveis de distância.
+
+### 2. Evoluir o custo por km fixo
+**Status:** Pendente / evolução futura  
+**Prioridade:** Baixa
+
+O MVP utiliza `CostPerKm = 0,53` como parâmetro fixo e transparente.
+
+Futuramente o valor pode ser:
+- configurável;
+- atualizado conforme combustível/consumo;
+- diferenciado por veículo;
+- mantido em configuração externa em vez de constante de código.
+
+O cálculo atual deve permanecer estável enquanto o MVP estiver em validação para garantir reprodutibilidade.
+
+### 3. Evoluir rateio do preço por quantidade de passageiros confirmados
+**Status:** Pendente / evolução futura  
+**Prioridade:** Média
+
+No MVP, o cálculo considera sempre 2 participantes:
+
+`motorista + 1 passageiro`
+
+Por isso, cada `RideRequest` guarda um snapshot individual do preço sugerido no momento da solicitação.
+
+Futuramente pode ser avaliado um rateio dinâmico entre os passageiros confirmados, mas isso exige definir:
+- quando o preço pode mudar;
+- como comunicar alterações aos usuários;
+- como tratar novos aceites e cancelamentos;
+- se solicitações antigas preservam preço original ou são recalculadas.
+
+Não alterar essa regra sem redefinir explicitamente a semântica do snapshot.
+
+### 4. Avaliar persistência de memória de cálculo/`pricingCalculations`
+**Status:** Pendente / opcional  
+**Prioridade:** Baixa
+
+O MVP não cria coleção `pricingCalculations`.
+
+Atualmente, o necessário para o fluxo é preservado por:
+- `WeeklyRoute.EstimatedDistanceKm`;
+- `RideRequest.SuggestedPrice` como snapshot.
+
+Uma coleção separada só deve ser criada futuramente se houver necessidade real de:
+- auditoria detalhada;
+- histórico da fórmula utilizada;
+- versionamento de parâmetros;
+- métricas de precificação.
+
+### 5. Definir terminologia final de preço/contribuição na interface
+**Status:** Pendente / acabamento de produto  
+**Prioridade:** Baixa
+
+O MVP usa textos como:
+- `Preço sugerido` para passageiro;
+- `Valor estimado a receber` para motorista.
+
+Antes de uma publicação mais formal, revisar a terminologia para deixar explícito que o aplicativo apresenta uma **estimativa de contribuição**, não realiza cobrança, pagamento ou garantia de recebimento.
+
+---
+
 ## Infraestrutura, entrega e validação
 
 ### 1. Revisar configuração final do Firestore antes de usuários reais
-**Status:** Pendente  
+**Status:** Pendente / obrigatório antes de usuários reais  
 **Prioridade:** Alta
 
 Antes de validação externa, executar uma revisão conjunta de:
@@ -394,30 +497,93 @@ Antes de validação externa, executar uma revisão conjunta de:
 - comportamento das operações atômicas;
 - dados antigos ainda existentes no banco;
 - documentos de teste;
-- permissões efetivas para `users`, `weeklyRoutes` e `rideRequests`.
+- permissões efetivas para `users`, `weeklyRoutes` e `rideRequests`;
+- proteção dos novos campos `estimatedDistanceKm` e `suggestedPrice`.
 
-### 2. Revisar compatibilidade de documentos antigos
-**Status:** Pendente / validação final  
-**Prioridade:** Baixa
+### 2. Limpar ou recriar documentos incompatíveis com o modelo atual
+**Status:** Pendente / preparação de ambiente  
+**Prioridade:** Média
 
-O projeto possui retrocompatibilidade para campos introduzidos depois, como:
-- `WeeklyRoute.UserName`;
-- `requestRevision`.
+Durante o desenvolvimento foram adicionados campos obrigatórios ao modelo, principalmente:
+- `WeeklyRoute.EstimatedDistanceKm` para rotas de motorista;
+- `RideRequest.SuggestedPrice`.
 
-Antes da entrega, validar que documentos antigos relevantes continuam sendo carregados sem erro e decidir se dados de desenvolvimento devem ser mantidos, migrados ou removidos.
+Foi decidido não implementar retrocompatibilidade para documentos antigos sem esses campos, pois os dados de teste seriam recriados.
+
+Antes de uma validação externa:
+- remover documentos antigos incompatíveis;
+- recriar rotas e solicitações necessárias;
+- confirmar que não existem dados legados capazes de causar erro de desserialização.
+
+### 3. Rodar validação automatizada final pelo terminal
+**Status:** Pendente / desejável antes da entrega  
+**Prioridade:** Média
+
+Durante o Incremento 4 a suíte chegou a **91 testes aprovados**, com build Android concluído com **0 erros e 0 avisos**.
+
+Antes da entrega final, repetir:
+- `dotnet test` pelo terminal no ambiente confiável;
+- build `net8.0-android`;
+- verificação de `git status` limpo;
+- teste manual curto do fluxo principal.
+
+A divergência conhecida do Test Explorer do Visual Studio deve ser tratada separadamente e não deve levar à remoção ou enfraquecimento dos testes.
+
+### 4. Documentar configuração mínima do projeto Firebase
+**Status:** Pendente / desejável antes da entrega  
+**Prioridade:** Média
+
+Registrar de forma curta e reproduzível:
+- `ProjectId` utilizado/configurável;
+- Web API Key e restrições aplicáveis;
+- coleções utilizadas;
+- Security Rules necessárias;
+- índices compostos necessários;
+- como preparar um ambiente Firebase novo para o UniRota.
 
 ---
 
-## Critério para revisão final
+## Classificação final
 
-Ao concluir todos os incrementos obrigatórios:
+### Obrigatório antes de usuários reais
 
-1. revisar todos os itens deste arquivo;
-2. classificar em:
-   - obrigatório antes da entrega;
-   - desejável se houver tempo;
-   - evolução futura;
-3. resolver primeiro riscos de estabilidade e segurança;
-4. revisar regras de negócio que possam gerar inconsistência de dados;
-5. depois revisar documentação, testes e qualidade visual;
-6. manter como evolução futura tudo que não for necessário para uma demonstração estável e coerente.
+- Firestore Security Rules;
+- índices compostos necessários;
+- revisão de permissões e configuração final do Firestore;
+- remoção de documentos antigos incompatíveis ou dados de teste inadequados.
+
+### Desejável antes da entrega acadêmica/formal
+
+- repetir testes automatizados e build final;
+- revisar restrições da Web API Key;
+- organizar configuração Firebase hardcoded;
+- revisar identificador definitivo do app;
+- documentar configuração mínima do Firebase;
+- acabamento visual mínimo, se houver tempo.
+
+### Evolução futura
+
+- cooldown após rejeição;
+- cancelamento/desistência;
+- notificações;
+- histórico;
+- capacidade por ocorrência/data;
+- limite realista de vagas;
+- tratamento de redução de capacidade com passageiros já aceitos;
+- timestamps de decisão;
+- conclusão/histórico de caronas `Once` passadas;
+- distância automática por mapas/API;
+- rateio dinâmico do preço;
+- custo por km dinâmico;
+- `pricingCalculations` para auditoria;
+- melhorias estruturais e visuais não necessárias ao MVP.
+
+---
+
+## Critério de encerramento
+
+O MVP funcional pode ser considerado concluído.
+
+Para considerar o ambiente pronto para validação com usuários reais, falta concluir o fechamento de segurança/configuração, com foco principal em **Firestore Security Rules** e **índices**.
+
+Após isso, as demais atividades passam a ser preparação de entrega, documentação, acabamento ou evolução futura, sem necessidade de novo incremento funcional obrigatório.
