@@ -1,9 +1,12 @@
+using System.Globalization;
 using UniRota.Models;
 
 namespace UniRota.ViewModels;
 
 public sealed class RideRequestItemViewModel
 {
+    private static readonly CultureInfo PtBrCulture = CultureInfo.GetCultureInfo("pt-BR");
+
     public RideRequestItemViewModel(
         RideRequest request,
         string counterpartyName,
@@ -34,6 +37,11 @@ public sealed class RideRequestItemViewModel
     public string RequestedDateText => Request.RequestedDate is not null
         ? Request.RequestedDate.Value.ToString("dd/MM/yyyy")
         : string.Empty;
+
+    public decimal SuggestedPrice => Request.SuggestedPrice;
+
+    public string SuggestedPriceText =>
+        $"Preço sugerido: R$ {SuggestedPrice.ToString("N2", PtBrCulture)} por viagem";
 
     public string StatusText => "Aguardando aceite";
 }

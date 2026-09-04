@@ -1,9 +1,12 @@
+using System.Globalization;
 using UniRota.Models;
 
 namespace UniRota.ViewModels;
 
 public sealed class ConfirmedRideItemViewModel
 {
+    private static readonly CultureInfo PtBrCulture = CultureInfo.GetCultureInfo("pt-BR");
+
     public ConfirmedRideItemViewModel(
         RideRequest request,
         string currentUserId)
@@ -22,6 +25,7 @@ public sealed class ConfirmedRideItemViewModel
                 currentUserId,
                 StringComparison.Ordinal))
         {
+            IsCurrentUserPassenger = true;
             CurrentUserRoleText = "Você é o passageiro";
         }
         else if (string.Equals(
@@ -29,6 +33,7 @@ public sealed class ConfirmedRideItemViewModel
                      currentUserId,
                      StringComparison.Ordinal))
         {
+            IsCurrentUserPassenger = false;
             CurrentUserRoleText = "Você é o motorista";
         }
         else
@@ -54,6 +59,8 @@ public sealed class ConfirmedRideItemViewModel
 
     public string CurrentUserRoleText { get; }
 
+    public bool IsCurrentUserPassenger { get; }
+
     public string TypeText => Request.Type switch
     {
         RideRequestType.Once => "Uma vez",
@@ -69,6 +76,12 @@ public sealed class ConfirmedRideItemViewModel
     public string RequestedDateText => Request.RequestedDate is not null
         ? Request.RequestedDate.Value.ToString("dd/MM/yyyy")
         : string.Empty;
+
+    public decimal SuggestedPrice => Request.SuggestedPrice;
+
+    public string SuggestedPriceText => IsCurrentUserPassenger
+        ? $"Preço sugerido: R$ {SuggestedPrice.ToString("N2", PtBrCulture)} por viagem"
+        : $"Valor estimado a receber: R$ {SuggestedPrice.ToString("N2", PtBrCulture)} por viagem";
 
     public string StatusText => "Confirmada";
 

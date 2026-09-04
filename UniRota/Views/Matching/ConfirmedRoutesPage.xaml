@@ -85,6 +85,10 @@
                                     Text="{Binding RequestedDateText, StringFormat='Data: {0}'}"
                                     IsVisible="{Binding HasRequestedDate}" />
                                 <Label
+                                    Text="{Binding SuggestedPriceText}"
+                                    FontAttributes="Bold"
+                                    TextColor="#1B5E20" />
+                                <Label
                                     Text="{Binding StatusText}"
                                     FontAttributes="Bold"
                                     TextColor="#1B5E20" />
