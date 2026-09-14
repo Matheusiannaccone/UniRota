@@ -21,7 +21,7 @@
                 FontAttributes="Bold" />
             <Label
                 Text="Caronas aceitas em que você participa como passageiro ou motorista."
-                TextColor="#616161" />
+                TextColor="{DynamicResource TextSecondary}" />
         </VerticalStackLayout>
 
         <ActivityIndicator
@@ -36,7 +36,7 @@
             IsVisible="{Binding HasError}">
             <Label
                 Text="{Binding ErrorMessage}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
             <Button
                 Text="Tentar novamente"
@@ -49,7 +49,7 @@
             <Label
                 Text="Você ainda não possui rotas confirmadas."
                 IsVisible="{Binding ShowEmptyState}"
-                TextColor="#616161"
+                TextColor="{DynamicResource TextSecondary}"
                 HorizontalTextAlignment="Center"
                 VerticalOptions="Center" />
 
@@ -61,8 +61,8 @@
                         <Border
                             Margin="0,0,0,12"
                             Padding="16"
-                            Stroke="#E0E0E0"
-                            BackgroundColor="#FAFAFA">
+                            Stroke="{DynamicResource BorderBrush}"
+                            BackgroundColor="{DynamicResource SurfaceSecondary}">
                             <Border.StrokeShape>
                                 <RoundRectangle CornerRadius="12" />
                             </Border.StrokeShape>
@@ -79,7 +79,7 @@
                                     Text="{Binding TypeText, StringFormat='Tipo: {0}'}" />
                                 <Label
                                     Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}"
-                                    TextColor="#616161"
+                                    TextColor="{DynamicResource TextSecondary}"
                                     LineBreakMode="WordWrap" />
                                 <Label
                                     Text="{Binding RequestedDateText, StringFormat='Data: {0}'}"
@@ -87,11 +87,11 @@
                                 <Label
                                     Text="{Binding SuggestedPriceText}"
                                     FontAttributes="Bold"
-                                    TextColor="#1B5E20" />
+                                    TextColor="{DynamicResource Success}" />
                                 <Label
                                     Text="{Binding StatusText}"
                                     FontAttributes="Bold"
-                                    TextColor="#1B5E20" />
+                                    TextColor="{DynamicResource Success}" />
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>

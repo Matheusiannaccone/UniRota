@@ -21,7 +21,7 @@
                 FontAttributes="Bold" />
             <Label
                 Text="Escolha uma de suas rotas de passageiro."
-                TextColor="#616161" />
+                TextColor="{DynamicResource TextSecondary}" />
         </VerticalStackLayout>
 
         <ActivityIndicator
@@ -36,7 +36,7 @@
             IsVisible="{Binding HasError}">
             <Label
                 Text="{Binding ErrorMessage}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
             <Button
                 Text="Tentar novamente"
@@ -49,7 +49,7 @@
             <Label
                 Text="Você ainda não possui uma rota de passageiro cadastrada."
                 IsVisible="{Binding ShowEmptyState}"
-                TextColor="#616161"
+                TextColor="{DynamicResource TextSecondary}"
                 HorizontalTextAlignment="Center"
                 VerticalOptions="Center" />
 
@@ -61,8 +61,8 @@
                         <Border
                             Margin="0,0,0,12"
                             Padding="16"
-                            Stroke="#E0E0E0"
-                            BackgroundColor="#FAFAFA">
+                            Stroke="{DynamicResource BorderBrush}"
+                            BackgroundColor="{DynamicResource SurfaceSecondary}">
                             <Border.StrokeShape>
                                 <RoundRectangle CornerRadius="12" />
                             </Border.StrokeShape>
@@ -74,7 +74,7 @@
                                     LineBreakMode="WordWrap" />
                                 <Label
                                     Text="{Binding DaysText}"
-                                    TextColor="#616161"
+                                    TextColor="{DynamicResource TextSecondary}"
                                     LineBreakMode="WordWrap" />
                                 <Label
                                     Text="{Binding DepartureTimeText, StringFormat='Horário: {0}'}" />

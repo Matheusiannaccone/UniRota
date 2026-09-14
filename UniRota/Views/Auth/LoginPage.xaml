@@ -54,7 +54,7 @@
             <Label
                 Text="{Binding ErrorMessage}"
                 IsVisible="{Binding HasError}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
 
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -75,7 +75,7 @@
                 Command="{Binding GoToRegisterCommand}"
                 IsEnabled="{Binding IsNotBusy}"
                 BackgroundColor="Transparent"
-                TextColor="#512BD4" />
+                TextColor="{DynamicResource Primary}" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

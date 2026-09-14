@@ -43,7 +43,7 @@
             IsVisible="{Binding HasError}">
             <Label
                 Text="{Binding ErrorMessage}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
             <Button
                 Text="Tentar novamente"
@@ -56,7 +56,7 @@
             <Label
                 Text="Você ainda não cadastrou nenhuma rota semanal."
                 IsVisible="{Binding ShowEmptyState}"
-                TextColor="#616161"
+                TextColor="{DynamicResource TextSecondary}"
                 HorizontalTextAlignment="Center"
                 VerticalOptions="Center" />
 
@@ -68,8 +68,8 @@
                         <Border
                             Margin="0,0,0,12"
                             Padding="16"
-                            Stroke="#E0E0E0"
-                            BackgroundColor="#FAFAFA">
+                            Stroke="{DynamicResource BorderBrush}"
+                            BackgroundColor="{DynamicResource SurfaceSecondary}">
                             <Border.StrokeShape>
                                 <RoundRectangle CornerRadius="12" />
                             </Border.StrokeShape>
@@ -85,7 +85,7 @@
                                     LineBreakMode="WordWrap" />
                                 <Label
                                     Text="{Binding DaysText}"
-                                    TextColor="#616161"
+                                    TextColor="{DynamicResource TextSecondary}"
                                     LineBreakMode="WordWrap" />
                                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
                                     <Label
@@ -100,7 +100,7 @@
                                 <Label
                                     Text="{Binding EstimatedDistanceText}"
                                     IsVisible="{Binding HasEstimatedDistance}"
-                                    TextColor="#616161" />
+                                    TextColor="{DynamicResource TextSecondary}" />
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                     <Button
                                         Grid.Column="0"
@@ -112,7 +112,7 @@
                                         Text="Excluir"
                                         Clicked="OnDeleteRouteClicked"
                                         CommandParameter="{Binding .}"
-                                        BackgroundColor="#B3261E" />
+                                        BackgroundColor="{DynamicResource Error}" />
                                 </Grid>
                             </VerticalStackLayout>
                         </Border>
