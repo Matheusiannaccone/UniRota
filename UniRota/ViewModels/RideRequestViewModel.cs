@@ -128,7 +128,7 @@ public partial class RideRequestViewModel : ObservableObject
         try
         {
             var pricingResult = _pricingService.Calculate(
-                match.DriverRoute.EstimatedDistanceKm);
+                match.SharedDistanceKm);
 
             if (pricingResult.SuggestedPrice <= 0m)
             {
@@ -283,7 +283,7 @@ public partial class RideRequestViewModel : ObservableObject
     private void SetInvalidPricingError()
     {
         SetError(
-            "A rota do motorista não possui uma distância estimada válida para calcular o preço sugerido.",
+            "A rota compartilhada não possui uma distância válida para calcular o preço sugerido.",
             "Não foi possível calcular o preço sugerido para esta rota.");
     }
 }
