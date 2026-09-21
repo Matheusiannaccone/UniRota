@@ -115,6 +115,52 @@ public sealed class GooglePlaceServiceTests
     }
 
     [Fact]
+    public async Task GetCoordinatesAsync_DeduplicatesPlaceIdsAndParsesLocations()
+    {
+        string? capturedBody = null;
+        var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(
+                cancellationToken);
+            return JsonResponse("""
+                {
+                  "result": {
+                    "coordinates": [
+                      {
+                        "placeId": "place-1",
+                        "latitude": -23.4708,
+                        "longitude": -47.4287
+                      },
+                      {
+                        "placeId": "place-2",
+                        "latitude": -23.5015,
+                        "longitude": -47.4526
+                      }
+                    ]
+                  }
+                }
+                """);
+        });
+        var service = CreateService(handler);
+
+        var coordinates = await service.GetCoordinatesAsync(
+            [" place-1 ", "place-1", "place-2"]);
+
+        Assert.Equal(2, coordinates.Count);
+        Assert.Equal(new MapCoordinate(-23.4708, -47.4287), coordinates["place-1"]);
+        Assert.Equal(new MapCoordinate(-23.5015, -47.4526), coordinates["place-2"]);
+
+        using var document = JsonDocument.Parse(capturedBody!);
+        Assert.Equal(
+            ["place-1", "place-2"],
+            document.RootElement
+                .GetProperty("data")
+                .GetProperty("placeIds")
+                .EnumerateArray()
+                .Select(item => item.GetString()));
+    }
+
+    [Fact]
     public async Task SearchAsync_QuotaErrorReturnsUsefulMessage()
     {
         var handler = new StubHttpMessageHandler((request, cancellationToken) =>

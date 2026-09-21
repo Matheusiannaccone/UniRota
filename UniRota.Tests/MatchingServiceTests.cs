@@ -27,6 +27,7 @@ public sealed class MatchingServiceTests
         Assert.Equal(40m, match.SharedDurationMinutes);
         Assert.Equal(2m, match.DetourDistanceKm);
         Assert.Equal(10m, match.DetourDurationMinutes);
+        Assert.Equal("shared-polyline", match.SharedEncodedPolyline);
         Assert.Equal(2, mapService.Requests.Count);
     }
 
@@ -708,12 +709,14 @@ public sealed class MatchingServiceTests
 
     private static MapRouteResult CreateMapRoute(
         long distanceMeters,
-        double durationMinutes)
+        double durationMinutes,
+        string encodedPolyline = "")
     {
         return new MapRouteResult
         {
             DistanceMeters = distanceMeters,
-            Duration = TimeSpan.FromMinutes(durationMinutes)
+            Duration = TimeSpan.FromMinutes(durationMinutes),
+            EncodedPolyline = encodedPolyline
         };
     }
 
@@ -808,8 +811,8 @@ public sealed class MatchingServiceTests
             }
 
             return Task.FromResult(request.IntermediatePlaceIds.Count == 0
-                ? CreateMapRoute(10000, 30)
-                : CreateMapRoute(12000, 40));
+                ? CreateMapRoute(10000, 30, "base-polyline")
+                : CreateMapRoute(12000, 40, "shared-polyline"));
         }
     }
 }

@@ -5,6 +5,7 @@ const { defineSecret } = require("firebase-functions/params");
 const {
   GooglePlacesError,
   autocompletePlaces,
+  getPlaceCoordinates,
   getPlaceDetails,
 } = require("./googlePlaces");
 const { createComputeRouteHandler } = require("./googleRoutesCallable");
@@ -54,6 +55,22 @@ exports.placeDetails = onCall(placesCallableOptions, async (request) => {
   }
 });
 
+exports.placeCoordinates = onCall(placesCallableOptions, async (request) => {
+  requireAuthenticatedUser(request);
+  const placeIds = requirePlaceIds(request.data?.placeIds);
+
+  try {
+    const coordinates = await Promise.all(placeIds.map((placeId) =>
+      getPlaceCoordinates({
+        apiKey: googlePlacesApiKey.value(),
+        placeId,
+      })));
+    return { coordinates };
+  } catch (error) {
+    throw mapPlacesError(error);
+  }
+});
+
 exports.computeRoute = onCall(
   routesCallableOptions,
   createComputeRouteHandler({
@@ -90,6 +107,17 @@ function requireSessionToken(value) {
   }
 
   return token;
+}
+
+function requirePlaceIds(value) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 4) {
+    throw new HttpsError("invalid-argument", "placeIds is invalid.");
+  }
+
+  const normalized = value.map((placeId, index) =>
+    requireText(placeId, `placeIds[${index}]`, 1, 300));
+
+  return [...new Set(normalized)];
 }
 
 function mapPlacesError(error) {

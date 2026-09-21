@@ -26,6 +26,9 @@
                 nameof(Views.Matching.RideRequestPage),
                 typeof(Views.Matching.RideRequestPage));
             Routing.RegisterRoute(
+                nameof(Views.Matching.RouteDetailsPage),
+                typeof(Views.Matching.RouteDetailsPage));
+            Routing.RegisterRoute(
                 nameof(Views.Matching.AwaitingApprovalPage),
                 typeof(Views.Matching.AwaitingApprovalPage));
             Routing.RegisterRoute(

@@ -15,4 +15,8 @@ public interface IPlaceService
         string placeId,
         PlaceAutocompleteSession session,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<string, MapCoordinate>> GetCoordinatesAsync(
+        IReadOnlyList<string> placeIds,
+        CancellationToken cancellationToken = default);
 }

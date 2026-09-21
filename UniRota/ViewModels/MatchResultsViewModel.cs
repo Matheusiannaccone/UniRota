@@ -45,6 +45,9 @@ public partial class MatchResultsViewModel : ObservableObject
     public event Action<WeeklyRoute, MatchResultItemViewModel>?
         RideRequestRequested;
 
+    public event Action<WeeklyRoute, MatchResultItemViewModel>?
+        RouteDetailsRequested;
+
     public ObservableCollection<MatchResultItemViewModel> Results { get; } = [];
 
     public bool IsNotBusy => !IsBusy;
@@ -155,6 +158,17 @@ public partial class MatchResultsViewModel : ObservableObject
         }
 
         RideRequestRequested?.Invoke(_passengerRoute, result);
+    }
+
+    [RelayCommand]
+    private void ViewRoute(MatchResultItemViewModel? result)
+    {
+        if (result is null || _passengerRoute is null || IsBusy)
+        {
+            return;
+        }
+
+        RouteDetailsRequested?.Invoke(_passengerRoute, result);
     }
 
     private void ClearError()

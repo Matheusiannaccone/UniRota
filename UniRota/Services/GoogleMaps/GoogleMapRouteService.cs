@@ -108,7 +108,9 @@ public sealed class GoogleMapRouteService : IMapRouteService
             return new MapRouteResult
             {
                 DistanceMeters = result.DistanceMeters,
-                Duration = TimeSpan.FromSeconds(result.DurationSeconds)
+                Duration = TimeSpan.FromSeconds(result.DurationSeconds),
+                EncodedPolyline = result.EncodedPolyline?.Trim()
+                    ?? string.Empty
             };
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -299,5 +301,8 @@ public sealed class GoogleMapRouteService : IMapRouteService
 
         [JsonPropertyName("durationSeconds")]
         public double DurationSeconds { get; init; }
+
+        [JsonPropertyName("encodedPolyline")]
+        public string? EncodedPolyline { get; init; }
     }
 }

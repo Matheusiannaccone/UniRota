@@ -1,9 +1,10 @@
 # Configuração do Google Maps Platform
 
-O UniRota usa três Firebase callable functions autenticadas:
+O UniRota usa quatro Firebase callable functions autenticadas:
 
 - `placesAutocomplete`
 - `placeDetails`
+- `placeCoordinates`
 - `computeRoute`
 
 As chaves do Google Places e do Google Routes não ficam no aplicativo nem no
@@ -39,7 +40,7 @@ Secret Manager.
 6. Implante as funções necessárias:
 
    ```text
-   firebase deploy --only functions:placesAutocomplete,functions:placeDetails,functions:computeRoute --project unirota-f0a63
+   firebase deploy --only functions:placesAutocomplete,functions:placeDetails,functions:placeCoordinates,functions:computeRoute --project unirota-f0a63
    ```
 
 As funções e o aplicativo estão configurados para a região
@@ -51,9 +52,49 @@ ao `FirebaseOptions` ou a arquivos `.env` versionados.
 
 `computeRoute` aceita `originPlaceId`, `destinationPlaceId` e, opcionalmente,
 até dois `intermediatePlaceIds`. A função exige um usuário Firebase autenticado
-e solicita ao Routes API somente `routes.distanceMeters` e `routes.duration`.
-O aplicativo persiste apenas a distância convertida para quilômetros em
-`EstimatedDistanceKm`; duração e resultados de matching não são persistidos.
+e usa o FieldMask
+`routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline`, com
+qualidade `OVERVIEW`, na mesma chamada usada para distância e duração. A
+polyline fica somente no `MatchResult` em memória e não é persistida. O
+aplicativo persiste apenas a distância convertida para quilômetros em
+`EstimatedDistanceKm`; duração, polyline e resultados de matching não são
+persistidos.
+
+`placeCoordinates` aceita no máximo quatro Place IDs, remove duplicações e
+solicita somente o campo `location` do Place Details (New). Essa callable é
+usada apenas ao abrir os detalhes visuais do trajeto para posicionar os pins.
+
+## Maps SDK for Android
+
+O mapa nativo usa uma terceira chave, dedicada ao **Maps SDK for Android**.
+Ela não deve reutilizar `GOOGLE_PLACES_API_KEY` nem
+`GOOGLE_ROUTES_API_KEY`.
+
+1. Habilite **Maps SDK for Android** no Google Cloud.
+2. Crie uma chave dedicada.
+3. Em **Application restrictions**, selecione **Android apps**.
+4. Cadastre o package name/ApplicationId atual: `com.companyname.unirota`.
+5. Cadastre o SHA-1 do certificado de debug usado localmente e, para uma
+   distribuição, o SHA-1 do certificado de release/Google Play App Signing.
+6. Em **API restrictions**, permita somente **Maps SDK for Android**.
+7. Disponibilize a chave localmente antes de compilar, sem gravá-la no Git:
+
+   ```powershell
+   $env:GOOGLE_MAPS_ANDROID_API_KEY = "SUA_CHAVE_ANDROID_RESTRITA"
+   dotnet build UniRota/UniRota.csproj -f net8.0-android
+   ```
+
+   Como alternativa, passe temporariamente
+   `-p:GoogleMapsAndroidApiKey=SUA_CHAVE_ANDROID_RESTRITA` ao `dotnet build`.
+
+O `AndroidManifest.xml` contém somente o placeholder
+`${GOOGLE_MAPS_ANDROID_API_KEY}`. Sem configuração local, o projeto compila
+com um valor sentinela, mas o Google Maps não renderiza o mapa autenticado.
+Nenhuma permissão de localização é usada neste bloco.
+
+No iOS, o controle mantém compatibilidade estrutural por meio do MapKit. A
+configuração e validação de distribuição iOS devem ser realizadas em ambiente
+macOS antes da publicação.
 
 O matching geográfico usa os limites centralizados em `MatchingOptions`:
 

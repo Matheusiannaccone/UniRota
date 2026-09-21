@@ -168,7 +168,8 @@ public sealed class MatchingService : IMatchingService
                 sharedDistanceKm,
                 sharedDurationMinutes,
                 detourDistanceKm,
-                detourDurationMinutes));
+                detourDurationMinutes,
+                sharedRoute.EncodedPolyline));
         }
 
         return matches

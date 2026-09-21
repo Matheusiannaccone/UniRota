@@ -38,7 +38,11 @@ test("computeRoute sends Place IDs, driving mode, and minimal field mask", async
       capturedUrl = url;
       capturedOptions = options;
       return jsonResponse({
-        routes: [{ distanceMeters: 11840, duration: "1325.5s" }],
+        routes: [{
+          distanceMeters: 11840,
+          duration: "1325.5s",
+          polyline: { encodedPolyline: "encoded-route" },
+        }],
       });
     },
   });
@@ -49,18 +53,37 @@ test("computeRoute sends Place IDs, driving mode, and minimal field mask", async
   assert.equal(capturedOptions.headers["X-Goog-Api-Key"], "test-routes-key");
   assert.equal(
     capturedOptions.headers["X-Goog-FieldMask"],
-    "routes.distanceMeters,routes.duration");
+    "routes.distanceMeters,routes.duration," +
+      "routes.polyline.encodedPolyline");
 
   const body = JSON.parse(capturedOptions.body);
   assert.deepEqual(body.origin, { placeId: "origin-place-id" });
   assert.deepEqual(body.destination, { placeId: "destination-place-id" });
   assert.equal(body.travelMode, "DRIVE");
   assert.equal(body.computeAlternativeRoutes, false);
+  assert.equal(body.polylineQuality, "OVERVIEW");
+  assert.equal(body.polylineEncoding, "ENCODED_POLYLINE");
   assert.equal("intermediates" in body, false);
   assert.deepEqual(result, {
     distanceMeters: 11840,
     durationSeconds: 1325.5,
+    encodedPolyline: "encoded-route",
   });
+});
+
+test("computeRoute tolerates a valid route without a polyline", async () => {
+  const result = await computeRoute({
+    apiKey: "test-key",
+    originPlaceId: "origin-place-id",
+    destinationPlaceId: "destination-place-id",
+    fetchImpl: async () => jsonResponse({
+      routes: [{ distanceMeters: 11840, duration: "1325.5s" }],
+    }),
+  });
+
+  assert.equal(result.distanceMeters, 11840);
+  assert.equal(result.durationSeconds, 1325.5);
+  assert.equal(result.encodedPolyline, "");
 });
 
 test("computeRoute sends one intermediate Place ID", async () => {

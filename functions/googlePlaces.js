@@ -71,6 +71,33 @@ async function getPlaceDetails({ apiKey, placeId, sessionToken, fetchImpl = fetc
   };
 }
 
+async function getPlaceCoordinates({ apiKey, placeId, fetchImpl = fetch }) {
+  const url = new URL(
+    `${PLACE_DETAILS_BASE_URL}/${encodeURIComponent(placeId)}`);
+
+  const response = await fetchImpl(url, {
+    method: "GET",
+    headers: {
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": "location",
+    },
+  });
+  const payload = await readGoogleResponse(response);
+  const latitude = payload.location?.latitude;
+  const longitude = payload.location?.longitude;
+
+  if (!Number.isFinite(latitude)
+      || !Number.isFinite(longitude)
+      || latitude < -90
+      || latitude > 90
+      || longitude < -180
+      || longitude > 180) {
+    throw new GooglePlacesError(502, "INVALID_RESPONSE");
+  }
+
+  return { placeId, latitude, longitude };
+}
+
 async function readGoogleResponse(response) {
   let payload;
 
@@ -100,5 +127,6 @@ class GooglePlacesError extends Error {
 module.exports = {
   GooglePlacesError,
   autocompletePlaces,
+  getPlaceCoordinates,
   getPlaceDetails,
 };

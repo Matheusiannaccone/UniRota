@@ -5,6 +5,7 @@ const test = require("node:test");
 const {
   GooglePlacesError,
   autocompletePlaces,
+  getPlaceCoordinates,
   getPlaceDetails,
 } = require("./googlePlaces");
 
@@ -79,6 +80,46 @@ test("quota errors retain a safe machine-readable status", async () => {
     }),
     (error) => error instanceof GooglePlacesError
       && error.googleStatus === "RESOURCE_EXHAUSTED");
+});
+
+test("place coordinates requests only the location field", async () => {
+  let capturedOptions;
+  const result = await getPlaceCoordinates({
+    apiKey: "test-key",
+    placeId: "place-id",
+    fetchImpl: async (url, options) => {
+      capturedOptions = options;
+      return jsonResponse({
+        location: { latitude: -23.4708, longitude: -47.4287 },
+      });
+    },
+  });
+
+  assert.equal(capturedOptions.headers["X-Goog-FieldMask"], "location");
+  assert.deepEqual(result, {
+    placeId: "place-id",
+    latitude: -23.4708,
+    longitude: -47.4287,
+  });
+});
+
+test("place coordinates rejects an invalid location response", async () => {
+  await assert.rejects(
+    getPlaceCoordinates({
+      apiKey: "test-key",
+      placeId: "place-id",
+      fetchImpl: async () => jsonResponse({ location: {} }),
+    }),
+    (error) => error instanceof GooglePlacesError
+      && error.googleStatus === "INVALID_RESPONSE");
+});
+
+test("place coordinates callable requires authentication", async () => {
+  const { placeCoordinates } = require("./index");
+
+  await assert.rejects(
+    placeCoordinates.run({ data: { placeIds: ["place-id"] } }),
+    (error) => error.code === "unauthenticated");
 });
 
 function jsonResponse(payload, status = 200) {

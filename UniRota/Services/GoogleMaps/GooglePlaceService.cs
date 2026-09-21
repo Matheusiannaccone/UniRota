@@ -13,6 +13,7 @@ public sealed class GooglePlaceService : IPlaceService
 {
     private const string AutocompleteFunctionName = "placesAutocomplete";
     private const string DetailsFunctionName = "placeDetails";
+    private const string CoordinatesFunctionName = "placeCoordinates";
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -112,6 +113,57 @@ public sealed class GooglePlaceService : IPlaceService
         };
     }
 
+    public async Task<IReadOnlyDictionary<string, MapCoordinate>>
+        GetCoordinatesAsync(
+            IReadOnlyList<string> placeIds,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(placeIds);
+
+        var normalizedPlaceIds = placeIds
+            .Select((placeId, index) => RequirePlaceId(
+                placeId,
+                $"{nameof(placeIds)}[{index}]"))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (normalizedPlaceIds.Length == 0)
+        {
+            return new Dictionary<string, MapCoordinate>(StringComparer.Ordinal);
+        }
+
+        if (normalizedPlaceIds.Length > 4)
+        {
+            throw new ArgumentException(
+                "É possível consultar no máximo quatro pontos do trajeto.",
+                nameof(placeIds));
+        }
+
+        var response = await CallAsync<PlaceCoordinatesResultDto>(
+            CoordinatesFunctionName,
+            new { placeIds = normalizedPlaceIds },
+            cancellationToken);
+        var coordinates = new Dictionary<string, MapCoordinate>(
+            StringComparer.Ordinal);
+
+        foreach (var item in response.Coordinates)
+        {
+            var placeId = item.PlaceId?.Trim() ?? string.Empty;
+            var coordinate = new MapCoordinate(item.Latitude, item.Longitude);
+
+            if (!normalizedPlaceIds.Contains(placeId, StringComparer.Ordinal)
+                || !coordinate.IsValid)
+            {
+                throw new InvalidOperationException(
+                    "O serviço de endereços retornou coordenadas inválidas.");
+            }
+
+            coordinates.TryAdd(placeId, coordinate);
+        }
+
+        return coordinates;
+    }
+
     private async Task<TResult> CallAsync<TResult>(
         string functionName,
         object data,
@@ -176,6 +228,20 @@ public sealed class GooglePlaceService : IPlaceService
                 "A sessão de busca de endereços é inválida.",
                 nameof(session));
         }
+    }
+
+    private static string RequirePlaceId(string? placeId, string parameterName)
+    {
+        var normalized = placeId?.Trim() ?? string.Empty;
+
+        if (normalized.Length is < 1 or > 300)
+        {
+            throw new ArgumentException(
+                "Informe um Place ID válido.",
+                parameterName);
+        }
+
+        return normalized;
     }
 
     private void EnsureConfigured()
@@ -284,5 +350,23 @@ public sealed class GooglePlaceService : IPlaceService
 
         [JsonPropertyName("address")]
         public string Address { get; init; } = string.Empty;
+    }
+
+    private sealed class PlaceCoordinatesResultDto
+    {
+        [JsonPropertyName("coordinates")]
+        public List<PlaceCoordinateDto> Coordinates { get; init; } = [];
+    }
+
+    private sealed class PlaceCoordinateDto
+    {
+        [JsonPropertyName("placeId")]
+        public string? PlaceId { get; init; }
+
+        [JsonPropertyName("latitude")]
+        public double Latitude { get; init; }
+
+        [JsonPropertyName("longitude")]
+        public double Longitude { get; init; }
     }
 }

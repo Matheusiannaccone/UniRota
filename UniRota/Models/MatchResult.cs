@@ -9,4 +9,5 @@ public sealed record MatchResult(
     decimal SharedDistanceKm = 0m,
     decimal SharedDurationMinutes = 0m,
     decimal DetourDistanceKm = 0m,
-    decimal DetourDurationMinutes = 0m);
+    decimal DetourDurationMinutes = 0m,
+    string SharedEncodedPolyline = "");

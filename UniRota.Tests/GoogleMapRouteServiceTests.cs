@@ -22,7 +22,8 @@ public sealed class GoogleMapRouteServiceTests
                 {
                   "result": {
                     "distanceMeters": 11840,
-                    "durationSeconds": 1325.5
+                    "durationSeconds": 1325.5,
+                    "encodedPolyline": "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
                   }
                 }
                 """);
@@ -35,6 +36,9 @@ public sealed class GoogleMapRouteServiceTests
 
         Assert.Equal(11840, result.DistanceMeters);
         Assert.Equal(TimeSpan.FromSeconds(1325.5), result.Duration);
+        Assert.Equal(
+            "_p~iF~ps|U_ulLnnqC_mqNvxq`@",
+            result.EncodedPolyline);
         Assert.Equal("Bearer", capturedRequest!.Headers.Authorization!.Scheme);
         Assert.Equal("test-token", capturedRequest.Headers.Authorization.Parameter);
         Assert.EndsWith("/computeRoute", capturedRequest.RequestUri!.AbsoluteUri);
@@ -50,6 +54,27 @@ public sealed class GoogleMapRouteServiceTests
         Assert.Equal(
             0,
             data.GetProperty("intermediatePlaceIds").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task CalculateAsync_MissingPolylineReturnsRouteWithoutGeometry()
+    {
+        var handler = new StubHttpMessageHandler((request, cancellationToken) =>
+            Task.FromResult(JsonResponse("""
+                {
+                  "result": {
+                    "distanceMeters": 11840,
+                    "durationSeconds": 1325.5
+                  }
+                }
+                """)));
+        var service = CreateService(handler);
+
+        var result = await service.CalculateAsync("origin", "destination");
+
+        Assert.Equal(11840, result.DistanceMeters);
+        Assert.Equal(TimeSpan.FromSeconds(1325.5), result.Duration);
+        Assert.Equal(string.Empty, result.EncodedPolyline);
     }
 
     [Fact]

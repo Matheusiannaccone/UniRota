@@ -2,7 +2,8 @@
 
 const COMPUTE_ROUTES_URL =
   "https://routes.googleapis.com/directions/v2:computeRoutes";
-const ROUTE_FIELD_MASK = "routes.distanceMeters,routes.duration";
+const ROUTE_FIELD_MASK =
+  "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline";
 const REQUEST_TIMEOUT_MILLISECONDS = 10000;
 
 async function computeRoute({
@@ -18,6 +19,8 @@ async function computeRoute({
     destination: { placeId: destinationPlaceId },
     travelMode: "DRIVE",
     computeAlternativeRoutes: false,
+    polylineQuality: "OVERVIEW",
+    polylineEncoding: "ENCODED_POLYLINE",
   };
 
   if (intermediatePlaceIds.length > 0) {
@@ -66,6 +69,9 @@ async function computeRoute({
   return {
     distanceMeters: route.distanceMeters,
     durationSeconds,
+    encodedPolyline: typeof route.polyline?.encodedPolyline === "string"
+      ? route.polyline.encodedPolyline
+      : "",
   };
 }
 

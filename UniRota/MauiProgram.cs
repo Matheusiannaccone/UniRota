@@ -24,7 +24,8 @@ namespace UniRota
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
-                });
+                })
+                .UseMauiMaps();
 
 #if DEBUG
     		builder.Logging.AddDebug();
@@ -57,6 +58,7 @@ namespace UniRota
             builder.Services.AddTransient<MyRoutesViewModel>();
             builder.Services.AddTransient<FindRideViewModel>();
             builder.Services.AddTransient<MatchResultsViewModel>();
+            builder.Services.AddTransient<RouteDetailsViewModel>();
             builder.Services.AddTransient<RideRequestViewModel>();
             builder.Services.AddTransient<AwaitingApprovalViewModel>();
             builder.Services.AddTransient<ReceivedRequestsViewModel>();
@@ -69,6 +71,7 @@ namespace UniRota
             builder.Services.AddTransient<NewRoutePage>();
             builder.Services.AddTransient<FindRidePage>();
             builder.Services.AddTransient<MatchResultsPage>();
+            builder.Services.AddTransient<RouteDetailsPage>();
             builder.Services.AddTransient<RideRequestPage>();
             builder.Services.AddTransient<AwaitingApprovalPage>();
             builder.Services.AddTransient<ReceivedRequestsPage>();

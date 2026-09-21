@@ -600,6 +600,15 @@ public sealed class NewRouteViewModelTests
         {
             return Task.FromResult(SelectedPlace);
         }
+
+        public Task<IReadOnlyDictionary<string, MapCoordinate>>
+            GetCoordinatesAsync(
+                IReadOnlyList<string> placeIds,
+                CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyDictionary<string, MapCoordinate>>(
+                new Dictionary<string, MapCoordinate>(StringComparer.Ordinal));
+        }
     }
 
     private sealed class FakeMapRouteService : IMapRouteService
