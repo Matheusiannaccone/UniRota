@@ -12,7 +12,11 @@ public sealed class WeeklyRoute
 
     public string Origin { get; init; } = string.Empty;
 
+    public string OriginPlaceId { get; init; } = string.Empty;
+
     public string Destination { get; init; } = string.Empty;
+
+    public string DestinationPlaceId { get; init; } = string.Empty;
 
     public IReadOnlyList<DayOfWeek> DaysOfWeek { get; init; } = [];
 

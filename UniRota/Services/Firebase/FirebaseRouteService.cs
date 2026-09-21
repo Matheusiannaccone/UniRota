@@ -256,7 +256,9 @@ public sealed class FirebaseRouteService : IRouteService
         }
 
         var origin = route.Origin?.Trim() ?? string.Empty;
+        var originPlaceId = route.OriginPlaceId?.Trim() ?? string.Empty;
         var destination = route.Destination?.Trim() ?? string.Empty;
+        var destinationPlaceId = route.DestinationPlaceId?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(origin))
         {
@@ -325,7 +327,9 @@ public sealed class FirebaseRouteService : IRouteService
             UserName = userName,
             Role = route.Role,
             Origin = origin,
+            OriginPlaceId = originPlaceId,
             Destination = destination,
+            DestinationPlaceId = destinationPlaceId,
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = route.DepartureTimeMinutes,
             AvailableSeats = route.Role == RouteRole.Driver
@@ -360,7 +364,7 @@ public sealed class FirebaseRouteService : IRouteService
     private static Dictionary<string, object> CreateEditableFirestoreFields(
         WeeklyRoute route)
     {
-        return new Dictionary<string, object>
+        var fields = new Dictionary<string, object>
         {
             ["role"] = new { stringValue = SerializeRole(route.Role) },
             ["origin"] = new { stringValue = route.Origin },
@@ -391,6 +395,25 @@ public sealed class FirebaseRouteService : IRouteService
                 doubleValue = (double)route.EstimatedDistanceKm
             }
         };
+
+        AddOptionalStringField(fields, "originPlaceId", route.OriginPlaceId);
+        AddOptionalStringField(
+            fields,
+            "destinationPlaceId",
+            route.DestinationPlaceId);
+
+        return fields;
+    }
+
+    private static void AddOptionalStringField(
+        IDictionary<string, object> fields,
+        string fieldName,
+        string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            fields[fieldName] = new { stringValue = value };
+        }
     }
 
     private static WeeklyRoute ConvertDocument(FirestoreDocumentDto document)
@@ -437,7 +460,11 @@ public sealed class FirebaseRouteService : IRouteService
             UserName = GetOptionalStringField(fields, "userName"),
             Role = role,
             Origin = GetRequiredStringField(fields, "origin"),
+            OriginPlaceId = GetOptionalStringField(fields, "originPlaceId"),
             Destination = GetRequiredStringField(fields, "destination"),
+            DestinationPlaceId = GetOptionalStringField(
+                fields,
+                "destinationPlaceId"),
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = departureTimeMinutes,
             AvailableSeats = availableSeats,
@@ -910,7 +937,9 @@ public sealed class FirebaseRouteService : IRouteService
         {
             "role",
             "origin",
+            "originPlaceId",
             "destination",
+            "destinationPlaceId",
             "daysOfWeek",
             "departureTimeMinutes",
             "availableSeats",
