@@ -66,6 +66,20 @@ public sealed class FirebaseRideRequestServicePricingTests
                 .GetProperty("update")
                 .GetProperty("fields")
                 .TryGetProperty("requestRevision", out _));
+        Assert.Equal(
+            "1",
+            writes[1]
+                .GetProperty("update")
+                .GetProperty("fields")
+                .GetProperty("requestRevision")
+                .GetProperty("integerValue")
+                .GetString());
+        Assert.Equal(
+            "2026-09-03T12:00:00Z",
+            writes[1]
+                .GetProperty("currentDocument")
+                .GetProperty("updateTime")
+                .GetString());
     }
 
     [Theory]
@@ -102,9 +116,151 @@ public sealed class FirebaseRideRequestServicePricingTests
         Assert.Equal(3.45m, request.SuggestedPrice);
     }
 
+    [Fact]
+    public async Task AcceptAsync_ConsumesLastSeatAndRejectsCompetingRequestsWithoutChangingPrice()
+    {
+        string? commitBody = null;
+        var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            var url = request.RequestUri?.AbsoluteUri ?? string.Empty;
+
+            if (request.Method == HttpMethod.Get
+                && url.Contains("/rideRequests/request-1", StringComparison.Ordinal))
+            {
+                return JsonResponse(CreateRideRequestDocumentJson(
+                    "request-1",
+                    "passenger-user",
+                    3.45m));
+            }
+
+            if (request.Method == HttpMethod.Get
+                && url.Contains("/weeklyRoutes/driver-route", StringComparison.Ordinal))
+            {
+                return JsonResponse(CreateDriverRouteDocumentJson(1));
+            }
+
+            if (url.EndsWith(":runQuery", StringComparison.Ordinal))
+            {
+                return JsonResponse(CreatePendingRouteRequestsQueryJson());
+            }
+
+            if (url.EndsWith(":commit", StringComparison.Ordinal))
+            {
+                commitBody = await request.Content!.ReadAsStringAsync(
+                    cancellationToken);
+                return JsonResponse("{}");
+            }
+
+            throw new InvalidOperationException($"Requisição inesperada: {url}");
+        });
+        var service = CreateService(handler, [], "driver-user");
+
+        await service.AcceptAsync("request-1");
+
+        Assert.NotNull(commitBody);
+        using var document = JsonDocument.Parse(commitBody);
+        var writes = document.RootElement.GetProperty("writes");
+        Assert.Equal(3, writes.GetArrayLength());
+        Assert.Equal("accepted", GetWrittenStringField(writes[0], "status"));
+        Assert.Equal("0", GetWrittenIntegerField(writes[1], "availableSeats"));
+        Assert.Equal("rejected", GetWrittenStringField(writes[2], "status"));
+        Assert.All(
+            writes.EnumerateArray(),
+            write => Assert.False(
+                write.GetProperty("update")
+                    .GetProperty("fields")
+                    .TryGetProperty("suggestedPrice", out _)));
+        Assert.All(
+            writes.EnumerateArray(),
+            write => Assert.True(
+                write.GetProperty("currentDocument")
+                    .TryGetProperty("updateTime", out _)));
+    }
+
+    [Fact]
+    public async Task RejectAsync_ChangesOnlyStatusAndPreservesSuggestedPriceSnapshot()
+    {
+        string? commitBody = null;
+        var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            var url = request.RequestUri?.AbsoluteUri ?? string.Empty;
+
+            if (request.Method == HttpMethod.Get)
+            {
+                return JsonResponse(CreateRideRequestDocumentJson(
+                    "request-1",
+                    "passenger-user",
+                    3.45m));
+            }
+
+            if (url.EndsWith(":commit", StringComparison.Ordinal))
+            {
+                commitBody = await request.Content!.ReadAsStringAsync(
+                    cancellationToken);
+                return JsonResponse("{}");
+            }
+
+            throw new InvalidOperationException($"Requisição inesperada: {url}");
+        });
+        var service = CreateService(handler, [], "driver-user");
+
+        await service.RejectAsync("request-1");
+
+        Assert.NotNull(commitBody);
+        using var document = JsonDocument.Parse(commitBody);
+        var write = Assert.Single(
+            document.RootElement.GetProperty("writes").EnumerateArray());
+        Assert.Equal("rejected", GetWrittenStringField(write, "status"));
+        Assert.False(
+            write.GetProperty("update")
+                .GetProperty("fields")
+                .TryGetProperty("suggestedPrice", out _));
+        Assert.Equal(
+            "2026-09-03T13:00:00Z",
+            write.GetProperty("currentDocument")
+                .GetProperty("updateTime")
+                .GetString());
+    }
+
+    [Fact]
+    public async Task AcceptAsync_WithoutSeatsDoesNotCommitAnyChange()
+    {
+        var handler = new StubHttpMessageHandler((request, cancellationToken) =>
+        {
+            var url = request.RequestUri?.AbsoluteUri ?? string.Empty;
+
+            if (request.Method == HttpMethod.Get
+                && url.Contains("/rideRequests/request-1", StringComparison.Ordinal))
+            {
+                return Task.FromResult(JsonResponse(
+                    CreateRideRequestDocumentJson(
+                        "request-1",
+                        "passenger-user",
+                        3.45m)));
+            }
+
+            if (request.Method == HttpMethod.Get
+                && url.Contains("/weeklyRoutes/driver-route", StringComparison.Ordinal))
+            {
+                return Task.FromResult(JsonResponse(
+                    CreateDriverRouteDocumentJson(0)));
+            }
+
+            throw new InvalidOperationException("Não deveria confirmar a transação.");
+        });
+        var service = CreateService(handler, [], "driver-user");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.AcceptAsync("request-1"));
+
+        Assert.Contains("Não há vagas", exception.Message);
+        Assert.Equal(2, handler.RequestCount);
+    }
+
     private static FirebaseRideRequestService CreateService(
         HttpMessageHandler handler,
-        IReadOnlyList<WeeklyRoute> routes)
+        IReadOnlyList<WeeklyRoute> routes,
+        string currentUserId = "passenger-user")
     {
         return new FirebaseRideRequestService(
             new HttpClient(handler),
@@ -113,7 +269,7 @@ public sealed class FirebaseRideRequestServicePricingTests
                 ApiKey = "test-api-key",
                 ProjectId = "test-project"
             },
-            new FakeAuthService(),
+            new FakeAuthService(currentUserId),
             new FakeRouteService(routes));
     }
 
@@ -150,15 +306,15 @@ public sealed class FirebaseRideRequestServicePricingTests
         return new MatchResult(driverRoute, [DayOfWeek.Monday], 0);
     }
 
-    private static string CreateDriverRouteDocumentJson()
+    private static string CreateDriverRouteDocumentJson(int availableSeats = 2)
     {
-        return """
+        return $$"""
             {
               "name": "projects/test-project/databases/(default)/documents/weeklyRoutes/driver-route",
               "fields": {
                 "userId": { "stringValue": "driver-user" },
                 "role": { "stringValue": "driver" },
-                "availableSeats": { "integerValue": "2" },
+                "availableSeats": { "integerValue": "{{availableSeats}}" },
                 "requestRevision": { "integerValue": "0" }
               },
               "updateTime": "2026-09-03T12:00:00Z"
@@ -197,6 +353,65 @@ public sealed class FirebaseRideRequestServicePricingTests
             """;
     }
 
+    private static string CreateRideRequestDocumentJson(
+        string requestId,
+        string passengerUserId,
+        decimal suggestedPrice)
+    {
+        return $$"""
+            {
+              "name": "projects/test-project/databases/(default)/documents/rideRequests/{{requestId}}",
+              "fields": {
+                "passengerUserId": { "stringValue": "{{passengerUserId}}" },
+                "passengerUserName": { "stringValue": "Passageiro" },
+                "driverUserId": { "stringValue": "driver-user" },
+                "driverUserName": { "stringValue": "Motorista" },
+                "passengerRouteId": { "stringValue": "passenger-route" },
+                "driverRouteId": { "stringValue": "driver-route" },
+                "compatibleDays": {
+                  "arrayValue": {
+                    "values": [ { "stringValue": "Monday" } ]
+                  }
+                },
+                "type": { "stringValue": "weekly" },
+                "status": { "stringValue": "pending" },
+                "requestedDate": { "nullValue": null },
+                "suggestedPrice": { "doubleValue": {{suggestedPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)}} },
+                "createdAtUtc": { "timestampValue": "2026-09-03T12:00:00Z" }
+              },
+              "updateTime": "2026-09-03T13:00:00Z"
+            }
+            """;
+    }
+
+    private static string CreatePendingRouteRequestsQueryJson()
+    {
+        return $"[{{\"document\":{CreateRideRequestDocumentJson("request-1", "passenger-user", 3.45m)}}},"
+            + $"{{\"document\":{CreateRideRequestDocumentJson("request-2", "other-passenger", 7.89m)}}}]";
+    }
+
+    private static string? GetWrittenStringField(
+        JsonElement write,
+        string fieldName)
+    {
+        return write.GetProperty("update")
+            .GetProperty("fields")
+            .GetProperty(fieldName)
+            .GetProperty("stringValue")
+            .GetString();
+    }
+
+    private static string? GetWrittenIntegerField(
+        JsonElement write,
+        string fieldName)
+    {
+        return write.GetProperty("update")
+            .GetProperty("fields")
+            .GetProperty(fieldName)
+            .GetProperty("integerValue")
+            .GetString();
+    }
+
     private static HttpResponseMessage JsonResponse(string content)
     {
         return new HttpResponseMessage(HttpStatusCode.OK)
@@ -230,12 +445,19 @@ public sealed class FirebaseRideRequestServicePricingTests
 
     private sealed class FakeAuthService : IAuthService
     {
-        public User? CurrentUser { get; } = new()
+        public FakeAuthService(string currentUserId)
         {
-            Id = "passenger-user",
-            Name = "Passageiro",
-            Email = "passageiro@facens.br"
-        };
+            CurrentUser = new User
+            {
+                Id = currentUserId,
+                Name = currentUserId == "driver-user"
+                    ? "Motorista"
+                    : "Passageiro",
+                Email = $"{currentUserId}@facens.br"
+            };
+        }
+
+        public User? CurrentUser { get; }
 
         public Task<User> RegisterAsync(
             string name,

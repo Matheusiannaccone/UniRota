@@ -1,502 +1,194 @@
-# UniRota — Fluxo de Desenvolvimento do MVP
+# UniRota — Fluxo técnico do MVP
 
 ## 1. Objetivo
 
-Este documento registra o fluxo de desenvolvimento do MVP do UniRota.
-
-O objetivo técnico é implementar e validar, de forma incremental, o seguinte fluxo:
+O UniRota é um aplicativo acadêmico de caronas para estudantes da Facens. O
+fluxo funcional atual é:
 
 ```text
 Cadastro/Login
     ↓
-Rotas semanais
+Rotas semanais com endereços reais
     ↓
-Matching determinístico
+Matching geográfico por desvio
     ↓
-Preço sugerido
+Solicitação Once/Weekly e preço sugerido
     ↓
-Validação acadêmica
+Aceite/rejeição e consumo de vagas
+    ↓
+Rotas confirmadas
 ```
 
-A prioridade é manter o produto simples, estável, demonstrável e coerente com a documentação oficial do projeto.
+O aplicativo é mobile-first, com Android como plataforma principal já validada.
+iOS permanece como target estrutural, mas exige validação em macOS/Xcode.
 
----
+## 2. Arquitetura
 
-## 2. Arquitetura técnica
-
-### Stack
-
-| Parte | Decisão |
+| Parte | Implementação atual |
 |---|---|
-| Aplicativo | .NET MAUI |
-| Framework | .NET 8 |
-| Linguagem | C# |
-| Interface | XAML |
-| Organização | MVVM simples |
+| Aplicativo | .NET MAUI 8, C#, XAML e MVVM simples |
 | Injeção de dependência | Microsoft.Extensions.DependencyInjection |
-| Autenticação | Firebase Authentication |
-| Banco | Cloud Firestore |
+| Autenticação | Firebase Authentication por REST |
+| Dados | Cloud Firestore por REST |
+| Endereços | Places API (New), protegida por callable autenticada |
+| Rotas | Routes API, protegida por callable autenticada |
+| Mapa | Microsoft.Maui.Controls.Maps / Maps SDK for Android |
 | Matching | Regras determinísticas em C# |
-| Precificação | Fórmula simples em C# |
-| Backend próprio | Não será criado no MVP |
-| IA / ML | Evolução futura |
-| Versionamento | GitHub |
-| Gestão | Trello |
+| Precificação | Fórmula determinística em C# |
+| Backend auxiliar | Firebase Functions mínimas e específicas para Google Maps Platform |
 
-### Estrutura conceitual
+As integrações Google ficam isoladas por `IPlaceService` e
+`IMapRouteService`. ViewModels e modelos de domínio não conhecem endpoints,
+headers, chaves nem DTOs do Google.
 
-```text
-.NET MAUI
-    │
-    ├── Firebase Authentication
-    │
-    ├── Cloud Firestore
-    │
-    ├── MatchingService
-    │
-    └── PricingService
-```
+## 3. Autenticação e dados
 
-### Estrutura sugerida do projeto
+O usuário cria conta ou entra com e-mail e senha. O refresh token é mantido em
+`SecureStorage`; o ID token válido acompanha operações autenticadas no
+Firestore e nas callable functions.
 
-```text
-UniRota/
-├── Models/
-│   ├── User.cs
-│   ├── WeeklyRoute.cs
-│   ├── MatchResult.cs
-│   └── PricingResult.cs
-├── Views/
-│   ├── Auth/
-│   │   ├── LoginPage.xaml
-│   │   └── RegisterPage.xaml
-│   ├── Routes/
-│   │   ├── WeeklyRoutesPage.xaml
-│   │   └── CreateWeeklyRoutePage.xaml
-│   ├── Matching/
-│   │   └── MatchResultsPage.xaml
-│   └── HomePage.xaml
-├── ViewModels/
-├── Services/
-│   ├── Interfaces/
-│   │   ├── IAuthService.cs
-│   │   ├── IRouteService.cs
-│   │   ├── IMatchingService.cs
-│   │   └── IPricingService.cs
-│   ├── Firebase/
-│   │   ├── FirebaseAuthService.cs
-│   │   └── FirestoreRouteService.cs
-│   ├── MatchingService.cs
-│   └── PricingService.cs
-├── App.xaml
-├── App.xaml.cs
-├── AppShell.xaml
-└── MauiProgram.cs
-```
+As coleções funcionais são:
 
----
+- `users`: perfil básico;
+- `weeklyRoutes`: rotas de motorista e passageiro;
+- `rideRequests`: solicitações, status e snapshot de preço.
 
-## 3. Estratégia de desenvolvimento
+Não existem coleções de cache geográfico, matches ou polylines. Resultados de
+matching e geometria permanecem apenas em memória.
 
-O MVP deve ser construído em incrementos verticais.
+## 4. Rotas semanais e endereços
 
-Cada incremento deve atravessar todas as camadas necessárias para entregar uma funcionalidade real e testável.
+Origem e destino são selecionados pelo autocomplete da Places API (New). Uma
+rota salva contém o texto apresentado ao usuário e os respectivos Place IDs.
 
-Evitar desenvolvimento horizontal do tipo:
+O autocomplete usa:
+
+- mínimo de 3 caracteres;
+- debounce de 350 ms;
+- cancelamento e versão da consulta para ignorar respostas obsoletas;
+- sessões independentes para origem e destino;
+- encerramento da sessão por Place Details após a seleção.
+
+Editar ou limpar o texto depois de uma seleção invalida o Place ID. Rotas
+novas e rotas editadas só podem ser salvas após uma seleção válida.
+
+Documentos legados sem Place IDs continuam legíveis e aparecem no gerenciamento
+de rotas. Eles não são geocodificados automaticamente e não participam do
+matching até serem editados e salvos com endereços selecionados.
+
+Ao salvar uma rota de motorista, a Routes API calcula a distância real e
+`EstimatedDistanceKm` recebe o valor em quilômetros. Rotas de passageiro
+continuam com distância zero. Não há entrada manual de distância.
+
+## 5. Matching geográfico
+
+O matching aplica primeiro os filtros locais:
+
+1. candidato motorista;
+2. usuário diferente;
+3. vaga disponível;
+4. ao menos um dia em comum;
+5. diferença de horário de até 30 minutos;
+6. Place IDs válidos.
+
+Somente os candidatos sobreviventes geram chamadas de rota. Para cada um, o
+aplicativo compara:
 
 ```text
-todos os Models
-→ todos os Services
-→ todas as telas
-→ toda a lógica
+rota base: motorista origem → motorista destino
+
+rota compartilhada: motorista origem
+                  → passageiro origem
+                  → passageiro destino
+                  → motorista destino
 ```
 
-Preferir:
+Waypoints consecutivos repetidos são removidos. A execução mantém cache em
+memória para não recalcular uma combinação idêntica. O processamento é
+sequencial para limitar chamadas faturáveis; uma falha específica elimina
+somente o candidato, enquanto falhas globais de autenticação, quota ou
+configuração interrompem a busca.
+
+Os limites centralizados em `MatchingOptions` são:
+
+- tolerância de horário: 30 minutos;
+- desvio máximo de distância: 5 km;
+- desvio máximo de duração: 15 minutos.
+
+Ambos os limites de desvio precisam ser respeitados. Diferenças negativas são
+normalizadas para zero. A ordenação é determinística por menor desvio de tempo,
+menor desvio de distância, menor diferença de horário, mais dias compatíveis,
+horário de saída e ID da rota.
+
+## 6. Precificação e solicitações
+
+A fórmula permanece:
 
 ```text
-uma funcionalidade completa
-→ próxima funcionalidade
-→ próxima funcionalidade
+distância compartilhada × 0,53 ÷ 2
 ```
 
-Cada incremento só deve ser considerado concluído quando puder ser demonstrado.
+`MatchResult.SharedDistanceKm` alimenta o cálculo. O valor arredondado exibido é
+persistido em `RideRequest.SuggestedPrice` como snapshot; aceite, rejeição e
+telas posteriores não recalculam o preço nem chamam Routes novamente.
 
----
+Solicitações preservam os tipos `Once` e `Weekly` e os status `Pending`,
+`Accepted` e `Rejected`. O aceite usa transação REST com preconditions de
+`updateTime`, `requestRevision` e tentativas limitadas para consumir a vaga sem
+overbooking. Quando a última vaga é ocupada, solicitações concorrentes pendentes
+da rota são rejeitadas na mesma operação.
 
-# 4. Incremento 1 — Autenticação
+## 7. Visualização do trajeto
 
-## Objetivo
-
-Garantir que apenas usuários cadastrados tenham acesso ao aplicativo.
-
-## Implementar
-
-- `LoginPage`
-- `RegisterPage`
-- `HomePage`
-- `LoginViewModel`
-- `RegisterViewModel`
-- `HomeViewModel`
-- modelo `User`
-- `IAuthService`
-- `FirebaseAuthService`
-- configuração de DI
-- navegação
-- verificação de sessão
-- logout
-- persistência do perfil básico em Firestore
-
-## Fluxo
+`computeRoute` retorna distância, duração e a polyline overview codificada na
+mesma chamada usada pelo matching. O FieldMask é:
 
 ```text
-Abre o aplicativo
-        ↓
-Existe sessão válida?
-    ↙            ↘
-  Sim            Não
-   ↓              ↓
- Home           Login
-                  ↓
-             Criar conta
-                  ↓
-               Cadastro
-                  ↓
-          Firebase Auth
-                  ↓
-             Firestore
-                  ↓
-                Home
+routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline
 ```
 
-## Critério de pronto
-
-O usuário consegue:
-
-1. criar conta;
-2. entrar;
-3. acessar a Home;
-4. fechar e reabrir o aplicativo com a sessão reconhecida quando aplicável;
-5. sair;
-6. retornar ao fluxo de autenticação.
-
----
-
-# 5. Incremento 2 — Rotas semanais
-
-## Objetivo
-
-Permitir que o usuário autenticado registre sua rotina de deslocamento.
-
-## Modelo principal
-
-`WeeklyRoute`
-
-Campos mínimos:
-
-- `Id`
-- `UserId`
-- `Origin`
-- `Destination`
-- `Days`
-- `Time`
-- `Role`
-- `Seats`, quando aplicável
-
-## Papel do usuário
-
-O papel deve estar associado à rota semanal.
-
-Exemplo:
-
-```text
-Usuário A
-├── segunda 07:00 → motorista
-├── terça 18:30   → passageiro
-└── quinta 07:00  → motorista
-```
-
-## Implementar
-
-- `WeeklyRoute`
-- `IRouteService`
-- implementação Firestore
-- tela para criação de rota
-- tela/listagem de rotas
-- gravação em `weeklyRoutes`
-- leitura das rotas do usuário
-- validação de campos
-
-## Critério de pronto
-
-Uma rota semanal pode ser cadastrada, persistida e recuperada.
-
----
-
-# 6. Incremento 3 — Matching determinístico
-
-## Objetivo
-
-Identificar compatibilidade entre motorista e passageiro usando regras simples.
-
-## Regras básicas
-
-Uma combinação pode considerar:
-
-```text
-papéis opostos
-AND
-dia compatível
-AND
-horário compatível
-AND
-origem compatível
-AND
-destino compatível
-```
-
-## Implementar
-
-- `MatchResult`
-- `IMatchingService`
-- `MatchingService`
-- regras de comparação
-- tolerância de horário definida pelo projeto
-- tela de resultado
-
-## Não implementar
-
-- cálculo real de rota
-- GPS
-- geolocalização avançada
-- desvio de rota
-- inteligência artificial
-
-## Critério de pronto
-
-Cenários compatíveis e incompatíveis previamente preparados produzem resultados coerentes e reproduzíveis.
-
----
-
-# 7. Incremento 4 — Preço sugerido
-
-## Objetivo
-
-Exibir um valor estimado por meio de uma fórmula simples e transparente.
-
-## Implementar
-
-- `PricingResult`
-- `IPricingService`
-- `PricingService`
-- fórmula documentada
-- parâmetros de entrada
-- exibição do resultado
-
-A persistência em `pricingCalculations` é opcional no início e deve ser feita apenas se contribuir para rastreabilidade ou validação.
-
-## Critério de pronto
-
-O preço exibido pode ser reproduzido manualmente usando a mesma fórmula e os mesmos parâmetros.
-
----
-
-# 8. Incremento 5 — Validação acadêmica
-
-## Objetivo
-
-Demonstrar que o MVP atende ao objetivo proposto.
-
-## Preparar
-
-- dados reais limitados ou dados demonstrativos;
-- cenários controlados;
-- entradas;
-- resultado esperado;
-- resultado obtido;
-- falhas;
-- evidências;
-- screenshots.
-
-## Casos mínimos
-
-### Autenticação
-- cadastro válido;
-- login válido;
-- login inválido;
-- logout.
-
-### Rotas
-- criação válida;
-- campos obrigatórios;
-- recuperação da rota salva.
-
-### Matching
-- cenário compatível;
-- cenário incompatível por dia;
-- cenário incompatível por horário;
-- cenário incompatível por origem/destino;
-- cenário incompatível por papel.
-
-### Preço
-- cálculo com parâmetros conhecidos;
-- reprodução manual da fórmula.
-
-## Fluxo final da demonstração
-
-```text
-Criar conta
-    ↓
-Entrar
-    ↓
-Cadastrar rota semanal
-    ↓
-Buscar/comparar rota
-    ↓
-Exibir compatibilidade
-    ↓
-Calcular preço sugerido
-```
-
-## Critério de pronto
-
-O fluxo completo pode ser demonstrado de ponta a ponta com estabilidade nos cenários preparados.
-
----
-
-# 9. Evolução do Firestore
-
-| Incremento | Coleção | Finalidade |
-|---|---|---|
-| 1 | `users` | Perfil básico e identificação funcional |
-| 2 | `weeklyRoutes` | Rotas semanais |
-| 3 | `matches` | Opcional; rastrear comparações/resultados |
-| 4 | `pricingCalculations` | Opcional; rastrear cálculos |
-| Futuro | `feedback` | Aceite, recusa, avaliações e dados para evolução futura |
-
-Criar apenas as coleções necessárias ao incremento em desenvolvimento.
-
----
-
-# 10. Itens fora do escopo prioritário
-
-Não implementar no MVP atual, salvo decisão explícita posterior:
-
-- backend próprio;
-- API REST separada;
-- SQL;
-- PostgreSQL;
-- mapas avançados;
-- geolocalização avançada;
-- cálculo real de distância;
-- cálculo real de desvio;
-- chat;
-- pagamento;
-- reputação;
-- publicação em lojas;
-- dashboard analítico no aplicativo;
-- Machine Learning treinado;
-- IA em produção;
-- microserviços;
-- arquitetura distribuída.
-
----
-
-# 11. Inteligência artificial
-
-No MVP, o matching utiliza regras determinísticas.
-
-A IA deve ser tratada como evolução futura.
-
-Possível evolução:
-
-```text
-dados reais
-    ↓
-histórico de matches
-    ↓
-aceites/recusas
-    ↓
-horários e trajetos
-    ↓
-preferências
-    ↓
-modelo de ranking
-```
-
-Não afirmar na documentação ou apresentação que o MVP utiliza IA se não existir um modelo efetivamente implementado.
-
----
-
-# 12. Regra de decisão
-
-Para qualquer nova funcionalidade:
-
-> Isso melhora de forma clara a demonstração, a validação ou a documentação da entrega?
-
-Se a resposta for não, registrar como evolução futura.
-
----
-
-# 13. Definição de pronto geral
-
-Uma tarefa técnica deve ser considerada concluída quando:
-
-- o código está implementado;
-- o projeto compila;
-- o fluxo relacionado pode ser testado;
-- erros principais são tratados;
-- as decisões relevantes estão documentadas;
-- não foram adicionadas funcionalidades fora do escopo;
-- a alteração é pequena o suficiente para ser revisada;
-- o commit descreve claramente a mudança.
-
----
-
-# 14. Estratégia de branches
-
-Sugestão:
-
-```text
-master
-├── feature/authentication
-├── feature/weekly-routes
-├── feature/matching
-├── feature/pricing
-└── feature/validation
-```
-
-Evitar implementar diretamente em `master`.
-
----
-
-# 15. Commits sugeridos
-
-```text
-feat(auth): add authentication views and navigation
-feat(auth): integrate Firebase authentication
-feat(auth): persist user profile in Firestore
-
-feat(routes): add weekly route model and service
-feat(routes): add weekly route registration flow
-
-feat(matching): add deterministic matching rules
-feat(matching): add match results view
-
-feat(pricing): add suggested price calculation
-
-test(validation): add MVP validation scenarios
-```
-
----
-
-# 16. Resultado esperado
-
-Ao final do desenvolvimento, o UniRota deve demonstrar que:
-
-- um usuário consegue criar conta e entrar;
-- uma rota semanal pode ser cadastrada;
-- o sistema consegue identificar ou classificar uma rota compatível;
-- o sistema apresenta um preço sugerido;
-- a demonstração é estável;
-- a equipe consegue explicar arquitetura, dados, limitações e evolução futura;
-- a documentação diferencia claramente o que foi implementado do que permanece como evolução.
+`RouteDetailsPage` decodifica a polyline no aplicativo, calcula o viewport e
+desenha o trajeto. `placeCoordinates` consulta somente `location` para até
+quatro Place IDs e é usada apenas ao abrir os detalhes, para posicionar os pins
+exatos. Place IDs repetidos geram um único pin com rótulos combinados.
+
+Abrir o mapa não chama Routes, não refaz matching, não cria solicitação e não
+altera preço ou vagas. O mapa não usa GPS, localização atual, tracking ou
+navegação turn-by-turn.
+
+## 8. Chaves e configuração
+
+- `GOOGLE_PLACES_API_KEY`: Secret Manager, restrita à Places API (New);
+- `GOOGLE_ROUTES_API_KEY`: Secret Manager, restrita à Routes API;
+- `GOOGLE_MAPS_ANDROID_API_KEY`: injetada no build e restrita ao aplicativo
+  Android e ao Maps SDK for Android.
+
+O ApplicationId definitivo é `io.github.matheusiannaccone.unirota`. A chave
+Android deve ser restrita por esse package name e pelos SHA-1 dos certificados
+de debug e release aplicáveis. Consulte `GooglePlacesSetup.md` para os comandos
+e passos manuais.
+
+## 9. Validação e fechamento
+
+Cada alteração deve manter:
+
+- testes unitários sem acesso real ao Google;
+- testes Node das Functions;
+- `npm audit` sem vulnerabilidades conhecidas;
+- `git diff --check` limpo;
+- build Android `net8.0-android` sem erros ou avisos;
+- ausência de chaves de servidor, tokens e credenciais no Git.
+
+Firestore Security Rules não fazem parte do fechamento deste incremento. Sua
+revisão e validação serão realizadas separadamente antes de usuários reais.
+
+## 10. Fora do escopo atual
+
+- GPS e localização atual;
+- tracking ou compartilhamento em tempo real;
+- navegação turn-by-turn;
+- chat, pagamento e notificações;
+- cache geográfico persistente;
+- otimização de múltiplos passageiros;
+- nova fórmula de preço;
+- refatoração arquitetural ampla.

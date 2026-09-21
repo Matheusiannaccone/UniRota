@@ -98,6 +98,9 @@
                                     Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}"
                                     TextColor="{DynamicResource TextSecondary}"
                                     LineBreakMode="WordWrap" />
+                                <Label
+                                    Text="{Binding DetourText}"
+                                    TextColor="{DynamicResource TextSecondary}" />
                                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
                                     <Label
                                         Grid.Column="0"
@@ -107,10 +110,18 @@
                                         Text="{Binding AvailableSeatsText}"
                                         HorizontalOptions="End" />
                                 </Grid>
-                                <Button
-                                    Text="Solicitar carona"
-                                    Clicked="OnRequestRideClicked"
-                                    CommandParameter="{Binding .}" />
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                    <Button
+                                        Grid.Column="0"
+                                        Text="Ver trajeto"
+                                        Clicked="OnViewRouteClicked"
+                                        CommandParameter="{Binding .}" />
+                                    <Button
+                                        Grid.Column="1"
+                                        Text="Solicitar carona"
+                                        Clicked="OnRequestRideClicked"
+                                        CommandParameter="{Binding .}" />
+                                </Grid>
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>

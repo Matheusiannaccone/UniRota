@@ -4,7 +4,8 @@ namespace UniRota.Services.Interfaces;
 
 public interface IMatchingService
 {
-    IReadOnlyList<MatchResult> FindMatches(
+    Task<IReadOnlyList<MatchResult>> FindMatchesAsync(
         WeeklyRoute passengerRoute,
-        IEnumerable<WeeklyRoute> candidateRoutes);
+        IEnumerable<WeeklyRoute> candidateRoutes,
+        CancellationToken cancellationToken = default);
 }

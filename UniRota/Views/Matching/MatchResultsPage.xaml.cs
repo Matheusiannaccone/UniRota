@@ -9,6 +9,8 @@ public partial class MatchResultsPage : ContentPage, IQueryAttributable
 
     private readonly MatchResultsViewModel _viewModel;
     private bool _isNavigatingToRequest;
+    private bool _isNavigatingToDetails;
+    private bool _skipNextLoad;
 
     public MatchResultsPage(MatchResultsViewModel viewModel)
     {
@@ -16,6 +18,7 @@ public partial class MatchResultsPage : ContentPage, IQueryAttributable
         _viewModel = viewModel;
         BindingContext = viewModel;
         _viewModel.RideRequestRequested += OnRideRequestRequested;
+        _viewModel.RouteDetailsRequested += OnRouteDetailsRequested;
     }
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
@@ -30,7 +33,22 @@ public partial class MatchResultsPage : ContentPage, IQueryAttributable
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        if (_skipNextLoad)
+        {
+            _skipNextLoad = false;
+            return;
+        }
+
         await _viewModel.LoadCommand.ExecuteAsync(null);
+    }
+
+    private void OnViewRouteClicked(object sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: MatchResultItemViewModel result })
+        {
+            _viewModel.ViewRouteCommand.Execute(result);
+        }
     }
 
     private void OnRequestRideClicked(object sender, EventArgs e)
@@ -65,6 +83,40 @@ public partial class MatchResultsPage : ContentPage, IQueryAttributable
         finally
         {
             _isNavigatingToRequest = false;
+        }
+    }
+
+    private async void OnRouteDetailsRequested(
+        WeeklyRoute passengerRoute,
+        MatchResultItemViewModel result)
+    {
+        if (_isNavigatingToDetails || _viewModel.IsBusy)
+        {
+            return;
+        }
+
+        _isNavigatingToDetails = true;
+        _skipNextLoad = true;
+
+        try
+        {
+            await Shell.Current.GoToAsync(
+                nameof(RouteDetailsPage),
+                new Dictionary<string, object>
+                {
+                    [RouteDetailsPage.PassengerRouteParameterName] =
+                        passengerRoute,
+                    [RouteDetailsPage.MatchParameterName] = result.Match
+                });
+        }
+        catch
+        {
+            _skipNextLoad = false;
+            throw;
+        }
+        finally
+        {
+            _isNavigatingToDetails = false;
         }
     }
 }

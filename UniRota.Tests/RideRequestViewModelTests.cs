@@ -8,19 +8,24 @@ namespace UniRota.Tests;
 public sealed class RideRequestViewModelTests
 {
     [Fact]
-    public void SetRequestContext_CalculatesAndExposesSuggestedPrice()
+    public void SetRequestContext_CalculatesPriceFromSharedRouteDistance()
     {
         var requestService = new FakeRideRequestService();
         var pricingService = new CountingPricingService();
         var viewModel = new RideRequestViewModel(
             requestService,
             pricingService);
-        var (passengerRoute, match) = CreateContext(12.75m);
+        var (passengerRoute, match) = CreateContext(
+            sharedDistanceKm: 12.75m,
+            driverEstimatedDistanceKm: 99m);
 
         viewModel.SetRequestContext(passengerRoute, match);
 
         Assert.Equal(1, pricingService.CalculateCount);
         Assert.Equal(12.75m, pricingService.LastDistanceKm);
+        Assert.NotEqual(
+            match.DriverRoute.EstimatedDistanceKm,
+            pricingService.LastDistanceKm);
         Assert.True(viewModel.HasSuggestedPrice);
         Assert.Equal(
             "Preço sugerido: R$ 3,38 por viagem",
@@ -51,20 +56,22 @@ public sealed class RideRequestViewModelTests
     }
 
     [Fact]
-    public async Task InvalidDriverDistance_PreventsRequestCreation()
+    public async Task InvalidSharedRouteDistance_PreventsRequestCreation()
     {
         var requestService = new FakeRideRequestService();
         var pricingService = new CountingPricingService();
         var viewModel = new RideRequestViewModel(
             requestService,
             pricingService);
-        var (passengerRoute, match) = CreateContext(0m);
+        var (passengerRoute, match) = CreateContext(
+            sharedDistanceKm: 0m,
+            driverEstimatedDistanceKm: 12.75m);
 
         viewModel.SetRequestContext(passengerRoute, match);
 
         Assert.False(viewModel.HasSuggestedPrice);
         Assert.True(viewModel.HasError);
-        Assert.Contains("distância estimada válida", viewModel.ErrorMessage);
+        Assert.Contains("rota compartilhada", viewModel.ErrorMessage);
 
         viewModel.SelectedRequestType = GetRequestType(
             viewModel,
@@ -74,6 +81,34 @@ public sealed class RideRequestViewModelTests
         Assert.Equal(1, pricingService.CalculateCount);
         Assert.Equal(0, requestService.CreateCount);
         Assert.True(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task Submit_DoesNotCallMapServiceAfterMatching()
+    {
+        var mapRouteService = new CountingMapRouteService();
+        var passengerRoute = CreatePassengerRouteWithPlaceIds();
+        var driverRoute = CreateDriverRouteWithPlaceIds();
+        var match = Assert.Single(await new MatchingService(
+                mapRouteService,
+                new MatchingOptions())
+            .FindMatchesAsync(passengerRoute, [driverRoute]));
+        Assert.Equal(2, mapRouteService.CalculateCount);
+
+        var requestService = new FakeRideRequestService();
+        var viewModel = new RideRequestViewModel(
+            requestService,
+            new CountingPricingService());
+        viewModel.SetRequestContext(passengerRoute, match);
+        viewModel.SelectedRequestType = GetRequestType(
+            viewModel,
+            RideRequestType.Weekly);
+
+        await viewModel.SubmitCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, mapRouteService.CalculateCount);
+        Assert.Equal(1, requestService.CreateCount);
+        Assert.Equal(3.18m, requestService.LastSuggestedPrice);
     }
 
     [Fact]
@@ -129,7 +164,8 @@ public sealed class RideRequestViewModelTests
     }
 
     private static (WeeklyRoute PassengerRoute, MatchResult Match) CreateContext(
-        decimal estimatedDistanceKm)
+        decimal sharedDistanceKm,
+        decimal driverEstimatedDistanceKm = 10m)
     {
         var currentDay = DateTime.Today.DayOfWeek;
         var passengerRoute = new WeeklyRoute
@@ -153,12 +189,52 @@ public sealed class RideRequestViewModelTests
             DaysOfWeek = [currentDay],
             DepartureTimeMinutes = 480,
             AvailableSeats = 1,
-            EstimatedDistanceKm = estimatedDistanceKm
+            EstimatedDistanceKm = driverEstimatedDistanceKm
         };
 
         return (
             passengerRoute,
-            new MatchResult(driverRoute, [currentDay], 0));
+            new MatchResult(
+                driverRoute,
+                [currentDay],
+                0,
+                SharedDistanceKm: sharedDistanceKm));
+    }
+
+    private static WeeklyRoute CreatePassengerRouteWithPlaceIds()
+    {
+        return new WeeklyRoute
+        {
+            Id = "passenger-route",
+            UserId = "passenger-user",
+            UserName = "Passageiro",
+            Role = RouteRole.Passenger,
+            Origin = "Origem do passageiro",
+            OriginPlaceId = "passenger-origin",
+            Destination = "Destino do passageiro",
+            DestinationPlaceId = "passenger-destination",
+            DaysOfWeek = [DayOfWeek.Monday],
+            DepartureTimeMinutes = 480
+        };
+    }
+
+    private static WeeklyRoute CreateDriverRouteWithPlaceIds()
+    {
+        return new WeeklyRoute
+        {
+            Id = "driver-route",
+            UserId = "driver-user",
+            UserName = "Motorista",
+            Role = RouteRole.Driver,
+            Origin = "Origem do motorista",
+            OriginPlaceId = "driver-origin",
+            Destination = "Destino do motorista",
+            DestinationPlaceId = "driver-destination",
+            DaysOfWeek = [DayOfWeek.Monday],
+            DepartureTimeMinutes = 480,
+            AvailableSeats = 1,
+            EstimatedDistanceKm = 10m
+        };
     }
 
     private sealed class CountingPricingService : IPricingService
@@ -174,6 +250,30 @@ public sealed class RideRequestViewModelTests
             CalculateCount++;
             LastDistanceKm = distanceKm;
             return _innerService.Calculate(distanceKm);
+        }
+    }
+
+    private sealed class CountingMapRouteService : IMapRouteService
+    {
+        public int CalculateCount { get; private set; }
+
+        public Task<MapRouteResult> CalculateAsync(
+            string originPlaceId,
+            string destinationPlaceId,
+            IReadOnlyList<string>? intermediatePlaceIds = null,
+            CancellationToken cancellationToken = default)
+        {
+            CalculateCount++;
+
+            return Task.FromResult(new MapRouteResult
+            {
+                DistanceMeters = intermediatePlaceIds is { Count: > 0 }
+                    ? 12000
+                    : 10000,
+                Duration = intermediatePlaceIds is { Count: > 0 }
+                    ? TimeSpan.FromMinutes(40)
+                    : TimeSpan.FromMinutes(30)
+            });
         }
     }
 

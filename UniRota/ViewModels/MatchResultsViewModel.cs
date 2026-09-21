@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using UniRota.Models;
@@ -43,6 +44,9 @@ public partial class MatchResultsViewModel : ObservableObject
 
     public event Action<WeeklyRoute, MatchResultItemViewModel>?
         RideRequestRequested;
+
+    public event Action<WeeklyRoute, MatchResultItemViewModel>?
+        RouteDetailsRequested;
 
     public ObservableCollection<MatchResultItemViewModel> Results { get; } = [];
 
@@ -108,9 +112,6 @@ public partial class MatchResultsViewModel : ObservableObject
 
             var driverRoutes = await _routeService.GetDriverRoutesAsync(
                 cancellationToken);
-            var matches = _matchingService.FindMatches(
-                _passengerRoute,
-                driverRoutes);
             var activeRequests = await _rideRequestService
                 .GetMyActiveRequestsAsync(cancellationToken);
             var unavailableDriverRouteIds = activeRequests
@@ -120,10 +121,13 @@ public partial class MatchResultsViewModel : ObservableObject
                     StringComparison.Ordinal))
                 .Select(request => request.DriverRouteId)
                 .ToHashSet(StringComparer.Ordinal);
+            var matches = await _matchingService.FindMatchesAsync(
+                _passengerRoute,
+                driverRoutes.Where(route =>
+                    !unavailableDriverRouteIds.Contains(route.Id)),
+                cancellationToken);
 
-            foreach (var match in matches.Where(
-                         match => !unavailableDriverRouteIds.Contains(
-                             match.DriverRoute.Id)))
+            foreach (var match in matches)
             {
                 Results.Add(new MatchResultItemViewModel(match));
             }
@@ -156,6 +160,17 @@ public partial class MatchResultsViewModel : ObservableObject
         RideRequestRequested?.Invoke(_passengerRoute, result);
     }
 
+    [RelayCommand]
+    private void ViewRoute(MatchResultItemViewModel? result)
+    {
+        if (result is null || _passengerRoute is null || IsBusy)
+        {
+            return;
+        }
+
+        RouteDetailsRequested?.Invoke(_passengerRoute, result);
+    }
+
     private void ClearError()
     {
         ErrorMessage = string.Empty;
@@ -173,6 +188,9 @@ public partial class MatchResultsViewModel : ObservableObject
 
 public sealed class MatchResultItemViewModel
 {
+    private static readonly CultureInfo PtBrCulture =
+        CultureInfo.GetCultureInfo("pt-BR");
+
     public MatchResultItemViewModel(MatchResult match)
     {
         Match = match ?? throw new ArgumentNullException(nameof(match));
@@ -198,4 +216,10 @@ public sealed class MatchResultItemViewModel
     public string AvailableSeatsText =>
         RoutePresentationText.GetAvailableSeatsText(
             Match.DriverRoute.AvailableSeats);
+
+    public string DetourText =>
+        $"Desvio: +{Match.DetourDistanceKm.ToString("0.#", PtBrCulture)} km"
+        + $" · +{Math.Ceiling(Match.DetourDurationMinutes).ToString(
+            "0",
+            PtBrCulture)} min";
 }

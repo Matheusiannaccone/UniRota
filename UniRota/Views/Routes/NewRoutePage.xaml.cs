@@ -1,8 +1,4 @@
 using System.ComponentModel;
-#if ANDROID
-using Android.Text;
-using Android.Text.Method;
-#endif
 using UniRota.Models;
 using UniRota.ViewModels;
 
@@ -21,31 +17,7 @@ public partial class NewRoutePage : ContentPage, IQueryAttributable
         _viewModel = viewModel;
         BindingContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-
-#if ANDROID
-        EstimatedDistanceEntry.HandlerChanged +=
-            OnEstimatedDistanceEntryHandlerChanged;
-        ConfigureEstimatedDistanceKeyboard();
-#endif
     }
-
-#if ANDROID
-    private void OnEstimatedDistanceEntryHandlerChanged(
-        object? sender,
-        EventArgs e)
-    {
-        ConfigureEstimatedDistanceKeyboard();
-    }
-
-    private void ConfigureEstimatedDistanceKeyboard()
-    {
-        if (EstimatedDistanceEntry.Handler?.PlatformView
-            is Android.Widget.EditText platformEntry)
-        {
-            platformEntry.KeyListener = new PtBrDecimalKeyListener();
-        }
-    }
-#endif
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
@@ -86,16 +58,4 @@ public partial class NewRoutePage : ContentPage, IQueryAttributable
         }
     }
 
-#if ANDROID
-    private sealed class PtBrDecimalKeyListener : NumberKeyListener
-    {
-        private static readonly char[] AcceptedCharacters =
-            "0123456789,".ToCharArray();
-
-        public override InputTypes InputType =>
-            InputTypes.ClassNumber | InputTypes.NumberFlagDecimal;
-
-        protected override char[] GetAcceptedChars() => AcceptedCharacters;
-    }
-#endif
 }

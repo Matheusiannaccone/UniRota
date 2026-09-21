@@ -376,7 +376,7 @@ public sealed class FirebaseAuthService : IAuthService
                 throw invalidSessionException;
             }
 
-            throw CreateFirebaseException(firebaseCode, response.Content);
+            throw CreateFirebaseException(firebaseCode);
         }
 
         var tokenResponse = DeserializeResponse<RefreshTokenResponseDto>(response.Content);
@@ -446,7 +446,7 @@ public sealed class FirebaseAuthService : IAuthService
         }
 
         var firebaseCode = ExtractFirebaseErrorCode(response.Content);
-        throw CreateFirebaseException(firebaseCode, response.Content);
+        throw CreateFirebaseException(firebaseCode);
     }
 
     private static T DeserializeResponse<T>(string content)
@@ -500,8 +500,7 @@ public sealed class FirebaseAuthService : IAuthService
     }
 
     private static InvalidOperationException CreateFirebaseException(
-        string firebaseCode,
-        string responseContent)
+        string firebaseCode)
     {
         var message = firebaseCode switch
         {
@@ -522,7 +521,6 @@ public sealed class FirebaseAuthService : IAuthService
 
         var exception = new InvalidOperationException(message);
         exception.Data["FirebaseCode"] = firebaseCode;
-        exception.Data["FirebaseResponse"] = responseContent;
         return exception;
     }
 
