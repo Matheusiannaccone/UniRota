@@ -3,6 +3,7 @@
 using Microsoft.Maui.Storage;
 using UniRota.Services;
 using UniRota.Services.Firebase;
+using UniRota.Services.GoogleMaps;
 using UniRota.Services.Interfaces;
 using UniRota.ViewModels;
 using UniRota.Views;
@@ -33,12 +34,14 @@ namespace UniRota
             builder.Services.AddSingleton(new FirebaseOptions
             {
                 ApiKey = "AIzaSyAzpxdWWh1ZnpYW1L8tREBbLvywpUPzUvc",
-                ProjectId = "unirota-f0a63"
+                ProjectId = "unirota-f0a63",
+                FunctionsRegion = "southamerica-east1"
             });
             builder.Services.AddSingleton(new HttpClient());
             builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
             builder.Services.AddSingleton<IAuthService, FirebaseAuthService>();
             builder.Services.AddSingleton<IRouteService, FirebaseRouteService>();
+            builder.Services.AddSingleton<IPlaceService, GooglePlaceService>();
             builder.Services.AddSingleton<IMatchingService, MatchingService>();
             builder.Services.AddSingleton<IPricingService, PricingService>();
             builder.Services.AddSingleton<IRideRequestService, FirebaseRideRequestService>();

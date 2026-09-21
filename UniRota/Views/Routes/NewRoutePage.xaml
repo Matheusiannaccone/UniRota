@@ -3,6 +3,7 @@
     x:Class="UniRota.Views.Routes.NewRoutePage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:UniRota.Models"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
     Shell.NavBarIsVisible="True"
     Title="{Binding PageTitle}">
@@ -46,6 +47,51 @@
                     ReturnType="Next"
                     IsEnabled="{Binding IsNotBusy}" />
             </Border>
+            <ActivityIndicator
+                IsRunning="{Binding IsSearchingOrigin}"
+                IsVisible="{Binding IsSearchingOrigin}"
+                HorizontalOptions="Start" />
+            <VerticalStackLayout
+                IsVisible="{Binding HasOriginSuggestions}"
+                Spacing="4">
+                <VerticalStackLayout
+                    BindableLayout.ItemsSource="{Binding OriginSuggestions}"
+                    Spacing="4">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="models:PlaceSuggestion">
+                            <Border
+                                Padding="12,10"
+                                BackgroundColor="{DynamicResource SurfaceSecondary}"
+                                Stroke="{DynamicResource BorderBrush}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="8" />
+                                </Border.StrokeShape>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectOriginCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Label
+                                    Text="{Binding DisplayText}"
+                                    TextColor="{DynamicResource TextPrimary}"
+                                    LineBreakMode="WordWrap" />
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label
+                    Text="Google Maps"
+                    FontSize="12"
+                    FontAttributes="None"
+                    TextColor="{DynamicResource TextSecondary}"
+                    HorizontalOptions="End" />
+            </VerticalStackLayout>
+            <Label
+                Text="{Binding OriginSearchError}"
+                IsVisible="{Binding HasOriginSearchError}"
+                TextColor="{DynamicResource Error}"
+                FontSize="13"
+                LineBreakMode="WordWrap" />
 
             <Label Text="Destino" />
             <Border Padding="12,0" Stroke="{DynamicResource BorderBrush}">
@@ -58,6 +104,51 @@
                     ReturnType="Next"
                     IsEnabled="{Binding IsNotBusy}" />
             </Border>
+            <ActivityIndicator
+                IsRunning="{Binding IsSearchingDestination}"
+                IsVisible="{Binding IsSearchingDestination}"
+                HorizontalOptions="Start" />
+            <VerticalStackLayout
+                IsVisible="{Binding HasDestinationSuggestions}"
+                Spacing="4">
+                <VerticalStackLayout
+                    BindableLayout.ItemsSource="{Binding DestinationSuggestions}"
+                    Spacing="4">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="models:PlaceSuggestion">
+                            <Border
+                                Padding="12,10"
+                                BackgroundColor="{DynamicResource SurfaceSecondary}"
+                                Stroke="{DynamicResource BorderBrush}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="8" />
+                                </Border.StrokeShape>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectDestinationCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Label
+                                    Text="{Binding DisplayText}"
+                                    TextColor="{DynamicResource TextPrimary}"
+                                    LineBreakMode="WordWrap" />
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label
+                    Text="Google Maps"
+                    FontSize="12"
+                    FontAttributes="None"
+                    TextColor="{DynamicResource TextSecondary}"
+                    HorizontalOptions="End" />
+            </VerticalStackLayout>
+            <Label
+                Text="{Binding DestinationSearchError}"
+                IsVisible="{Binding HasDestinationSearchError}"
+                TextColor="{DynamicResource Error}"
+                FontSize="13"
+                LineBreakMode="WordWrap" />
 
             <Label Text="Dias da semana" />
             <VerticalStackLayout
