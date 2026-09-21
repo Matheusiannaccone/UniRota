@@ -7,15 +7,22 @@ const {
   autocompletePlaces,
   getPlaceDetails,
 } = require("./googlePlaces");
+const { createComputeRouteHandler } = require("./googleRoutesCallable");
 
 const googlePlacesApiKey = defineSecret("GOOGLE_PLACES_API_KEY");
-const callableOptions = {
+const googleRoutesApiKey = defineSecret("GOOGLE_ROUTES_API_KEY");
+const placesCallableOptions = {
   region: "southamerica-east1",
   secrets: [googlePlacesApiKey],
   timeoutSeconds: 15,
 };
+const routesCallableOptions = {
+  region: "southamerica-east1",
+  secrets: [googleRoutesApiKey],
+  timeoutSeconds: 15,
+};
 
-exports.placesAutocomplete = onCall(callableOptions, async (request) => {
+exports.placesAutocomplete = onCall(placesCallableOptions, async (request) => {
   requireAuthenticatedUser(request);
   const input = requireText(request.data?.input, "input", 3, 200);
   const sessionToken = requireSessionToken(request.data?.sessionToken);
@@ -31,7 +38,7 @@ exports.placesAutocomplete = onCall(callableOptions, async (request) => {
   }
 });
 
-exports.placeDetails = onCall(callableOptions, async (request) => {
+exports.placeDetails = onCall(placesCallableOptions, async (request) => {
   requireAuthenticatedUser(request);
   const placeId = requireText(request.data?.placeId, "placeId", 1, 300);
   const sessionToken = requireSessionToken(request.data?.sessionToken);
@@ -46,6 +53,12 @@ exports.placeDetails = onCall(callableOptions, async (request) => {
     throw mapPlacesError(error);
   }
 });
+
+exports.computeRoute = onCall(
+  routesCallableOptions,
+  createComputeRouteHandler({
+    getApiKey: () => googleRoutesApiKey.value(),
+  }));
 
 function requireAuthenticatedUser(request) {
   if (!request.auth) {

@@ -5,8 +5,7 @@ namespace UniRota.Services.Interfaces;
 public interface IMapRouteService
 {
     Task<MapRouteResult> CalculateAsync(
-        SelectedPlace origin,
-        SelectedPlace destination,
-        IReadOnlyList<SelectedPlace>? waypoints = null,
+        string originPlaceId,
+        string destinationPlaceId,
         CancellationToken cancellationToken = default);
 }

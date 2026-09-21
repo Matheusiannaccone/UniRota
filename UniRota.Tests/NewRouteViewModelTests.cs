@@ -7,124 +7,148 @@ namespace UniRota.Tests;
 public sealed class NewRouteViewModelTests
 {
     [Fact]
-    public async Task Save_CreatesDriverRouteWithDecimalDistance()
+    public async Task Save_CalculatesAndCreatesDriverRouteInKilometers()
     {
         var service = new FakeRouteService();
-        var viewModel = CreateValidViewModel(service, RouteRole.Driver);
-        viewModel.EstimatedDistanceKmText = "12,75";
+        var mapRouteService = new FakeMapRouteService
+        {
+            Result = CreateMapRouteResult(11840, 1325.5)
+        };
+        var viewModel = CreateValidViewModel(
+            service,
+            RouteRole.Driver,
+            mapRouteService);
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
         var route = Assert.Single(service.CreatedRoutes);
-        Assert.Equal(12.75m, route.EstimatedDistanceKm);
+        Assert.Equal(11.84m, route.EstimatedDistanceKm);
+        var request = Assert.Single(mapRouteService.Requests);
+        Assert.Equal("origin-place-id", request.OriginPlaceId);
+        Assert.Equal("destination-place-id", request.DestinationPlaceId);
     }
 
     [Fact]
-    public async Task Save_DoesNotCreateDriverRouteWithoutDistance()
+    public async Task Save_CreatesPassengerRouteWithoutCalculatingDistance()
     {
         var service = new FakeRouteService();
-        var viewModel = CreateValidViewModel(service, RouteRole.Driver);
-        viewModel.EstimatedDistanceKmText = string.Empty;
-
-        await viewModel.SaveCommand.ExecuteAsync(null);
-
-        Assert.Empty(service.CreatedRoutes);
-        Assert.True(viewModel.HasError);
-    }
-
-    [Fact]
-    public async Task Save_DoesNotCreateDriverRouteWithZeroDistance()
-    {
-        var service = new FakeRouteService();
-        var viewModel = CreateValidViewModel(service, RouteRole.Driver);
-        viewModel.EstimatedDistanceKmText = "0";
-
-        await viewModel.SaveCommand.ExecuteAsync(null);
-
-        Assert.Empty(service.CreatedRoutes);
-        Assert.True(viewModel.HasError);
-    }
-
-    [Fact]
-    public async Task Save_DoesNotCreateDriverRouteWithNegativeDistance()
-    {
-        var service = new FakeRouteService();
-        var viewModel = CreateValidViewModel(service, RouteRole.Driver);
-        viewModel.EstimatedDistanceKmText = "-8,5";
-
-        await viewModel.SaveCommand.ExecuteAsync(null);
-
-        Assert.Empty(service.CreatedRoutes);
-        Assert.True(viewModel.HasError);
-    }
-
-    [Fact]
-    public async Task Save_DoesNotCreateDriverRouteWithInvalidDistanceFormat()
-    {
-        var service = new FakeRouteService();
-        var viewModel = CreateValidViewModel(service, RouteRole.Driver);
-        viewModel.EstimatedDistanceKmText = "oito e meio";
-
-        await viewModel.SaveCommand.ExecuteAsync(null);
-
-        Assert.Empty(service.CreatedRoutes);
-        Assert.True(viewModel.HasError);
-    }
-
-    [Fact]
-    public async Task Save_CreatesPassengerRouteWithZeroDistance()
-    {
-        var service = new FakeRouteService();
-        var viewModel = CreateValidViewModel(service, RouteRole.Passenger);
-        viewModel.EstimatedDistanceKmText = "99,9";
+        var mapRouteService = new FakeMapRouteService();
+        var viewModel = CreateValidViewModel(
+            service,
+            RouteRole.Passenger,
+            mapRouteService);
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
         var route = Assert.Single(service.CreatedRoutes);
         Assert.Equal(0m, route.EstimatedDistanceKm);
+        Assert.Empty(mapRouteService.Requests);
     }
 
     [Fact]
-    public void SelectingPassenger_ClearsDriverDistance()
-    {
-        var viewModel = CreateViewModel();
-        viewModel.SelectedRole = GetRole(viewModel, RouteRole.Driver);
-        viewModel.EstimatedDistanceKmText = "8,5";
-
-        viewModel.SelectedRole = GetRole(viewModel, RouteRole.Passenger);
-
-        Assert.Equal(string.Empty, viewModel.EstimatedDistanceKmText);
-    }
-
-    [Fact]
-    public void BeginEdit_LoadsDriverDistanceUsingPtBrFormat()
-    {
-        var viewModel = CreateViewModel();
-
-        viewModel.BeginEdit(CreateRoute(RouteRole.Driver, 8.5m));
-
-        Assert.True(viewModel.IsDriver);
-        Assert.Equal("8,5", viewModel.EstimatedDistanceKmText);
-    }
-
-    [Fact]
-    public void BeginEdit_KeepsPassengerDistanceAtZeroAndHidden()
-    {
-        var viewModel = CreateViewModel();
-
-        viewModel.BeginEdit(CreateRoute(RouteRole.Passenger, 0m));
-
-        Assert.False(viewModel.IsDriver);
-        Assert.Equal(string.Empty, viewModel.EstimatedDistanceKmText);
-    }
-
-    [Fact]
-    public async Task Save_UpdatesDriverRouteWithNewDistanceAndPreservesId()
+    public async Task Save_InvalidDriverRouteDoesNotCallMapService()
     {
         var service = new FakeRouteService();
-        var viewModel = new NewRouteViewModel(service, new FakePlaceService());
+        var mapRouteService = new FakeMapRouteService();
+        var viewModel = CreateValidViewModel(
+            service,
+            RouteRole.Driver,
+            mapRouteService);
+        viewModel.OriginPlaceId = string.Empty;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Empty(service.CreatedRoutes);
+        Assert.Empty(mapRouteService.Requests);
+    }
+
+    [Fact]
+    public async Task Save_RouteCalculationFailureDoesNotPersistDriverRoute()
+    {
+        var service = new FakeRouteService();
+        var mapRouteService = new FakeMapRouteService
+        {
+            CalculateHandler = (origin, destination, cancellationToken) =>
+                throw new InvalidOperationException(
+                    "Não foi possível calcular a rota. Tente novamente.")
+        };
+        var viewModel = CreateValidViewModel(
+            service,
+            RouteRole.Driver,
+            mapRouteService);
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Empty(service.CreatedRoutes);
+        Assert.True(viewModel.HasError);
+        Assert.Equal(
+            "Não foi possível calcular a rota. Tente novamente.",
+            viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Save_InvalidMapResultDoesNotPersistDriverRoute()
+    {
+        var service = new FakeRouteService();
+        var mapRouteService = new FakeMapRouteService
+        {
+            Result = CreateMapRouteResult(0, 0)
+        };
+        var viewModel = CreateValidViewModel(
+            service,
+            RouteRole.Driver,
+            mapRouteService);
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Empty(service.CreatedRoutes);
+        Assert.True(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task Save_WhileCalculatingDoesNotStartAnotherCalculation()
+    {
+        var service = new FakeRouteService();
+        var calculationStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCalculation = new TaskCompletionSource<MapRouteResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var mapRouteService = new FakeMapRouteService
+        {
+            CalculateHandler = (origin, destination, cancellationToken) =>
+            {
+                calculationStarted.TrySetResult();
+                return releaseCalculation.Task;
+            }
+        };
+        var viewModel = CreateValidViewModel(
+            service,
+            RouteRole.Driver,
+            mapRouteService);
+
+        var firstSave = viewModel.SaveCommand.ExecuteAsync(null);
+        await calculationStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var secondSave = viewModel.SaveCommand.ExecuteAsync(null);
+        releaseCalculation.SetResult(CreateMapRouteResult(8500, 900));
+        await Task.WhenAll(firstSave, secondSave);
+
+        Assert.Single(mapRouteService.Requests);
+        Assert.Single(service.CreatedRoutes);
+    }
+
+    [Fact]
+    public async Task Save_UpdatesDriverRouteWithRecalculatedDistanceAndPreservesId()
+    {
+        var service = new FakeRouteService();
+        var mapRouteService = new FakeMapRouteService
+        {
+            Result = CreateMapRouteResult(14250, 1200)
+        };
+        var viewModel = new NewRouteViewModel(
+            service,
+            new FakePlaceService(),
+            mapRouteService);
         viewModel.BeginEdit(CreateRoute(RouteRole.Driver, 8.5m));
-        viewModel.EstimatedDistanceKmText = "14,25";
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
@@ -360,12 +384,14 @@ public sealed class NewRouteViewModelTests
     public async Task BeginEdit_LoadsLegacyRouteButRequiresSelectionsToSave()
     {
         var routeService = new FakeRouteService();
+        var mapRouteService = new FakeMapRouteService();
         var viewModel = new NewRouteViewModel(
             routeService,
-            new FakePlaceService());
+            new FakePlaceService(),
+            mapRouteService);
         var legacyRoute = CreateRoute(
-            RouteRole.Passenger,
-            0m,
+            RouteRole.Driver,
+            8.5m,
             includePlaceIds: false);
 
         viewModel.BeginEdit(legacyRoute);
@@ -374,6 +400,7 @@ public sealed class NewRouteViewModelTests
         Assert.Equal("Centro", viewModel.Origin);
         Assert.Equal("Facens", viewModel.Destination);
         Assert.Empty(routeService.UpdatedRoutes);
+        Assert.Empty(mapRouteService.Requests);
         Assert.Equal(
             "Selecione uma origem válida nas sugestões.",
             viewModel.ErrorMessage);
@@ -413,16 +440,19 @@ public sealed class NewRouteViewModelTests
 
     private static NewRouteViewModel CreateValidViewModel(
         FakeRouteService service,
-        RouteRole role)
+        RouteRole role,
+        FakeMapRouteService? mapRouteService = null)
     {
-        var viewModel = new NewRouteViewModel(service, new FakePlaceService())
+        var viewModel = new NewRouteViewModel(
+            service,
+            new FakePlaceService(),
+            mapRouteService ?? new FakeMapRouteService())
         {
             SelectedRole = null,
             Origin = "Centro",
             Destination = "Facens",
             DepartureTime = new TimeSpan(7, 30, 0),
-            AvailableSeats = role == RouteRole.Driver ? 2 : null,
-            EstimatedDistanceKmText = role == RouteRole.Driver ? "8,5" : string.Empty
+            AvailableSeats = role == RouteRole.Driver ? 2 : null
         };
 
         viewModel.OriginPlaceId = "origin-place-id";
@@ -435,11 +465,24 @@ public sealed class NewRouteViewModelTests
 
     private static NewRouteViewModel CreateViewModel(
         FakeRouteService? routeService = null,
-        FakePlaceService? placeService = null)
+        FakePlaceService? placeService = null,
+        FakeMapRouteService? mapRouteService = null)
     {
         return new NewRouteViewModel(
             routeService ?? new FakeRouteService(),
-            placeService ?? new FakePlaceService());
+            placeService ?? new FakePlaceService(),
+            mapRouteService ?? new FakeMapRouteService());
+    }
+
+    private static MapRouteResult CreateMapRouteResult(
+        long distanceMeters,
+        double durationSeconds)
+    {
+        return new MapRouteResult
+        {
+            DistanceMeters = distanceMeters,
+            Duration = TimeSpan.FromSeconds(durationSeconds)
+        };
     }
 
     private static FakePlaceService CreateSelectablePlaceService(
@@ -548,6 +591,36 @@ public sealed class NewRouteViewModelTests
             CancellationToken cancellationToken = default)
         {
             return Task.FromResult(SelectedPlace);
+        }
+    }
+
+    private sealed class FakeMapRouteService : IMapRouteService
+    {
+        public List<(string OriginPlaceId, string DestinationPlaceId)> Requests
+            { get; } = [];
+
+        public MapRouteResult Result { get; init; } =
+            CreateMapRouteResult(8500, 900);
+
+        public Func<
+            string,
+            string,
+            CancellationToken,
+            Task<MapRouteResult>>? CalculateHandler { get; init; }
+
+        public Task<MapRouteResult> CalculateAsync(
+            string originPlaceId,
+            string destinationPlaceId,
+            CancellationToken cancellationToken = default)
+        {
+            Requests.Add((originPlaceId, destinationPlaceId));
+
+            return CalculateHandler is not null
+                ? CalculateHandler(
+                    originPlaceId,
+                    destinationPlaceId,
+                    cancellationToken)
+                : Task.FromResult(Result);
         }
     }
 

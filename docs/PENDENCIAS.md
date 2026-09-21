@@ -411,16 +411,18 @@ Futuramente definir:
 ## Incremento 4 — Preço sugerido
 
 ### 1. Substituir distância manual por distância calculada/geográfica
-**Status:** Pendente / evolução futura  
+**Status:** Concluído no Bloco 3 do incremento Google Maps
 **Prioridade:** Média
 
-No MVP, `EstimatedDistanceKm` é informado manualmente pelo motorista e representa a distância estimada usada no cálculo daquela rota.
+No MVP, `EstimatedDistanceKm` era informado manualmente pelo motorista. Agora,
+para rotas de motorista com Place IDs válidos, o valor é calculado pelo Google
+Routes no momento do salvamento e persistido em quilômetros.
 
-Essa decisão evita dependência de mapas, geocodificação ou APIs externas durante o MVP.
+Rotas de passageiro continuam com distância zero. Documentos legados continuam
+legíveis e são recalculados somente quando o usuário os edita e salva com
+endereços selecionados.
 
 **Possíveis evoluções futuras:**
-- calcular distância automaticamente a partir de origem/destino;
-- integrar serviço de mapas/rotas;
 - considerar desvios, pontos de embarque e trajeto real;
 - validar limites plausíveis de distância.
 
