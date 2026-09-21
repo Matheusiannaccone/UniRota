@@ -9,9 +9,22 @@ async function computeRoute({
   apiKey,
   originPlaceId,
   destinationPlaceId,
+  intermediatePlaceIds = [],
   fetchImpl = fetch,
 }) {
   let response;
+  const requestBody = {
+    origin: { placeId: originPlaceId },
+    destination: { placeId: destinationPlaceId },
+    travelMode: "DRIVE",
+    computeAlternativeRoutes: false,
+  };
+
+  if (intermediatePlaceIds.length > 0) {
+    requestBody.intermediates = intermediatePlaceIds.map((placeId) => ({
+      placeId,
+    }));
+  }
 
   try {
     response = await fetchImpl(COMPUTE_ROUTES_URL, {
@@ -21,12 +34,7 @@ async function computeRoute({
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": ROUTE_FIELD_MASK,
       },
-      body: JSON.stringify({
-        origin: { placeId: originPlaceId },
-        destination: { placeId: destinationPlaceId },
-        travelMode: "DRIVE",
-        computeAlternativeRoutes: false,
-      }),
+      body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MILLISECONDS),
     });
   } catch (error) {

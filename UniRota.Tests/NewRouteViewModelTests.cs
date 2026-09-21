@@ -68,7 +68,11 @@ public sealed class NewRouteViewModelTests
         var service = new FakeRouteService();
         var mapRouteService = new FakeMapRouteService
         {
-            CalculateHandler = (origin, destination, cancellationToken) =>
+            CalculateHandler = (
+                    origin,
+                    destination,
+                    intermediates,
+                    cancellationToken) =>
                 throw new InvalidOperationException(
                     "Não foi possível calcular a rota. Tente novamente.")
         };
@@ -115,7 +119,11 @@ public sealed class NewRouteViewModelTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         var mapRouteService = new FakeMapRouteService
         {
-            CalculateHandler = (origin, destination, cancellationToken) =>
+            CalculateHandler = (
+                    origin,
+                    destination,
+                    intermediates,
+                    cancellationToken) =>
             {
                 calculationStarted.TrySetResult();
                 return releaseCalculation.Task;
@@ -605,12 +613,14 @@ public sealed class NewRouteViewModelTests
         public Func<
             string,
             string,
+            IReadOnlyList<string>?,
             CancellationToken,
             Task<MapRouteResult>>? CalculateHandler { get; init; }
 
         public Task<MapRouteResult> CalculateAsync(
             string originPlaceId,
             string destinationPlaceId,
+            IReadOnlyList<string>? intermediatePlaceIds = null,
             CancellationToken cancellationToken = default)
         {
             Requests.Add((originPlaceId, destinationPlaceId));
@@ -619,6 +629,7 @@ public sealed class NewRouteViewModelTests
                 ? CalculateHandler(
                     originPlaceId,
                     destinationPlaceId,
+                    intermediatePlaceIds,
                     cancellationToken)
                 : Task.FromResult(Result);
         }

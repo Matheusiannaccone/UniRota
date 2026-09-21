@@ -63,6 +63,94 @@ test("computeRoute sends Place IDs, driving mode, and minimal field mask", async
   });
 });
 
+test("computeRoute sends one intermediate Place ID", async () => {
+  let capturedBody;
+
+  await computeRoute({
+    apiKey: "test-key",
+    originPlaceId: "driver-origin",
+    destinationPlaceId: "driver-destination",
+    intermediatePlaceIds: ["passenger-origin"],
+    fetchImpl: async (url, options) => {
+      capturedBody = JSON.parse(options.body);
+      return jsonResponse({
+        routes: [{ distanceMeters: 12000, duration: "1200s" }],
+      });
+    },
+  });
+
+  assert.deepEqual(capturedBody.intermediates, [
+    { placeId: "passenger-origin" },
+  ]);
+});
+
+test("computeRoute sends two intermediate Place IDs in order", async () => {
+  let capturedBody;
+
+  await computeRoute({
+    apiKey: "test-key",
+    originPlaceId: "driver-origin",
+    destinationPlaceId: "driver-destination",
+    intermediatePlaceIds: ["passenger-origin", "passenger-destination"],
+    fetchImpl: async (url, options) => {
+      capturedBody = JSON.parse(options.body);
+      return jsonResponse({
+        routes: [{ distanceMeters: 14000, duration: "1500s" }],
+      });
+    },
+  });
+
+  assert.deepEqual(capturedBody.intermediates, [
+    { placeId: "passenger-origin" },
+    { placeId: "passenger-destination" },
+  ]);
+});
+
+test("computeRoute callable rejects more than two intermediates", async () => {
+  let callCount = 0;
+  const handler = createComputeRouteHandler({
+    getApiKey: () => "test-key",
+    computeRouteImpl: async () => {
+      callCount++;
+    },
+  });
+
+  await assert.rejects(
+    handler(authenticatedRequest({
+      intermediatePlaceIds: ["one", "two", "three"],
+    })),
+    (error) => error.code === "invalid-argument");
+  assert.equal(callCount, 0);
+});
+
+test("computeRoute callable rejects an empty intermediate", async () => {
+  const handler = createComputeRouteHandler({
+    getApiKey: () => "test-key",
+    computeRouteImpl: async () => {
+      throw new Error("should not be called");
+    },
+  });
+
+  await assert.rejects(
+    handler(authenticatedRequest({ intermediatePlaceIds: [" "] })),
+    (error) => error.code === "invalid-argument");
+});
+
+test("computeRoute callable rejects consecutive duplicate route points", async () => {
+  const handler = createComputeRouteHandler({
+    getApiKey: () => "test-key",
+    computeRouteImpl: async () => {
+      throw new Error("should not be called");
+    },
+  });
+
+  await assert.rejects(
+    handler(authenticatedRequest({
+      intermediatePlaceIds: ["origin-place-id"],
+    })),
+    (error) => error.code === "invalid-argument");
+});
+
 test("duration parser accepts protobuf seconds and rejects invalid values", () => {
   assert.equal(parseDurationSeconds("1325s"), 1325);
   assert.equal(parseDurationSeconds("1325.123456789s"), 1325.123456789);
@@ -121,5 +209,16 @@ function jsonResponse(payload, status = 200) {
     ok: status >= 200 && status < 300,
     status,
     json: async () => payload,
+  };
+}
+
+function authenticatedRequest(overrides = {}) {
+  return {
+    auth: { uid: "user-1" },
+    data: {
+      originPlaceId: "origin-place-id",
+      destinationPlaceId: "destination-place-id",
+      ...overrides,
+    },
   };
 }

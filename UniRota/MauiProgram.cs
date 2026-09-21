@@ -43,6 +43,7 @@ namespace UniRota
             builder.Services.AddSingleton<IRouteService, FirebaseRouteService>();
             builder.Services.AddSingleton<IPlaceService, GooglePlaceService>();
             builder.Services.AddSingleton<IMapRouteService, GoogleMapRouteService>();
+            builder.Services.AddSingleton(new MatchingOptions());
             builder.Services.AddSingleton<IMatchingService, MatchingService>();
             builder.Services.AddSingleton<IPricingService, PricingService>();
             builder.Services.AddSingleton<IRideRequestService, FirebaseRideRequestService>();

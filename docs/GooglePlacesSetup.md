@@ -49,11 +49,21 @@ As funções e o aplicativo estão configurados para a região
 Nenhuma chave do Places ou do Routes deve ser adicionada ao `MauiProgram.cs`,
 ao `FirebaseOptions` ou a arquivos `.env` versionados.
 
-`computeRoute` aceita apenas `originPlaceId` e `destinationPlaceId`, exige um
-usuário Firebase autenticado e solicita ao Routes API somente
-`routes.distanceMeters` e `routes.duration`. O aplicativo persiste apenas a
-distância convertida para quilômetros em `EstimatedDistanceKm`; a duração não
-é persistida neste bloco.
+`computeRoute` aceita `originPlaceId`, `destinationPlaceId` e, opcionalmente,
+até dois `intermediatePlaceIds`. A função exige um usuário Firebase autenticado
+e solicita ao Routes API somente `routes.distanceMeters` e `routes.duration`.
+O aplicativo persiste apenas a distância convertida para quilômetros em
+`EstimatedDistanceKm`; duração e resultados de matching não são persistidos.
+
+O matching geográfico usa os limites centralizados em `MatchingOptions`:
+
+- diferença máxima entre horários: 30 minutos;
+- desvio máximo de distância: 5 km;
+- desvio máximo de duração: 15 minutos.
+
+Ambos os limites de desvio precisam ser respeitados. Esses valores são iniciais
+e conservadores e devem ser revistos com dados reais de uso antes de uma
+distribuição ampla.
 
 Antes de uma distribuição pública, publique termos de uso e política de
 privacidade do aplicativo que incorporem os termos e a política de privacidade

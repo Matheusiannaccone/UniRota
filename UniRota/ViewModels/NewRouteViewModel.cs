@@ -356,7 +356,7 @@ public partial class NewRouteViewModel : ObservableObject
                 var mapRoute = await _mapRouteService.CalculateAsync(
                     route.OriginPlaceId,
                     route.DestinationPlaceId,
-                    cancellationToken);
+                    cancellationToken: cancellationToken);
 
                 if (mapRoute.DistanceMeters <= 0
                     || mapRoute.Duration <= TimeSpan.Zero)

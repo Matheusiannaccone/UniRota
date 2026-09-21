@@ -35,6 +35,7 @@ public sealed class GoogleMapRouteService : IMapRouteService
     public async Task<MapRouteResult> CalculateAsync(
         string originPlaceId,
         string destinationPlaceId,
+        IReadOnlyList<string>? intermediatePlaceIds = null,
         CancellationToken cancellationToken = default)
     {
         var normalizedOriginPlaceId = RequirePlaceId(
@@ -43,10 +44,14 @@ public sealed class GoogleMapRouteService : IMapRouteService
         var normalizedDestinationPlaceId = RequirePlaceId(
             destinationPlaceId,
             nameof(destinationPlaceId));
+        var normalizedIntermediatePlaceIds = NormalizeIntermediatePlaceIds(
+            normalizedOriginPlaceId,
+            normalizedDestinationPlaceId,
+            intermediatePlaceIds);
 
         EnsureConfigured();
 
-        var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
+        var idToken = await GetIdTokenAsync(cancellationToken);
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
             BuildFunctionUrl())
@@ -58,7 +63,8 @@ public sealed class GoogleMapRouteService : IMapRouteService
                         data = new
                         {
                             originPlaceId = normalizedOriginPlaceId,
-                            destinationPlaceId = normalizedDestinationPlaceId
+                            destinationPlaceId = normalizedDestinationPlaceId,
+                            intermediatePlaceIds = normalizedIntermediatePlaceIds
                         }
                     },
                     JsonOptions),
@@ -122,7 +128,7 @@ public sealed class GoogleMapRouteService : IMapRouteService
     {
         var normalized = value?.Trim() ?? string.Empty;
 
-        if (string.IsNullOrWhiteSpace(normalized))
+        if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > 300)
         {
             throw new ArgumentException(
                 "Selecione um endereço válido nas sugestões.",
@@ -132,13 +138,79 @@ public sealed class GoogleMapRouteService : IMapRouteService
         return normalized;
     }
 
+    private static IReadOnlyList<string> NormalizeIntermediatePlaceIds(
+        string originPlaceId,
+        string destinationPlaceId,
+        IReadOnlyList<string>? intermediatePlaceIds)
+    {
+        if (intermediatePlaceIds is null || intermediatePlaceIds.Count == 0)
+        {
+            return [];
+        }
+
+        if (intermediatePlaceIds.Count > 2)
+        {
+            throw new ArgumentException(
+                "A rota aceita no máximo dois pontos intermediários.",
+                nameof(intermediatePlaceIds));
+        }
+
+        var normalized = intermediatePlaceIds
+            .Select((placeId, index) => RequirePlaceId(
+                placeId,
+                $"{nameof(intermediatePlaceIds)}[{index}]"))
+            .ToArray();
+        var sequence = new[] { originPlaceId }
+            .Concat(normalized)
+            .Append(destinationPlaceId)
+            .ToArray();
+
+        for (var index = 1; index < sequence.Length; index++)
+        {
+            if (string.Equals(
+                    sequence[index - 1],
+                    sequence[index],
+                    StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    "A rota não pode possuir pontos consecutivos duplicados.",
+                    nameof(intermediatePlaceIds));
+            }
+        }
+
+        return normalized;
+    }
+
+    private async Task<string> GetIdTokenAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _authService.GetValidIdTokenAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var authenticationException = new InvalidOperationException(
+                "Não foi possível validar sua sessão. Entre novamente e tente de novo.",
+                exception);
+            authenticationException.Data["FunctionStatus"] = "UNAUTHENTICATED";
+            throw authenticationException;
+        }
+    }
+
     private void EnsureConfigured()
     {
         if (string.IsNullOrWhiteSpace(_options.ProjectId)
             || string.IsNullOrWhiteSpace(_options.FunctionsRegion))
         {
-            throw new InvalidOperationException(
+            var exception = new InvalidOperationException(
                 "Configure o projeto e a região das Firebase Functions.");
+            exception.Data["FunctionStatus"] = "CONFIGURATION_ERROR";
+            throw exception;
         }
     }
 

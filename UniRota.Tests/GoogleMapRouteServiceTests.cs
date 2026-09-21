@@ -47,6 +47,41 @@ public sealed class GoogleMapRouteServiceTests
         Assert.Equal(
             "destination-place-id",
             data.GetProperty("destinationPlaceId").GetString());
+        Assert.Equal(
+            0,
+            data.GetProperty("intermediatePlaceIds").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task CalculateAsync_SendsIntermediatePlaceIdsInOrder()
+    {
+        string? capturedBody = null;
+        var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return JsonResponse("""
+                {
+                  "result": {
+                    "distanceMeters": 15000,
+                    "durationSeconds": 1800
+                  }
+                }
+                """);
+        });
+        var service = CreateService(handler);
+
+        await service.CalculateAsync(
+            "driver-origin",
+            "driver-destination",
+            ["passenger-origin", "passenger-destination"]);
+
+        using var document = JsonDocument.Parse(capturedBody!);
+        var intermediates = document.RootElement
+            .GetProperty("data")
+            .GetProperty("intermediatePlaceIds");
+        Assert.Equal(
+            ["passenger-origin", "passenger-destination"],
+            intermediates.EnumerateArray().Select(item => item.GetString()));
     }
 
     [Fact]
@@ -121,6 +156,35 @@ public sealed class GoogleMapRouteServiceTests
 
         Assert.Equal(0, handler.RequestCount);
     }
+
+    [Theory]
+    [MemberData(nameof(InvalidIntermediatePlaceIds))]
+    public async Task CalculateAsync_InvalidIntermediatesDoNotCallProxy(
+        IReadOnlyList<string> intermediatePlaceIds)
+    {
+        var handler = new StubHttpMessageHandler(
+            (request, cancellationToken) =>
+                throw new InvalidOperationException("Não deveria acessar a rede."));
+        var service = CreateService(handler);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.CalculateAsync(
+                "origin",
+                "destination",
+                intermediatePlaceIds));
+
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    public static TheoryData<IReadOnlyList<string>> InvalidIntermediatePlaceIds =>
+        new()
+        {
+            new[] { "one", "two", "three" },
+            new[] { " " },
+            new[] { "origin" },
+            new[] { "one", "one" },
+            new[] { "one", "destination" }
+        };
 
     private static GoogleMapRouteService CreateService(HttpMessageHandler handler)
     {

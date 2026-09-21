@@ -15,12 +15,17 @@ function createComputeRouteHandler({
     const destinationPlaceId = requirePlaceId(
       request.data?.destinationPlaceId,
       "destinationPlaceId");
+    const intermediatePlaceIds = requireIntermediatePlaceIds(
+      request.data?.intermediatePlaceIds,
+      originPlaceId,
+      destinationPlaceId);
 
     try {
       return await computeRouteImpl({
         apiKey: getApiKey(),
         originPlaceId,
         destinationPlaceId,
+        intermediatePlaceIds,
       });
     } catch (error) {
       throw mapRoutesError(error);
@@ -43,6 +48,35 @@ function requirePlaceId(value, fieldName) {
 
   if (normalized.length < 1 || normalized.length > 300) {
     throw new HttpsError("invalid-argument", `${fieldName} is invalid.`);
+  }
+
+  return normalized;
+}
+
+function requireIntermediatePlaceIds(
+  value,
+  originPlaceId,
+  destinationPlaceId) {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value) || value.length > 2) {
+    throw new HttpsError(
+      "invalid-argument",
+      "intermediatePlaceIds is invalid.");
+  }
+
+  const normalized = value.map((placeId, index) =>
+    requirePlaceId(placeId, `intermediatePlaceIds[${index}]`));
+  const sequence = [originPlaceId, ...normalized, destinationPlaceId];
+
+  for (let index = 1; index < sequence.length; index++) {
+    if (sequence[index - 1] === sequence[index]) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Consecutive route points must be distinct.");
+    }
   }
 
   return normalized;
