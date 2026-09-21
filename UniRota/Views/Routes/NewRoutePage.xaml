@@ -20,10 +20,10 @@
                 FontAttributes="Bold" />
             <Label
                 Text="Preencha os dados da sua rotina semanal."
-                TextColor="#616161" />
+                TextColor="{DynamicResource TextSecondary}" />
 
             <Label Text="Papel na rota" />
-            <Border Padding="8,0" Stroke="#E0E0E0">
+            <Border Padding="8,0" Stroke="{DynamicResource BorderBrush}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="10" />
                 </Border.StrokeShape>
@@ -36,7 +36,7 @@
             </Border>
 
             <Label Text="Origem" />
-            <Border Padding="12,0" Stroke="#E0E0E0">
+            <Border Padding="12,0" Stroke="{DynamicResource BorderBrush}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="10" />
                 </Border.StrokeShape>
@@ -48,7 +48,7 @@
             </Border>
 
             <Label Text="Destino" />
-            <Border Padding="12,0" Stroke="#E0E0E0">
+            <Border Padding="12,0" Stroke="{DynamicResource BorderBrush}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="10" />
                 </Border.StrokeShape>
@@ -84,7 +84,7 @@
             </VerticalStackLayout>
 
             <Label Text="Horário de saída" />
-            <Border Padding="12,0" Stroke="#E0E0E0">
+            <Border Padding="12,0" Stroke="{DynamicResource BorderBrush}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="10" />
                 </Border.StrokeShape>
@@ -97,7 +97,7 @@
                 Spacing="8"
                 IsVisible="{Binding IsDriver}">
                 <Label Text="Distância estimada da rota (km)" />
-                <Border Padding="12,0" Stroke="#E0E0E0">
+                <Border Padding="12,0" Stroke="{DynamicResource BorderBrush}">
                     <Border.StrokeShape>
                         <RoundRectangle CornerRadius="10" />
                     </Border.StrokeShape>
@@ -111,7 +111,7 @@
                 </Border>
 
                 <Label Text="Vagas disponíveis" />
-                <Border Padding="12,0" Stroke="#E0E0E0">
+                <Border Padding="12,0" Stroke="{DynamicResource BorderBrush}">
                     <Border.StrokeShape>
                         <RoundRectangle CornerRadius="10" />
                     </Border.StrokeShape>
@@ -127,12 +127,12 @@
             <Label
                 Text="{Binding ErrorMessage}"
                 IsVisible="{Binding HasError}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
             <Label
                 Text="{Binding SuccessMessage}"
                 IsVisible="{Binding HasSavedSuccessfully}"
-                TextColor="#2E7D32"
+                TextColor="{DynamicResource Success}"
                 HorizontalTextAlignment="Center" />
 
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">

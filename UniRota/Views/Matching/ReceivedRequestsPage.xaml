@@ -22,7 +22,7 @@
                 FontAttributes="Bold" />
             <Label
                 Text="Aceite ou recuse as solicitações das suas rotas."
-                TextColor="#616161" />
+                TextColor="{DynamicResource TextSecondary}" />
         </VerticalStackLayout>
 
         <ActivityIndicator
@@ -37,7 +37,7 @@
             IsVisible="{Binding HasError}">
             <Label
                 Text="{Binding ErrorMessage}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
             <Button
                 Text="Tentar novamente"
@@ -50,7 +50,7 @@
             Grid.Row="3"
             Text="{Binding FeedbackMessage}"
             IsVisible="{Binding HasFeedback}"
-            TextColor="#1B5E20"
+            TextColor="{DynamicResource Success}"
             FontAttributes="Bold"
             HorizontalTextAlignment="Center" />
 
@@ -58,7 +58,7 @@
             <Label
                 Text="Você não possui solicitações pendentes recebidas."
                 IsVisible="{Binding ShowEmptyState}"
-                TextColor="#616161"
+                TextColor="{DynamicResource TextSecondary}"
                 HorizontalTextAlignment="Center"
                 VerticalOptions="Center" />
 
@@ -70,8 +70,8 @@
                         <Border
                             Margin="0,0,0,12"
                             Padding="16"
-                            Stroke="#E0E0E0"
-                            BackgroundColor="#FAFAFA">
+                            Stroke="{DynamicResource BorderBrush}"
+                            BackgroundColor="{DynamicResource SurfaceSecondary}">
                             <Border.StrokeShape>
                                 <RoundRectangle CornerRadius="12" />
                             </Border.StrokeShape>
@@ -84,7 +84,7 @@
                                     Text="{Binding TypeText, StringFormat='Tipo: {0}'}" />
                                 <Label
                                     Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}"
-                                    TextColor="#616161"
+                                    TextColor="{DynamicResource TextSecondary}"
                                     LineBreakMode="WordWrap" />
                                 <Label
                                     Text="{Binding RequestedDateText, StringFormat='Data: {0}'}"

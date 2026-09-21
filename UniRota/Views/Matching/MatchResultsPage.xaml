@@ -23,8 +23,8 @@
         <Border
             Grid.Row="1"
             Padding="14"
-            Stroke="#E0E0E0"
-            BackgroundColor="#FAFAFA">
+            Stroke="{DynamicResource BorderBrush}"
+            BackgroundColor="{DynamicResource SurfaceSecondary}">
             <Border.StrokeShape>
                 <RoundRectangle CornerRadius="12" />
             </Border.StrokeShape>
@@ -37,7 +37,7 @@
                     LineBreakMode="WordWrap" />
                 <Label
                     Text="{Binding PassengerRouteDetailsText}"
-                    TextColor="#616161"
+                    TextColor="{DynamicResource TextSecondary}"
                     LineBreakMode="WordWrap" />
             </VerticalStackLayout>
         </Border>
@@ -54,7 +54,7 @@
             IsVisible="{Binding HasError}">
             <Label
                 Text="{Binding ErrorMessage}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
             <Button
                 Text="Tentar novamente"
@@ -67,7 +67,7 @@
             <Label
                 Text="Nenhuma rota compatível foi encontrada."
                 IsVisible="{Binding ShowEmptyState}"
-                TextColor="#616161"
+                TextColor="{DynamicResource TextSecondary}"
                 HorizontalTextAlignment="Center"
                 VerticalOptions="Center" />
 
@@ -79,8 +79,8 @@
                         <Border
                             Margin="0,0,0,12"
                             Padding="16"
-                            Stroke="#E0E0E0"
-                            BackgroundColor="#FAFAFA">
+                            Stroke="{DynamicResource BorderBrush}"
+                            BackgroundColor="{DynamicResource SurfaceSecondary}">
                             <Border.StrokeShape>
                                 <RoundRectangle CornerRadius="12" />
                             </Border.StrokeShape>
@@ -96,7 +96,7 @@
                                     LineBreakMode="WordWrap" />
                                 <Label
                                     Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}"
-                                    TextColor="#616161"
+                                    TextColor="{DynamicResource TextSecondary}"
                                     LineBreakMode="WordWrap" />
                                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
                                     <Label

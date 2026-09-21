@@ -20,20 +20,20 @@
                     FontAttributes="Bold" />
                 <Label
                     Text="Escolha como deseja realizar esta carona."
-                    TextColor="#616161" />
+                    TextColor="{DynamicResource TextSecondary}" />
             </VerticalStackLayout>
 
             <Border
                 Padding="14"
-                Stroke="#E0E0E0"
-                BackgroundColor="#FAFAFA">
+                Stroke="{DynamicResource BorderBrush}"
+                BackgroundColor="{DynamicResource SurfaceSecondary}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="12" />
                 </Border.StrokeShape>
                 <VerticalStackLayout Spacing="6">
                     <Label
                         Text="Motorista"
-                        TextColor="#616161" />
+                        TextColor="{DynamicResource TextSecondary}" />
                     <Label
                         Text="{Binding DriverNameText}"
                         FontSize="18"
@@ -44,15 +44,15 @@
                         LineBreakMode="WordWrap" />
                     <Label
                         Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}"
-                        TextColor="#616161"
+                        TextColor="{DynamicResource TextSecondary}"
                         LineBreakMode="WordWrap" />
                 </VerticalStackLayout>
             </Border>
 
             <Border
                 Padding="14"
-                Stroke="#E0E0E0"
-                BackgroundColor="#FAFAFA"
+                Stroke="{DynamicResource BorderBrush}"
+                BackgroundColor="{DynamicResource SurfaceSecondary}"
                 IsVisible="{Binding HasSuggestedPrice}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="12" />
@@ -88,13 +88,13 @@
                 <Label
                     Text="A data precisa corresponder a um dos dias compatíveis."
                     FontSize="13"
-                    TextColor="#616161" />
+                    TextColor="{DynamicResource TextSecondary}" />
             </VerticalStackLayout>
 
             <Border
                 Padding="14"
-                Stroke="#E0E0E0"
-                BackgroundColor="#FAFAFA"
+                Stroke="{DynamicResource BorderBrush}"
+                BackgroundColor="{DynamicResource SurfaceSecondary}"
                 IsVisible="{Binding IsWeeklySelected}">
                 <Border.StrokeShape>
                     <RoundRectangle CornerRadius="12" />
@@ -107,7 +107,7 @@
                         Text="Todos os dias compatíveis serão incluídos:" />
                     <Label
                         Text="{Binding CompatibleDaysText}"
-                        TextColor="#616161"
+                        TextColor="{DynamicResource TextSecondary}"
                         LineBreakMode="WordWrap" />
                 </VerticalStackLayout>
             </Border>
@@ -120,7 +120,7 @@
             <Label
                 Text="{Binding ErrorMessage}"
                 IsVisible="{Binding HasError}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
 
             <Button

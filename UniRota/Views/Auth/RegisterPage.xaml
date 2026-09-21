@@ -21,7 +21,7 @@
             <Label
                 Text="Preencha seus dados para começar"
                 HorizontalTextAlignment="Center"
-                TextColor="#616161" />
+                TextColor="{DynamicResource TextSecondary}" />
 
             <Label Text="Nome" />
             <Border Padding="12,0">
@@ -77,7 +77,7 @@
             <Label
                 Text="{Binding ErrorMessage}"
                 IsVisible="{Binding HasError}"
-                TextColor="#B3261E"
+                TextColor="{DynamicResource Error}"
                 HorizontalTextAlignment="Center" />
 
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -98,7 +98,7 @@
                 Command="{Binding GoToLoginCommand}"
                 IsEnabled="{Binding IsNotBusy}"
                 BackgroundColor="Transparent"
-                TextColor="#512BD4" />
+                TextColor="{DynamicResource Primary}" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>
