@@ -249,7 +249,6 @@ public sealed class GoogleMapRouteService : IMapRouteService
 
         var exception = new InvalidOperationException(message);
         exception.Data["FunctionStatus"] = errorStatus;
-        exception.Data["FunctionResponse"] = content;
         return exception;
     }
 

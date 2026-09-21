@@ -62,7 +62,11 @@ public sealed class GooglePlaceService : IPlaceService
             },
             cancellationToken);
 
-        return response.Suggestions
+        var suggestions = response.Suggestions
+            ?? throw new InvalidOperationException(
+                "O serviço de endereços retornou uma resposta inválida.");
+
+        return suggestions
             .Where(suggestion =>
                 !string.IsNullOrWhiteSpace(suggestion.PlaceId)
                 && !string.IsNullOrWhiteSpace(suggestion.DisplayText))
@@ -146,7 +150,11 @@ public sealed class GooglePlaceService : IPlaceService
         var coordinates = new Dictionary<string, MapCoordinate>(
             StringComparer.Ordinal);
 
-        foreach (var item in response.Coordinates)
+        var coordinateItems = response.Coordinates
+            ?? throw new InvalidOperationException(
+                "O serviço de endereços retornou coordenadas inválidas.");
+
+        foreach (var item in coordinateItems)
         {
             var placeId = item.PlaceId?.Trim() ?? string.Empty;
             var coordinate = new MapCoordinate(item.Latitude, item.Longitude);
@@ -283,7 +291,6 @@ public sealed class GooglePlaceService : IPlaceService
 
         var exception = new InvalidOperationException(message);
         exception.Data["FunctionStatus"] = errorStatus;
-        exception.Data["FunctionResponse"] = content;
         return exception;
     }
 
@@ -331,7 +338,7 @@ public sealed class GooglePlaceService : IPlaceService
     private sealed class AutocompleteResultDto
     {
         [JsonPropertyName("suggestions")]
-        public List<PlaceSuggestionDto> Suggestions { get; init; } = [];
+        public List<PlaceSuggestionDto>? Suggestions { get; init; } = [];
     }
 
     private sealed class PlaceSuggestionDto
@@ -355,7 +362,7 @@ public sealed class GooglePlaceService : IPlaceService
     private sealed class PlaceCoordinatesResultDto
     {
         [JsonPropertyName("coordinates")]
-        public List<PlaceCoordinateDto> Coordinates { get; init; } = [];
+        public List<PlaceCoordinateDto>? Coordinates { get; init; } = [];
     }
 
     private sealed class PlaceCoordinateDto

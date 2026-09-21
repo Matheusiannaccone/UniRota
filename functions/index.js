@@ -129,7 +129,11 @@ function mapPlacesError(error) {
     return new HttpsError("resource-exhausted", "Places quota exceeded.");
   }
 
-  if (error.httpStatus >= 500) {
+  if (error.googleStatus === "DEADLINE_EXCEEDED") {
+    return new HttpsError("deadline-exceeded", "Places request timed out.");
+  }
+
+  if (error.httpStatus >= 500 || error.googleStatus === "UNAVAILABLE") {
     return new HttpsError("unavailable", "Places is temporarily unavailable.");
   }
 

@@ -415,7 +415,7 @@ Implementar em blocos verticais.
 - dados legados
 - testes
 - build Android
-- Firestore Rules
+- documentar a revisão separada das Firestore Rules, sem alterá-las neste bloco
 - documentação
 
 Não avançar automaticamente de um bloco para outro sem solicitação explícita.

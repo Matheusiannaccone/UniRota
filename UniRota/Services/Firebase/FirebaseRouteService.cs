@@ -870,7 +870,6 @@ public sealed class FirebaseRouteService : IRouteService
 
         var exception = new InvalidOperationException(message);
         exception.Data["FirebaseCode"] = firebaseCode;
-        exception.Data["FirebaseResponse"] = response.Content;
         throw exception;
     }
 

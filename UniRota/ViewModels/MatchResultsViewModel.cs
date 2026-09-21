@@ -219,5 +219,7 @@ public sealed class MatchResultItemViewModel
 
     public string DetourText =>
         $"Desvio: +{Match.DetourDistanceKm.ToString("0.#", PtBrCulture)} km"
-        + $" · +{Match.DetourDurationMinutes.ToString("0.#", PtBrCulture)} min";
+        + $" · +{Math.Ceiling(Match.DetourDurationMinutes).ToString(
+            "0",
+            PtBrCulture)} min";
 }

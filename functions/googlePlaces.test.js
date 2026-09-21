@@ -34,6 +34,7 @@ test("autocomplete forwards the session token and returns only required data", a
   const body = JSON.parse(capturedOptions.body);
   assert.equal(body.sessionToken, "11111111-1111-4111-8111-111111111111");
   assert.equal(body.regionCode, "br");
+  assert.ok(capturedOptions.signal instanceof AbortSignal);
   assert.equal(
     capturedOptions.headers["X-Goog-FieldMask"],
     "suggestions.placePrediction.placeId," +
@@ -80,6 +81,40 @@ test("quota errors retain a safe machine-readable status", async () => {
     }),
     (error) => error instanceof GooglePlacesError
       && error.googleStatus === "RESOURCE_EXHAUSTED");
+});
+
+test("Places timeout is normalized without exposing upstream details", async () => {
+  await assert.rejects(
+    autocompletePlaces({
+      apiKey: "test-key",
+      input: "Facens",
+      sessionToken: "11111111-1111-4111-8111-111111111111",
+      fetchImpl: async () => {
+        const error = new Error("sensitive upstream timeout details");
+        error.name = "TimeoutError";
+        throw error;
+      },
+    }),
+    (error) => error instanceof GooglePlacesError
+      && error.httpStatus === 504
+      && error.googleStatus === "DEADLINE_EXCEEDED"
+      && !error.message.includes("sensitive"));
+});
+
+test("Places network failure is normalized as unavailable", async () => {
+  await assert.rejects(
+    getPlaceDetails({
+      apiKey: "test-key",
+      placeId: "place-id",
+      sessionToken: "11111111-1111-4111-8111-111111111111",
+      fetchImpl: async () => {
+        throw new Error("sensitive network details");
+      },
+    }),
+    (error) => error instanceof GooglePlacesError
+      && error.httpStatus === 503
+      && error.googleStatus === "UNAVAILABLE"
+      && !error.message.includes("sensitive"));
 });
 
 test("place coordinates requests only the location field", async () => {

@@ -4,9 +4,10 @@ const AUTOCOMPLETE_URL =
   "https://places.googleapis.com/v1/places:autocomplete";
 const PLACE_DETAILS_BASE_URL =
   "https://places.googleapis.com/v1/places";
+const REQUEST_TIMEOUT_MILLISECONDS = 10000;
 
 async function autocompletePlaces({ apiKey, input, sessionToken, fetchImpl = fetch }) {
-  const response = await fetchImpl(AUTOCOMPLETE_URL, {
+  const response = await fetchGoogle(fetchImpl, AUTOCOMPLETE_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -50,7 +51,7 @@ async function getPlaceDetails({ apiKey, placeId, sessionToken, fetchImpl = fetc
   url.searchParams.set("languageCode", "pt-BR");
   url.searchParams.set("regionCode", "br");
 
-  const response = await fetchImpl(url, {
+  const response = await fetchGoogle(fetchImpl, url, {
     method: "GET",
     headers: {
       "X-Goog-Api-Key": apiKey,
@@ -75,7 +76,7 @@ async function getPlaceCoordinates({ apiKey, placeId, fetchImpl = fetch }) {
   const url = new URL(
     `${PLACE_DETAILS_BASE_URL}/${encodeURIComponent(placeId)}`);
 
-  const response = await fetchImpl(url, {
+  const response = await fetchGoogle(fetchImpl, url, {
     method: "GET",
     headers: {
       "X-Goog-Api-Key": apiKey,
@@ -96,6 +97,23 @@ async function getPlaceCoordinates({ apiKey, placeId, fetchImpl = fetch }) {
   }
 
   return { placeId, latitude, longitude };
+}
+
+async function fetchGoogle(fetchImpl, url, options) {
+  try {
+    return await fetchImpl(url, {
+      ...options,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MILLISECONDS),
+    });
+  } catch (error) {
+    const status = error?.name === "AbortError"
+      || error?.name === "TimeoutError"
+      ? "DEADLINE_EXCEEDED"
+      : "UNAVAILABLE";
+    throw new GooglePlacesError(
+      status === "DEADLINE_EXCEEDED" ? 504 : 503,
+      status);
+  }
 }
 
 async function readGoogleResponse(response) {

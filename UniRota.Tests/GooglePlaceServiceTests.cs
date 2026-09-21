@@ -161,6 +161,26 @@ public sealed class GooglePlaceServiceTests
     }
 
     [Fact]
+    public async Task GetCoordinatesAsync_NullCoordinatesFailsSafely()
+    {
+        var handler = new StubHttpMessageHandler((request, cancellationToken) =>
+            Task.FromResult(JsonResponse(
+                """
+                {
+                  "result": {
+                    "coordinates": null
+                  }
+                }
+                """)));
+        var service = CreateService(handler);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GetCoordinatesAsync(["place-1"]));
+
+        Assert.Contains("coordenadas inválidas", exception.Message);
+    }
+
+    [Fact]
     public async Task SearchAsync_QuotaErrorReturnsUsefulMessage()
     {
         var handler = new StubHttpMessageHandler((request, cancellationToken) =>
@@ -181,6 +201,7 @@ public sealed class GooglePlaceServiceTests
 
         Assert.Contains("limite", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("RESOURCE_EXHAUSTED", exception.Data["FunctionStatus"]);
+        Assert.False(exception.Data.Contains("FunctionResponse"));
     }
 
     [Fact]
@@ -188,6 +209,26 @@ public sealed class GooglePlaceServiceTests
     {
         var handler = new StubHttpMessageHandler((request, cancellationToken) =>
             Task.FromResult(JsonResponse("not-json")));
+        var service = CreateService(handler);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SearchAsync("Facens", service.CreateSession()));
+
+        Assert.Contains("resposta inválida", exception.Message);
+    }
+
+    [Fact]
+    public async Task SearchAsync_NullSuggestionsFailsSafely()
+    {
+        var handler = new StubHttpMessageHandler((request, cancellationToken) =>
+            Task.FromResult(JsonResponse(
+                """
+                {
+                  "result": {
+                    "suggestions": null
+                  }
+                }
+                """)));
         var service = CreateService(handler);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>

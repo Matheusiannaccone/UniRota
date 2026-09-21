@@ -1602,7 +1602,6 @@ public sealed class FirebaseRideRequestService : IRideRequestService
 
         var exception = new InvalidOperationException(message);
         exception.Data["FirebaseCode"] = firebaseCode;
-        exception.Data["FirebaseResponse"] = response.Content;
         throw exception;
     }
 

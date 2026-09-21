@@ -73,7 +73,8 @@ Ela não deve reutilizar `GOOGLE_PLACES_API_KEY` nem
 1. Habilite **Maps SDK for Android** no Google Cloud.
 2. Crie uma chave dedicada.
 3. Em **Application restrictions**, selecione **Android apps**.
-4. Cadastre o package name/ApplicationId atual: `com.companyname.unirota`.
+4. Cadastre o package name/ApplicationId definitivo:
+   `io.github.matheusiannaccone.unirota`.
 5. Cadastre o SHA-1 do certificado de debug usado localmente e, para uma
    distribuição, o SHA-1 do certificado de release/Google Play App Signing.
 6. Em **API restrictions**, permita somente **Maps SDK for Android**.
@@ -92,6 +93,11 @@ O `AndroidManifest.xml` contém somente o placeholder
 com um valor sentinela, mas o Google Maps não renderiza o mapa autenticado.
 Nenhuma permissão de localização é usada neste bloco.
 
+A chave Android é injetada apenas no build e ficará visível no APK, como é
+esperado para uma chave cliente. A proteção efetiva depende das restrições de
+aplicativo Android (package + SHA-1) e de API descritas acima. Ela não deve ser
+armazenada no Secret Manager usado pelas Functions.
+
 No iOS, o controle mantém compatibilidade estrutural por meio do MapKit. A
 configuração e validação de distribuição iOS devem ser realizadas em ambiente
 macOS antes da publicação.
@@ -105,6 +111,11 @@ O matching geográfico usa os limites centralizados em `MatchingOptions`:
 Ambos os limites de desvio precisam ser respeitados. Esses valores são iniciais
 e conservadores e devem ser revistos com dados reais de uso antes de uma
 distribuição ampla.
+
+As chamadas upstream de Places e Routes possuem timeout de 10 segundos nas
+Functions, que por sua vez têm limite de execução de 15 segundos. O aplicativo
+também aplica timeout às chamadas das callables e apresenta mensagens seguras
+para indisponibilidade, quota, sessão expirada e respostas inválidas.
 
 Antes de uma distribuição pública, publique termos de uso e política de
 privacidade do aplicativo que incorporem os termos e a política de privacidade

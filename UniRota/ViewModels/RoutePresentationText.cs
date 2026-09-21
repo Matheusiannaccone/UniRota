@@ -31,7 +31,77 @@ internal static class RoutePresentationText
 
     public static string GetOriginDestinationText(WeeklyRoute route)
     {
-        return $"{route.Origin} → {route.Destination}";
+        return $"{GetShortAddress(route.Origin)} → "
+               + GetShortAddress(route.Destination);
+    }
+
+    private static string GetShortAddress(string? address)
+    {
+        var normalizedAddress = address?.Trim() ?? string.Empty;
+
+        if (normalizedAddress.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var components = normalizedAddress.Split(
+            ',',
+            StringSplitOptions.TrimEntries);
+
+        if (components.Length >= 2
+            && components[0].Length > 0)
+        {
+            var number = GetTextBeforeNeighborhood(components[1]);
+
+            if (LooksLikeStreetNumber(number))
+            {
+                return $"{components[0]}, {number}";
+            }
+        }
+
+        var neighborhoodSeparatorIndex = normalizedAddress.IndexOf(
+            " - ",
+            StringComparison.Ordinal);
+
+        if (neighborhoodSeparatorIndex > 0)
+        {
+            var relevantPart = normalizedAddress[..neighborhoodSeparatorIndex]
+                .Trim();
+
+            if (relevantPart.Length > 0)
+            {
+                return relevantPart;
+            }
+        }
+
+        return normalizedAddress;
+    }
+
+    private static string GetTextBeforeNeighborhood(string component)
+    {
+        var separatorIndex = component.IndexOf(
+            " - ",
+            StringComparison.Ordinal);
+
+        return (separatorIndex >= 0
+                ? component[..separatorIndex]
+                : component)
+            .Trim();
+    }
+
+    private static bool LooksLikeStreetNumber(string value)
+    {
+        if (value.Length == 0)
+        {
+            return false;
+        }
+
+        return char.IsDigit(value[0])
+            || value.Equals("s/n", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("sn", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("nº ", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("n° ", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("km ", StringComparison.OrdinalIgnoreCase);
     }
 
     public static string GetDaysText(IEnumerable<DayOfWeek> days)

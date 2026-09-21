@@ -344,7 +344,7 @@ public sealed class MatchingServiceTests
             baseDistanceMeters: 10000,
             baseDurationMinutes: 30,
             sharedDistanceMeters: 14000,
-            sharedDurationMinutes: 45.1);
+            sharedDurationMinutes: 45.01);
 
         var matches = await CreateService(mapService)
             .FindMatchesAsync(CreatePassenger(), [CreateDriver()]);
@@ -647,19 +647,28 @@ public sealed class MatchingServiceTests
         Assert.Equal(15m, options.MaximumDetourDurationMinutes);
     }
 
-    [Fact]
-    public void MatchResultItemViewModel_FormatsDetourUsingExistingCardText()
+    [Theory]
+    [InlineData(6.0, 6)]
+    [InlineData(6.1, 7)]
+    [InlineData(6.9, 7)]
+    public void MatchResultItemViewModel_RoundsDisplayedMinutesUp(
+        double durationMinutes,
+        int expectedDisplayedMinutes)
     {
+        var realDurationMinutes = Convert.ToDecimal(durationMinutes);
         var match = new MatchResult(
             CreateDriver(),
             [DayOfWeek.Monday],
             0,
             DetourDistanceKm: 2.5m,
-            DetourDurationMinutes: 7.4m);
+            DetourDurationMinutes: realDurationMinutes);
 
         var item = new MatchResultItemViewModel(match);
 
-        Assert.Equal("Desvio: +2,5 km · +7,4 min", item.DetourText);
+        Assert.Equal(
+            $"Desvio: +2,5 km · +{expectedDisplayedMinutes} min",
+            item.DetourText);
+        Assert.Equal(realDurationMinutes, match.DetourDurationMinutes);
     }
 
     private static MatchingService CreateService(
