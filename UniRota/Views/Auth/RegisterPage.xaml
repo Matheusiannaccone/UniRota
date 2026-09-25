@@ -1,104 +1,50 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage
-    x:Class="UniRota.Views.Auth.RegisterPage"
+<ContentPage x:Class="UniRota.Views.Auth.RegisterPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    Shell.NavBarIsVisible="False"
-    Title="Criar conta">
-
+    Shell.NavBarIsVisible="False" Title="Criar conta">
     <ScrollView>
-        <VerticalStackLayout
-            Padding="24,32"
-            MaximumWidthRequest="480"
-            HorizontalOptions="Fill"
-            Spacing="12">
-            <Label
-                Text="Criar conta"
-                FontSize="32"
-                FontAttributes="Bold"
-                HorizontalOptions="Center"
-                HorizontalTextAlignment="Center" />
-            <Label
-                Text="Preencha seus dados para começar"
-                HorizontalTextAlignment="Center"
-                TextColor="{DynamicResource TextSecondary}" />
-
-            <Label Text="Nome" />
-            <Border Padding="12,0">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="10" />
-                </Border.StrokeShape>
-                <Entry
-                    Text="{Binding Name}"
-                    Placeholder="Seu nome"
-                    ReturnType="Next"
-                    IsEnabled="{Binding IsNotBusy}" />
-            </Border>
-
-            <Label Text="E-mail" />
-            <Border Padding="12,0">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="10" />
-                </Border.StrokeShape>
-                <Entry
-                    Text="{Binding Email}"
-                    Placeholder="seuemail@exemplo.com"
-                    Keyboard="Email"
-                    ReturnType="Next"
-                    IsEnabled="{Binding IsNotBusy}" />
-            </Border>
-
-            <Label Text="Senha" />
-            <Border Padding="12,0">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="10" />
-                </Border.StrokeShape>
-                <Entry
-                    Text="{Binding Password}"
-                    Placeholder="Mínimo de 6 caracteres"
-                    IsPassword="True"
-                    ReturnType="Next"
-                    IsEnabled="{Binding IsNotBusy}" />
-            </Border>
-
-            <Label Text="Confirmar senha" />
-            <Border Padding="12,0">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="10" />
-                </Border.StrokeShape>
-                <Entry
-                    Text="{Binding ConfirmPassword}"
-                    Placeholder="Digite a senha novamente"
-                    IsPassword="True"
-                    ReturnType="Go"
-                    IsEnabled="{Binding IsNotBusy}" />
-            </Border>
-
-            <Label
-                Text="{Binding ErrorMessage}"
-                IsVisible="{Binding HasError}"
-                TextColor="{DynamicResource Error}"
-                HorizontalTextAlignment="Center" />
-
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <Button
-                    Grid.Column="0"
-                    Text="Criar conta"
-                    Command="{Binding RegisterCommand}"
-                    IsEnabled="{Binding IsNotBusy}" />
-                <ActivityIndicator
-                    Grid.Column="1"
-                    IsRunning="{Binding IsBusy}"
-                    IsVisible="{Binding IsBusy}"
-                    VerticalOptions="Center" />
+        <VerticalStackLayout Style="{StaticResource AuthContent}">
+            <!-- Container substituível pela marca oficial. -->
+            <Grid Style="{StaticResource BrandSlot}" ColumnDefinitions="Auto,*">
+                <Button Text="‹" Command="{Binding GoToLoginCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource LinkButton}" SemanticProperties.Description="Voltar para login" />
+                <Label Grid.Column="1" Text="UniRota" Style="{StaticResource BrandText}" />
             </Grid>
+            <VerticalStackLayout Style="{StaticResource DetailContent}">
+                <Label Text="Criar conta" Style="{StaticResource PageTitle}" />
+                <Label Text="Faça parte do UniRota e organize seus deslocamentos à Facens." Style="{StaticResource PageSubtitle}" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Style="{StaticResource SectionContent}">
+                <Border Style="{StaticResource InputContainer}">
+                <VerticalStackLayout Spacing="0">
+                    <Label Text="Nome completo" Style="{StaticResource Caption}" />
+                    <Entry Text="{Binding Name}" Placeholder="Seu nome" ReturnType="Next" IsEnabled="{Binding IsNotBusy}" />
+                </VerticalStackLayout>
+            </Border>
+                <Border Style="{StaticResource InputContainer}">
+                <VerticalStackLayout Spacing="0">
+                    <Label Text="E-mail" Style="{StaticResource Caption}" />
+                    <Entry Text="{Binding Email}" Placeholder="seu@email.com" Keyboard="Email" ReturnType="Next" IsEnabled="{Binding IsNotBusy}" />
+                </VerticalStackLayout>
+            </Border>
+                <Border Style="{StaticResource InputContainer}">
+                <VerticalStackLayout Spacing="0">
+                    <Label Text="Senha" Style="{StaticResource Caption}" />
+                    <Entry Text="{Binding Password}" Placeholder="Mínimo de 6 caracteres" IsPassword="True" ReturnType="Next" IsEnabled="{Binding IsNotBusy}" />
+                </VerticalStackLayout>
+            </Border>
+                <Border Style="{StaticResource InputContainer}">
+                <VerticalStackLayout Spacing="0">
+                    <Label Text="Confirmar senha" Style="{StaticResource Caption}" />
+                    <Entry Text="{Binding ConfirmPassword}" Placeholder="Digite a senha novamente" IsPassword="True" ReturnType="Go" IsEnabled="{Binding IsNotBusy}" />
+                </VerticalStackLayout>
+            </Border>
+            </VerticalStackLayout>
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <Button Text="Criar conta" Command="{Binding RegisterCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" />
+            <Button Text="Já tenho uma conta" Command="{Binding GoToLoginCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource LinkButton}" />
 
-            <Button
-                Text="Já tenho uma conta"
-                Command="{Binding GoToLoginCommand}"
-                IsEnabled="{Binding IsNotBusy}"
-                BackgroundColor="Transparent"
-                TextColor="{DynamicResource Primary}" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>
