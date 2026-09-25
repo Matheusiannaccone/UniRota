@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using UniRota.Models;
 using UniRota.Services.Interfaces;
 
 namespace UniRota.ViewModels;
@@ -22,19 +23,44 @@ public partial class ConfirmedRoutesViewModel : ObservableObject
     [ObservableProperty]
     private bool isEmpty = true;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VisibleRoutes))]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
+    [NotifyPropertyChangedFor(nameof(EmptyStateText))]
+    private bool showRecurring;
+
     public ConfirmedRoutesViewModel(
         IRideRequestService rideRequestService,
         IAuthService authService)
     {
         _rideRequestService = rideRequestService;
         _authService = authService;
+        Routes.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(VisibleRoutes));
+            OnPropertyChanged(nameof(ShowEmptyState));
+        };
     }
 
     public ObservableCollection<ConfirmedRideItemViewModel> Routes { get; } = [];
 
     public bool IsNotBusy => !IsBusy;
 
-    public bool ShowEmptyState => IsEmpty && !HasError && !IsBusy;
+    public IReadOnlyList<ConfirmedRideItemViewModel> VisibleRoutes => Routes
+        .Where(item => item.Request.Type == (ShowRecurring ? RideRequestType.Weekly : RideRequestType.Once))
+        .ToArray();
+
+    public bool ShowEmptyState => VisibleRoutes.Count == 0 && !HasError && !IsBusy;
+
+    public string EmptyStateText => ShowRecurring
+        ? "Você ainda não possui caronas recorrentes confirmadas."
+        : "Você ainda não possui caronas pontuais confirmadas.";
+
+    [RelayCommand]
+    private void ShowOnceRides() => ShowRecurring = false;
+
+    [RelayCommand]
+    private void ShowWeeklyRides() => ShowRecurring = true;
 
     partial void OnIsBusyChanged(bool value)
     {

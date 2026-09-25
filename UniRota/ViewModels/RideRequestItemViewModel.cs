@@ -44,4 +44,10 @@ public sealed class RideRequestItemViewModel
         $"Preço sugerido: R$ {SuggestedPrice.ToString("N2", PtBrCulture)} por viagem";
 
     public string StatusText => "Aguardando aceite";
+
+    public bool HasCreatedAt => Request.CreatedAtUtc != default;
+
+    public string SentAtText => HasCreatedAt
+        ? $"Enviada em {Request.CreatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy 'às' HH:mm", PtBrCulture)}"
+        : string.Empty;
 }
