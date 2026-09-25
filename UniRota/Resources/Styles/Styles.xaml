@@ -559,4 +559,54 @@
         <Setter Property="MinimumHeightRequest" Value="112" />
         <Setter Property="LineBreakMode" Value="WordWrap" />
     </Style>
+<Style x:Key="ChoiceRadio" TargetType="RadioButton">
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="MinimumHeightRequest" Value="72" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="BorderColor" Value="{StaticResource Border}" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray900}}" />
+        <Style.Triggers>
+            <Trigger TargetType="RadioButton" Property="IsChecked" Value="True">
+                <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}" />
+                <Setter Property="TextColor" Value="{StaticResource PrimaryDark}" />
+                <Setter Property="BorderColor" Value="{StaticResource Primary}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="DayChip" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="MinimumHeightRequest" Value="44" />
+        <Setter Property="MinimumWidthRequest" Value="44" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Margin" Value="0,0,6,6" />
+        <Style.Triggers>
+            <DataTrigger TargetType="Button" Binding="{Binding IsSelected}" Value="True">
+                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                <Setter Property="TextColor" Value="{StaticResource White}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="SelectableCard" TargetType="Border" BasedOn="{StaticResource ListCard}">
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Selected">
+                        <VisualState.Setters>
+                            <Setter Property="Stroke" Value="{StaticResource PrimaryBrush}" />
+                            <Setter Property="StrokeThickness" Value="2" />
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource PrimaryLight}, Dark={StaticResource PrimaryDark}}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+    <Style x:Key="SuggestionCard" TargetType="Border" BasedOn="{StaticResource InfoCard}">
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
 </ResourceDictionary>

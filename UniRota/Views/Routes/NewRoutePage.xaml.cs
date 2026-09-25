@@ -19,6 +19,19 @@ public partial class NewRoutePage : ContentPage, IQueryAttributable
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
+    private void OnDayClicked(object sender, EventArgs e)
+    {
+        if (!_viewModel.IsBusy && sender is Button { CommandParameter: SelectableDayViewModel day })
+            day.IsSelected = !day.IsSelected;
+    }
+
+    private void OnRoleCheckedChanged(object sender, CheckedChangedEventArgs e)
+    {
+        if (e.Value && sender is RadioButton { Value: RouteRoleOption role }
+            && BindingContext is NewRouteViewModel viewModel && !viewModel.IsBusy)
+            viewModel.SelectedRole = role;
+    }
+
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
         if (query.TryGetValue(RouteParameterName, out var value)

@@ -22,6 +22,12 @@ public partial class FindRideViewModel : ObservableObject
     [ObservableProperty]
     private bool isEmpty = true;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanFindMatches))]
+    private WeeklyRouteItemViewModel? selectedRoute;
+
+    public bool CanFindMatches => SelectedRoute is not null && !IsBusy && !HasError;
+
     public FindRideViewModel(IRouteService routeService)
     {
         _routeService = routeService;
@@ -38,11 +44,13 @@ public partial class FindRideViewModel : ObservableObject
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(IsNotBusy));
+        OnPropertyChanged(nameof(CanFindMatches));
         OnPropertyChanged(nameof(ShowEmptyState));
     }
 
     partial void OnHasErrorChanged(bool value)
     {
+        OnPropertyChanged(nameof(CanFindMatches));
         OnPropertyChanged(nameof(ShowEmptyState));
     }
 
@@ -66,6 +74,8 @@ public partial class FindRideViewModel : ObservableObject
         {
             var routes = await _routeService.GetMyRoutesAsync(cancellationToken);
 
+            var selectedId = SelectedRoute?.Route.Id;
+            SelectedRoute = null;
             PassengerRoutes.Clear();
 
             foreach (var route in routes.Where(
@@ -75,6 +85,7 @@ public partial class FindRideViewModel : ObservableObject
             }
 
             IsEmpty = PassengerRoutes.Count == 0;
+            SelectedRoute = PassengerRoutes.FirstOrDefault(route => route.Route.Id == selectedId);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -94,7 +105,7 @@ public partial class FindRideViewModel : ObservableObject
     [RelayCommand]
     private void FindMatches(WeeklyRouteItemViewModel? route)
     {
-        if (route is null || IsBusy)
+        if (route is null || IsBusy || HasError || !PassengerRoutes.Contains(route))
         {
             return;
         }

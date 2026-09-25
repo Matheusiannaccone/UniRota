@@ -1,72 +1,31 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage
-    x:Class="UniRota.Views.Matching.RouteDetailsPage"
+<ContentPage x:Class="UniRota.Views.Matching.RouteDetailsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:maps="http://schemas.microsoft.com/dotnet/2021/maui/maps"
-    Shell.NavBarIsVisible="True"
-    Title="Detalhes do trajeto">
-
-    <Grid
-        Padding="20,16,20,20"
-        MaximumWidthRequest="720"
-        HorizontalOptions="Fill"
-        RowDefinitions="Auto,*,Auto,Auto"
-        RowSpacing="14">
-
-        <VerticalStackLayout Grid.Row="0" Spacing="4">
-            <Label
-                Text="Trajeto compartilhado"
-                FontSize="28"
-                FontAttributes="Bold" />
-            <Label
-                Text="{Binding DriverRouteText}"
-                TextColor="{DynamicResource TextSecondary}"
-                LineBreakMode="WordWrap" />
-        </VerticalStackLayout>
-
-        <Grid Grid.Row="1" MinimumHeightRequest="320">
-            <maps:Map
-                x:Name="RouteMap"
-                IsShowingUser="False"
-                IsVisible="{Binding HasMapData}" />
-
-            <ActivityIndicator
-                IsRunning="{Binding IsBusy}"
-                IsVisible="{Binding IsBusy}"
-                HorizontalOptions="Center"
-                VerticalOptions="Center" />
-
-            <Label
-                Text="Não foi possível exibir o trajeto no mapa."
-                IsVisible="{Binding ShowMapPlaceholder}"
-                TextColor="{DynamicResource TextSecondary}"
-                HorizontalTextAlignment="Center"
-                VerticalTextAlignment="Center" />
-        </Grid>
-
-        <Border
-            Grid.Row="2"
-            Padding="14"
-            Stroke="{DynamicResource BorderBrush}"
-            BackgroundColor="{DynamicResource SurfaceSecondary}">
-            <Border.StrokeShape>
-                <RoundRectangle CornerRadius="12" />
-            </Border.StrokeShape>
-            <VerticalStackLayout Spacing="6">
-                <Label Text="{Binding DistanceText}" FontAttributes="Bold" />
-                <Label Text="{Binding DurationText}" />
-                <Label
-                    Text="{Binding DetourText}"
-                    TextColor="{DynamicResource TextSecondary}" />
+    Shell.NavBarIsVisible="True" Title="Detalhes do trajeto">
+    <ScrollView>
+        <VerticalStackLayout Style="{StaticResource PageContent}">
+            <VerticalStackLayout Style="{StaticResource DetailContent}">
+                <Label Text="Trajeto compartilhado" Style="{StaticResource PageTitle}" />
+                <Label Text="{Binding DriverRouteText}" Style="{StaticResource PageSubtitle}" />
             </VerticalStackLayout>
-        </Border>
-
-        <Label
-            Grid.Row="3"
-            Text="{Binding MapMessage}"
-            IsVisible="{Binding HasMapMessage}"
-            TextColor="{DynamicResource TextSecondary}"
-            HorizontalTextAlignment="Center" />
-    </Grid>
+            <Border Style="{StaticResource Card}" Padding="0">
+                <Grid HeightRequest="360">
+                    <maps:Map x:Name="RouteMap" IsShowingUser="False" IsVisible="{Binding HasMapData}" />
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Label Text="Não foi possível exibir o trajeto no mapa." IsVisible="{Binding ShowMapPlaceholder}" Style="{StaticResource EmptyState}" />
+                </Grid>
+            </Border>
+            <Border Style="{StaticResource InfoCard}">
+                <VerticalStackLayout Style="{StaticResource SectionContent}">
+                    <Label Text="Seu trajeto em números" Style="{StaticResource SectionTitle}" />
+                    <Label Text="{Binding DistanceText}" Style="{StaticResource CardTitle}" />
+                    <Label Text="{Binding DurationText}" Style="{StaticResource CardTitle}" />
+                    <Label Text="{Binding DetourText}" Style="{StaticResource PageSubtitle}" />
+                </VerticalStackLayout>
+            </Border>
+            <Label Text="{Binding MapMessage}" IsVisible="{Binding HasMapMessage}" Style="{StaticResource Caption}" />
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

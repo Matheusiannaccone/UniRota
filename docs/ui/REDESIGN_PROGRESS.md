@@ -1,62 +1,60 @@
 # Progresso do redesign UniRota
 
 ## Estado geral
-- Bloco atual: 2 — Shell TabBar, Home e Minhas Rotas.
-- Etapa atual: inspeção da navegação antes da alteração estrutural.
-- Último checkpoint: Bloco 1 aprovado em compilação Android e revisão de bindings.
-- Build atual: Android Debug aprovado, 0 erros e 0 avisos.
-- Testes atuais: não executados; Bloco 1 alterou apenas XAML.
+- Bloco atual: 4 — Solicitações e Caronas.
+- Etapa atual: início do Bloco 4.
+- Último checkpoint: Bloco 3 aprovado.
+- Build atual: Android aprovado, 0 erros e 0 avisos.
+- Testes atuais: 157/157 testes .NET aprovados.
+- `git diff --check`: aprovado.
 
 ## Concluído
-- Fundação: estilos de conteúdo, tipografia, marca textual, cards, campos, ações, erros e espaçamentos centralizados.
-- Startup, Login e Cadastro redesenhados conforme mockups 02, 03 e 04.
-- Autenticação, validações e comandos preservados.
+- Bloco 1 — Fundação visual e autenticação.
+- Bloco 2 — Shell TabBar, Home e Minhas Rotas.
+- Bloco 3 — Nova Rota, Encontrar Carona, Matching e Mapa.
 
 ## Em andamento
-- Migração da área autenticada para Shell TabBar e redesign de Home/Minhas Rotas.
+- Bloco 4 — Solicitações e Caronas.
 
-## Arquivos alterados no bloco atual
-- Nenhum arquivo do Bloco 2 ainda.
-
-## Decisões tomadas
-- Marca textual em container substituível; nenhum asset fictício.
-- Não implementar recuperação de senha/visibilidade de senha ausentes no fluxo atual.
-- Manter senha mínima de seis caracteres, conforme validação existente.
-- Estilos compartilhados suportam temas claro e escuro.
+## Arquivos alterados no bloco anterior
+- `UniRota/Resources/Styles/Styles.xaml`
+- `UniRota/ViewModels/FindRideViewModel.cs`
+- `UniRota/ViewModels/NewRouteViewModel.cs`
+- `UniRota/Views/Routes/NewRoutePage.xaml`
+- `UniRota/Views/Routes/NewRoutePage.xaml.cs`
+- `UniRota/Views/Matching/FindRidePage.xaml`
+- `UniRota/Views/Matching/MatchResultsPage.xaml`
+- `UniRota/Views/Matching/RouteDetailsPage.xaml`
+- `UniRota/Platforms/Android/MainActivity.cs`
+- `UniRota.Tests/FindRideSelectionTests.cs`
+- `docs/ui/REDESIGN_PROGRESS.md`
 
 ## Validações executadas
-- Bloco 1: dotnet build UniRota/UniRota.csproj -f net8.0-android --no-restore -v minimal: aprovado (0/0).
-- Build exige execução fora do sandbox para acesso ao SDK local; tentativa inicial bloqueada antes da compilação.
-- git diff --check aprovado após remover espaços finais.
-- Bindings e comandos das três páginas conferidos; nenhum ViewModel/code-behind alterado.
+- Bloco 3: build Android aprovado, 0 erros e 0 avisos.
+- Bloco 3: 157/157 testes .NET aprovados.
+- Bloco 3: `git diff --check` aprovado.
+- Smoke test: autocomplete real, edição de rota, seleção de rota, busca, matching sem resultados, teclado e seleção explícita de papel.
 
 ## Pendências conhecidas
-- Validação visual/interação em Android (teclado, scroll, telas pequenas) ainda pendente.
-- Checkpoints 2 a 4 e revisão integrada.
+- Resultado de matching com correspondência real e mapa ainda dependem de cenário de teste adicional.
+- Bloco 4 ainda precisa ser implementado.
+- Revisão integrada das 13 páginas ainda precisa ser executada.
 
 ## Próxima ação exata
-- Ler AppShell, navegação/autenticação diretamente relacionada, Home/MyRoutes e mockups 01/05; implementar TabBar e validar checkpoint 2.
+1. Confirmar `git status` e `git diff`.
+3. Consultar os mockups 09, 10, 11 e 07.
+4. Ler:
+   - `RideRequestPage.xaml`
+   - `AwaitingApprovalPage.xaml`
+   - `ReceivedRequestsPage.xaml`
+   - `ConfirmedRoutesPage.xaml`
+5. Implementar o Bloco 4 conforme `AGENTS.md` e `docs/ui/MOCKUPS.md`.
+6. Executar o Checkpoint 4.
+7. Atualizar este arquivo.
+8. Prosseguir para a revisão integrada.
 
 ## Observações para retomada
-- Projeto MAUI em UniRota/; testes em UniRota.Tests/.
-- Separação de commit do Bloco 1: Colors.xaml, Styles.xaml, StartupPage.xaml, LoginPage.xaml, RegisterPage.xaml e este progresso.
-- Execução dos quatro blocos autorizada sem confirmação intermediária.
-
-### Etapa estrutural do Bloco 2
-- TabBar nativa criada via Shell com templates DI: home/HomePage, routes/MyRoutesPage, rides/ConfirmedRoutesPage sob main.
-- Login, Cadastro e Startup usam AppShell.HomeRoute; raízes de abas removidas do registro de rotas globais.
-- Troca de aba conserva stacks. Ao retornar a login sem sessão, templates/stacks autenticados são recriados; navegação para main sem sessão é bloqueada.
-- Home e MyRoutes redesenhados; três SVGs funcionais provisórios para abas adicionados.
-- Build Android aprovado (0 erros/0 avisos), suíte .NET completa 154/154, diff --check aprovado.
-- Emulador disponível: emulator-5554. APK inicialmente carregou assemblies antigos do fast deployment.
-- Cache files/.__override__ do app foi renomeado para files/unirota-redesign-override-backup (preservado). Build com EmbedAssembliesIntoApk=true em andamento para smoke test real.
-- Próxima ação: instalar APK autocontido, validar restauração/abas/back no emulador; registrar limitações de login/cadastro sem credenciais e encerrar checkpoint 2 antes do Bloco 3.
-- Smoke real encontrou NullReferenceException em OnNavigating durante InitializeComponent. Corrigido atribuindo dependências antes do XAML e protegendo callbacks de inicialização; repetir build e smoke antes de avançar.
-- Correção do callback validada: build Android autocontido aprovado 0/0, app abre e restaura sessão existente.
-- Smoke Android: Início/Rotas/Caronas renderizam; Nova Rota abre; alternar Rotas → Caronas → Rotas conserva formulário; back retorna à lista sem duplicar raiz.
-- Login/Cadastro/logout seguidos de novo login: validação interativa pendente por ausência de credenciais fornecidas. Comandos e redirecionamentos conferidos estaticamente; não houve alteração na autenticação.
-- Checkpoint 2 aprovado nos checks disponíveis, sem regressão conhecida; limitações manuais registradas.
-
-### Início do Bloco 3
-- Etapa atual: consulta dos mockups 06, 08 e 12 e dos quatro XAMLs correspondentes.
-- Próxima ação exata: redesenhar NewRoute, FindRide, MatchResults e RouteDetails preservando handlers, comandos, nomes dos controles de mapa e bindings geográficos.
+- Não reiniciar os Blocos 1, 2 ou 3.
+- Shell TabBar já foi validada.
+- Bloco 3 já foi implementado e validado.
+- Continuar diretamente do Bloco 4.
