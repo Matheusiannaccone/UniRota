@@ -1,26 +1,29 @@
 # UniRota — Instruções para agentes de código
 
-## Objetivo do projeto
+## 1. Objetivo atual do projeto
 
 O UniRota é um aplicativo acadêmico de caronas para estudantes da Facens.
 
-O MVP funcional original foi concluído com o seguinte fluxo:
+O MVP funcional já está concluído e validado no Android. O fluxo consolidado é:
 
 1. Cadastro/Login
-2. Rotas semanais
-3. Matching determinístico
+2. Rotas semanais com endereços reais
+3. Matching determinístico e geográfico
 4. Solicitação de carona Once/Weekly
 5. Aceite/rejeição e consumo de vagas
 6. Rotas confirmadas
 7. Preço sugerido
+8. Visualização do trajeto em mapa
 
-A partir deste ponto, o projeto está em evolução funcional. O incremento atual adiciona endereços reais, cálculo de rotas e matching geográfico usando Google Maps Platform.
+A fase atual é o **redesign completo da interface e da experiência de uso**, seguindo os mockups aprovados pelo grupo.
 
-O foco continua sendo simplicidade, estabilidade, rastreabilidade, baixo acoplamento e coerência com a documentação do projeto.
+Os mockups **não são apenas referências estéticas**. Eles representam decisões de experiência do usuário, hierarquia de informação, navegação e organização das telas. A implementação deve reproduzir sua intenção de UX com fidelidade, adaptando apenas o necessário para respeitar os dados e comportamentos reais do aplicativo.
+
+O objetivo final desta fase é deixar **todas as 13 páginas do aplicativo devidamente estilizadas, visualmente consistentes e sem regressão funcional**.
 
 ---
 
-## Stack definida
+## 2. Stack e arquitetura que devem ser preservadas
 
 - .NET MAUI
 - .NET 8
@@ -30,578 +33,538 @@ O foco continua sendo simplicidade, estabilidade, rastreabilidade, baixo acoplam
 - Dependency Injection
 - Firebase Authentication
 - Cloud Firestore
-- Google Maps Platform no incremento geográfico
+- Google Places API (New)
+- Google Routes API
+- Maps SDK for Android
 - GitHub para versionamento
-- Trello para gestão do projeto
 
----
-
-## Arquitetura
-
-Manter um único projeto .NET MAUI.
-
-Estrutura principal esperada:
-
-```text
-UniRota/
-├── Models/
-├── Views/
-│   ├── Auth/
-│   ├── Routes/
-│   └── Matching/
-├── ViewModels/
-├── Services/
-│   ├── Interfaces/
-│   ├── Firebase/
-│   └── GoogleMaps/
-├── App.xaml
-├── App.xaml.cs
-├── AppShell.xaml
-└── MauiProgram.cs
-```
-
-A arquitetura deve permanecer simples e adequada ao estágio atual do projeto.
+Manter um único projeto .NET MAUI e a arquitetura atual.
 
 Não criar novas camadas apenas por organização estética.
 
+Não refatorar serviços ou regras de negócio durante tarefas visuais, salvo necessidade concreta para preservar um comportamento existente ou implementar a nova navegação por Shell.
+
 ---
 
-## Responsabilidades técnicas principais
+## 3. Baseline funcional protegida
+
+A implementação visual deve preservar integralmente os fluxos já validados.
 
 ### Autenticação
 
-- Firebase Authentication
-- cadastro
-- login
-- verificação de sessão
-- logout
-- acesso à área autenticada apenas para usuários logados
-- persistência do perfil básico em `users`
+Preservar:
 
-O fluxo atual de autenticação deve ser preservado.
+- cadastro;
+- login;
+- restauração/verificação de sessão;
+- logout;
+- perfil em `users`;
+- acesso à área autenticada somente para usuários logados.
 
-### Rotas semanais
+### Rotas e Google Maps
 
-Uma rota semanal deve representar a rotina do usuário e conter, conforme aplicável:
+Preservar:
 
-- origem
-- destino
-- referência geográfica dos endereços
-- dias da semana
-- horário
-- papel do usuário na rota
-- vagas, quando motorista
-- dados necessários ao cálculo de distância
-
-A persistência continua em `weeklyRoutes`.
+- origem e destino com endereços reais;
+- autocomplete do Google Places;
+- Place IDs;
+- invalidação da seleção quando o texto é editado manualmente;
+- compatibilidade com rotas legadas;
+- cálculo real de distância e duração;
+- regras de chamada às APIs externas;
+- tratamento de timeout, ausência de rota e erros de rede.
 
 ### Matching
 
-O matching continua determinístico e implementado em C#.
+Preservar:
 
-O incremento atual substitui a comparação textual de origem/destino por análise geográfica.
+- filtros locais baratos antes das chamadas externas;
+- papéis opostos;
+- exclusão do próprio usuário;
+- vagas disponíveis;
+- compatibilidade de dia e horário;
+- matching geográfico por desvio;
+- limites configurados atualmente;
+- ordenação dos resultados.
 
-O fluxo esperado deve preservar primeiro os filtros baratos já existentes:
-
-- candidato deve ser motorista
-- candidato não pode pertencer ao mesmo usuário
-- deve possuir vaga disponível
-- deve possuir ao menos um dia compatível
-- diferença de horário deve permanecer dentro da tolerância definida
-
-Somente depois desses filtros devem ser executados cálculos geográficos.
-
-A compatibilidade final poderá considerar:
-
-- distância da rota original do motorista
-- duração da rota original
-- distância da rota com passagem pelo passageiro
-- duração da rota compartilhada
-- desvio adicional em quilômetros
-- desvio adicional em minutos
-
-Evitar chamadas desnecessárias à API do Google.
+Não voltar para comparação textual simples de origem/destino.
 
 ### Precificação
 
-A precificação deve continuar:
+Preservar:
 
-- implementada em C#
-- simples
-- transparente
-- reproduzível
-- desacoplada do fornecedor de mapas
+- fórmula atual;
+- uso da distância compartilhada calculada;
+- `SuggestedPrice` persistido como snapshot;
+- ausência de nova chamada ao Google apenas para recalcular preço.
 
-A fórmula atual não deve ser alterada durante o incremento geográfico sem solicitação explícita.
+Não alterar a fórmula durante o redesign.
 
-A principal mudança deste incremento é substituir a distância informada manualmente por distância calculada.
+### Solicitações, vagas e concorrência
 
-O `SuggestedPrice` persistido na solicitação deve continuar funcionando como snapshot.
+Preservar:
 
-### Solicitações e vagas
+- Once/Weekly;
+- Pending / Accepted / Rejected;
+- consumo de vagas;
+- rejeição de concorrentes quando aplicável;
+- `requestRevision`;
+- preconditions / `updateTime`;
+- commits atômicos e tentativas limitadas;
+- prevenção de inconsistências em concorrência.
 
-O fluxo já validado deve ser preservado:
+Mudanças visuais não devem reimplementar essa lógica.
 
-- criação de solicitação
-- Once/Weekly
-- Pending
-- Accepted
-- Rejected
-- consumo de vagas
-- rejeição de concorrentes quando aplicável
-- `requestRevision`
-- prevenção de inconsistências em concorrência
+### Mapa
 
-O incremento de mapas não deve alterar essa lógica sem necessidade concreta e aprovação explícita.
+Preservar na `RouteDetailsPage`:
+
+- mapa;
+- polyline;
+- pins;
+- viewport;
+- distância;
+- duração;
+- desvio;
+- estados de loading e fallback.
 
 ---
 
-## Incremento atual — Google Maps e matching geográfico
+## 4. Páginas que fazem parte do redesign
 
-### Objetivo
+O redesign contempla exatamente estas 13 páginas atuais:
 
-Permitir que o usuário selecione endereços reais e que o UniRota determine compatibilidade de carona com base em trajetos reais.
+### Inicialização e autenticação
 
-Fluxo esperado:
+1. `Views/StartupPage.xaml`
+2. `Views/Auth/LoginPage.xaml`
+3. `Views/Auth/RegisterPage.xaml`
+
+### Área principal e rotas
+
+4. `Views/HomePage.xaml`
+5. `Views/Routes/MyRoutesPage.xaml`
+6. `Views/Routes/NewRoutePage.xaml`
+
+### Matching e caronas
+
+7. `Views/Matching/FindRidePage.xaml`
+8. `Views/Matching/MatchResultsPage.xaml`
+9. `Views/Matching/RouteDetailsPage.xaml`
+10. `Views/Matching/RideRequestPage.xaml`
+11. `Views/Matching/AwaitingApprovalPage.xaml`
+12. `Views/Matching/ReceivedRequestsPage.xaml`
+13. `Views/Matching/ConfirmedRoutesPage.xaml`
+
+A `RouteDetailsPage` não possui mockup próprio porque foi adicionada posteriormente com o incremento de Google Maps.
+
+Seu visual deve ser derivado do mesmo sistema visual e dos padrões das telas de matching aprovadas, sem alterar o funcionamento do mapa.
+
+---
+
+## 5. Navegação — Shell TabBar é requisito desta fase
+
+A área autenticada do UniRota deve adotar **Shell TabBar nativa** como parte da experiência definida nos mockups.
+
+As três áreas principais devem ser:
+
+- **Início** → `HomePage`
+- **Rotas** → `MyRoutesPage`
+- **Caronas** → `ConfirmedRoutesPage`
+
+`StartupPage`, `LoginPage` e `RegisterPage` permanecem fora da TabBar.
+
+As demais páginas autenticadas devem funcionar como rotas internas/navegação a partir das áreas principais, preservando o fluxo existente:
+
+- `NewRoutePage`
+- `FindRidePage`
+- `MatchResultsPage`
+- `RouteDetailsPage`
+- `RideRequestPage`
+- `AwaitingApprovalPage`
+- `ReceivedRequestsPage`
+
+A migração para TabBar pode exigir alterações em `AppShell.xaml` e `AppShell.xaml.cs`. Essas alterações são permitidas e fazem parte do escopo visual/UX.
+
+Ao implementar:
+
+- usar a navegação nativa do Shell;
+- não criar uma barra inferior manual duplicada dentro de cada página;
+- manter stacks de navegação coerentes por aba;
+- impedir criação indevida de páginas duplicadas;
+- evitar perda desnecessária de estado de navegação;
+- preservar rotas nomeadas necessárias ao fluxo interno;
+- garantir que autenticação e restauração de sessão continuem direcionando o usuário corretamente;
+- não duplicar a TabBar em XAML de páginas individuais.
+
+---
+
+## 6. Sistema visual centralizado
+
+A identidade visual existente deve ser **evoluída, não recriada**.
+
+Arquivos centrais atuais:
 
 ```text
-Usuário digita endereço
-    ↓
-Google Places sugere endereços
-    ↓
-Usuário seleciona endereço válido
-    ↓
-Rota salva com referência geográfica
-    ↓
-Passageiro procura carona
-    ↓
-Filtros determinísticos locais
-    ↓
-Google Routes calcula trajetos necessários
-    ↓
-UniRota calcula distância, duração e desvio
-    ↓
-Candidatos fora dos limites são removidos
-    ↓
-Resultados são ordenados
-    ↓
-Passageiro solicita carona
-    ↓
-Preço usa distância calculada
+Resources/Styles/Colors.xaml
+Resources/Styles/Styles.xaml
 ```
 
----
+`App.xaml` deve continuar carregando os recursos globais.
 
-## Google Maps Platform
+### Regra principal de reutilização
 
-O provedor inicial aprovado é Google Maps Platform.
+Todo recurso visual reutilizado em mais de uma página deve ser centralizado.
 
-Serviços previstos:
+- Cores e brushes semânticos ficam em `Colors.xaml`.
+- **Estilos, dimensões, tipografia, espaçamentos e padrões visuais reutilizáveis ficam centralizados em `Styles.xaml`.**
+- Não criar cópias locais do mesmo estilo em diferentes páginas.
+- Não espalhar valores repetidos de cor, `CornerRadius`, `Padding`, `FontSize`, alturas ou estados visuais se representam o mesmo componente/padrão.
+- Se um padrão visual aparecer em duas ou mais páginas, extrair para `Styles.xaml`.
+- Recursos locais de página só são aceitáveis quando forem realmente exclusivos daquela tela.
 
-- Places API (New) para pesquisa/autocomplete de endereços
-- Routes API para cálculo de distância, duração e trajeto
-- Maps SDK apenas quando houver necessidade de visualização do mapa
+Priorizar estilos nomeados e semânticos, por exemplo para:
 
-Não implementar Navigation SDK ou navegação turn-by-turn.
+- títulos de página;
+- subtítulos;
+- texto auxiliar;
+- cards;
+- cards selecionados;
+- campos de formulário;
+- botões primários;
+- botões secundários;
+- botões destrutivos;
+- badges/status;
+- chips de dias;
+- blocos de informação;
+- estados vazio/erro/loading;
+- espaçamentos recorrentes.
 
-### Abstração
+Não criar uma biblioteca de componentes complexa sem necessidade real.
 
-O restante do aplicativo não deve depender diretamente de classes específicas do Google.
-
-Preferir interfaces como:
-
-```text
-IPlaceService
-IMapRouteService
-```
-
-e implementações específicas em:
-
-```text
-Services/GoogleMaps/
-```
-
-Isso deve permitir futura substituição do fornecedor com impacto reduzido.
-
----
-
-## Endereços e Place IDs
-
-As rotas novas devem utilizar endereços selecionados por autocomplete, e não apenas texto digitado livremente.
-
-Adicionar e preservar referências geográficas adequadas, preferencialmente Place IDs para origem e destino.
-
-Exemplo conceitual:
-
-```text
-Origin
-OriginPlaceId
-
-Destination
-DestinationPlaceId
-```
-
-O texto continua útil para apresentação ao usuário.
-
-O código deve tratar como inválida uma seleção quando o usuário editar manualmente o texto depois de escolher um resultado.
-
-Rotas antigas sem referência geográfica devem continuar legíveis e não devem causar falha na aplicação.
-
-Não tentar inferir silenciosamente Place IDs de textos antigos ambíguos.
+Centralização deve reduzir repetição, não aumentar abstração desnecessariamente.
 
 ---
 
-## Distância e duração
+## 7. Cores, tipografia e temas
 
-A distância informada manualmente pelo motorista deve ser substituída por cálculo real.
+A paleta existente inspirada na Facens deve ser preservada como base.
 
-Durante a migração, `EstimatedDistanceKm` pode ser preservado como propriedade existente para evitar mudanças desnecessárias em precificação, Firestore e testes, mas seu valor deverá passar a ser derivado do serviço de rotas.
+Não reintroduzir cores roxas do template MAUI.
 
-Não renomear essa propriedade apenas por estética durante este incremento.
+Não inserir cores hexadecimais diretamente nas páginas quando já existir ou puder existir um recurso semântico correspondente.
 
----
+As fontes oficiais definitivas e outros assets de marca ainda não estão disponíveis.
 
-## Desvio da rota
+Até que sejam adicionados:
 
-A compatibilidade geográfica deve comparar:
-
-```text
-Rota original:
-motorista origem → motorista destino
-```
-
-com:
-
-```text
-Rota compartilhada:
-motorista origem
-→ passageiro origem
-→ passageiro destino
-→ motorista destino
-```
-
-Calcular pelo menos:
-
-```text
-DetourDistanceKm
-DetourDurationMinutes
-```
-
-Evitar waypoints duplicados quando motorista e passageiro compartilharem origem ou destino.
-
-Os limites máximos de desvio devem ficar centralizados/configuráveis e não espalhados como números mágicos pelo código.
+- usar as fontes atualmente configuradas no projeto;
+- não baixar ou inventar fontes novas;
+- não adicionar logos fictícios;
+- não gerar imagens de marca provisórias;
+- preparar layouts e espaços de forma que logo/imagens oficiais possam ser substituídos depois sem reestruturar as telas.
 
 ---
 
-## Segurança de API
+## 8. Logo, imagens e ícones ainda não oficiais
 
-Não expor no repositório chaves secretas ou chaves de web service sem restrição adequada.
+Outro integrante do grupo fornecerá futuramente o logo e os assets oficiais.
 
-Não adicionar uma chave de Google Routes/Places diretamente ao código-fonte apenas para facilitar testes.
+Nesta fase:
 
-Caso seja necessário proteger chamadas de web service, uma função serverless mínima no ecossistema Firebase/Google Cloud está aprovada para este incremento.
+- reservar espaços adequados nos layouts quando os mockups exigirem logo ou imagem;
+- usar placeholders discretos ou elementos textuais existentes somente quando necessário para manter a composição;
+- não criar uma identidade visual definitiva por conta própria;
+- não adicionar imagens genéricas ou stock ao repositório;
+- manter o espaço adaptável para substituição posterior por `Image`/asset real;
+- ícones funcionais podem usar soluções nativas ou já existentes quando necessárias à usabilidade;
+- ícones provisórios não devem ser tratados como identidade final do projeto.
 
-Essa função deve:
-
-- ser pequena
-- ter propósito específico
-- validar usuário quando aplicável
-- expor somente operações necessárias
-- não funcionar como proxy genérico para qualquer chamada Google
-- manter segredos fora do aplicativo e do GitHub
-
-Não transformar essa necessidade em backend tradicional, microserviço ou API genérica.
+O layout deve continuar funcional mesmo sem os assets finais.
 
 ---
 
-## Firestore
+## 9. Fidelidade aos mockups
 
-Coleções atuais principais:
+Antes de implementar cada bloco visual, ler docs/ui/MOCKUPS.md e consultar somente as imagens correspondentes às páginas daquele bloco. Os mockups são fonte de verdade para UX e composição visual, enquanto o código atual é fonte de verdade para funcionalidades, dados e comportamentos existentes.
 
-- `users`
-- `weeklyRoutes`
-- `rideRequests`
+Os mockups aprovados orientam:
 
-Preservar o modelo atual sempre que possível.
+- hierarquia de informação;
+- densidade de conteúdo;
+- agrupamento de dados;
+- posição relativa das ações;
+- navegação;
+- prioridade dos botões;
+- estrutura de cards;
+- estados visuais;
+- clareza e simplicidade da experiência.
 
-Novos campos de localização devem ser adicionados somente onde realmente necessários.
+Quando um mockup mostrar um dado ou recurso que **não existe funcionalmente** no aplicativo, não implementar nova regra de negócio apenas para copiar a imagem.
 
-Não criar novas coleções apenas para cache sem necessidade concreta.
+Exemplos:
 
-Ao alterar `weeklyRoutes`:
+- reputação;
+- chat;
+- notificações reais;
+- avaliações;
+- funcionalidades ainda não existentes.
 
-- preservar leitura de documentos antigos quando possível
-- validar novos campos
-- atualizar serialização e desserialização
-- revisar Firestore Security Rules
-- não quebrar `requestRevision`
+Nesses casos, adaptar o layout aos dados reais disponíveis mantendo a intenção visual.
 
----
+Não remover informações funcionais importantes que foram adicionadas após a criação dos mockups, como:
 
-## Compatibilidade com dados legados
-
-Documentos antigos podem não possuir campos geográficos.
-
-O aplicativo deve:
-
-- continuar conseguindo carregar essas rotas
-- identificá-las como não preparadas para matching geográfico
-- orientar o usuário a editar e selecionar endereços válidos
-- não geocodificar automaticamente entradas ambíguas sem interação do usuário
-
-Migrações destrutivas devem ser evitadas.
-
----
-
-## Ordem de desenvolvimento do incremento atual
-
-Implementar em blocos verticais.
-
-### Bloco 1 — Fundação geográfica
-
-- atualizar modelos
-- adicionar campos de Place ID
-- adaptar persistência Firestore
-- criar modelos/interfaces geográficos
-- manter compatibilidade com documentos antigos
-- não chamar Google ainda
-
-### Bloco 2 — Endereços reais
-
-- integrar autocomplete
-- selecionar endereço
-- validar seleção
-- salvar Place IDs
-- tratar edição do texto após seleção
-
-### Bloco 3 — Distância e duração
-
-- integrar Routes API
-- obter distância e duração reais
-- remover entrada manual de distância
-- preencher a distância calculada
-- tratar falhas da API
-
-### Bloco 4 — Matching geográfico
-
-- preservar filtros determinísticos atuais
-- remover igualdade textual de origem/destino
-- calcular rota original e compartilhada
-- calcular desvio
-- aplicar limites configuráveis
-- enriquecer `MatchResult`
-- ordenar resultados
-
-### Bloco 5 — Precificação e solicitação
-
-- usar distância calculada
-- preservar fórmula de preço
-- preservar snapshot de `SuggestedPrice`
-- preservar fluxo de `rideRequests`, vagas e concorrência
-
-### Bloco 6 — Visualização no mapa
-
-- adicionar mapa apenas depois da lógica estar funcional
-- mostrar rota e pontos relevantes
-- exibir distância, duração e desvio
-- não implementar navegação turn-by-turn
-
-### Bloco 7 — Robustez e fechamento
-
-- erros de rede
-- timeout
-- quota
-- respostas sem rota
-- dados legados
-- testes
-- build Android
-- documentar a revisão separada das Firestore Rules, sem alterá-las neste bloco
-- documentação
-
-Não avançar automaticamente de um bloco para outro sem solicitação explícita.
+- distância;
+- duração;
+- desvio;
+- dados geográficos;
+- estados reais do fluxo;
+- informações necessárias ao funcionamento atual.
 
 ---
 
-## Itens fora do escopo deste incremento
+## 10. Organização da implementação visual
 
-Não implementar sem solicitação explícita:
+Implementar em blocos para limitar contexto e facilitar validação.
 
-- GPS/localização atual automática
-- rastreamento em tempo real
-- compartilhamento de localização ao vivo
-- navegação turn-by-turn
-- chat
-- pagamento
-- reputação
-- notificações de aproximação
-- múltiplos passageiros otimizados na mesma rota
-- alteração da fórmula de preço
-- Machine Learning
-- IA
-- microserviços
-- backend tradicional
-- SQL/PostgreSQL
+### Bloco 1 — Fundação visual e autenticação
 
----
+- revisar/evoluir `Colors.xaml` apenas quando necessário;
+- consolidar estilos semânticos em `Styles.xaml`;
+- preparar placeholders de marca;
+- `StartupPage`;
+- `LoginPage`;
+- `RegisterPage`.
 
-## Regra para chamadas externas
+### Bloco 2 — Shell TabBar, Home e Minhas Rotas
 
-Chamadas faturáveis ou sujeitas a quota devem ser feitas somente quando necessárias.
+- migrar a área autenticada para Shell TabBar;
+- Início;
+- Rotas;
+- Caronas;
+- `HomePage`;
+- `MyRoutesPage`;
+- validar navegação e restauração de sessão.
 
-Preferir:
+### Bloco 3 — Criação de rota, busca, matching e mapa
 
-```text
-filtros locais baratos
-↓
-redução de candidatos
-↓
-chamadas externas
-```
+- `NewRoutePage`;
+- `FindRidePage`;
+- `MatchResultsPage`;
+- `RouteDetailsPage`;
+- preservar Places, Routes, matching geográfico e Maps SDK.
 
-Não consultar Google para candidatos que já seriam descartados por papel, usuário, vaga, dia ou horário.
+### Bloco 4 — Solicitações e caronas
 
----
+- `RideRequestPage`;
+- `AwaitingApprovalPage`;
+- `ReceivedRequestsPage`;
+- `ConfirmedRoutesPage`;
+- preservar Once/Weekly, preço, status, vagas e concorrência.
 
-## Tratamento de erros
+### Fechamento — revisão integrada
 
-Serviços externos devem tratar, pelo menos:
+- validar as 13 páginas;
+- revisar consistência visual;
+- revisar TabBar e stacks de navegação;
+- verificar textos longos;
+- verificar estados vazios;
+- verificar estados de erro;
+- verificar loading;
+- verificar estados disabled;
+- testar teclado;
+- testar scroll;
+- testar telas menores;
+- executar suíte completa;
+- executar build Android;
+- registrar qualquer limitação restante.
 
-- cancelamento
-- timeout
-- ausência de conexão
-- resposta inválida
-- rota inexistente
-- quota/rate limit
-- erro 4xx relevante
-- erro 5xx
+Quando a tarefa autorizar explicitamente a implementação completa do redesign, os blocos podem ser executados sequencialmente sem nova autorização. Cada bloco deve ser validado antes do próximo. Se houver falha de build, regressão funcional ou necessidade de decisão de produto não prevista, interromper a execução e solicitar orientação.
 
-Falhas do Google não devem corromper dados existentes.
 
-Mensagens apresentadas ao usuário devem ser simples e úteis.
+## 11. Estratégia de contexto para agentes
 
----
-
-## Testes
-
-Alterações relevantes devem incluir ou atualizar testes automatizados quando a lógica puder ser testada sem dependência real da rede.
-
-Usar mocks/stubs/fakes para serviços externos.
-
-Cobrir, conforme o bloco:
-
-- Place IDs
-- validação de seleção
-- serialização Firestore
-- documentos legados
-- parsing de rotas
-- cálculo de desvio
-- filtros do matching
-- limites
-- ordenação
-- precificação
-- preservação das regras já existentes
-
-Não transformar testes unitários em testes que dependam de chamadas reais ao Google.
-
----
-
-## Regras para alterações
-
-Ao trabalhar no código:
-
-- ler este arquivo antes de alterar o projeto
-- inspecionar o estado atual da branch
-- alterar somente arquivos necessários para o bloco atual
-- não fazer refatorações fora do escopo
-- não adicionar abstrações sem necessidade real
-- preservar todos os fluxos já validados
-- preservar compilação sempre que possível
-- não avançar para o bloco seguinte automaticamente
-- não inserir chaves secretas no repositório
-- informar claramente qualquer configuração manual necessária
-
-Se uma alteração exigir mudar uma decisão funcional ainda não definida, parar e solicitar a decisão ao usuário em vez de inventar uma regra.
-
----
-
-## Regra de decisão
-
-Antes de adicionar qualquer recurso, perguntar:
-
-> Isso é necessário para o bloco atual ou para preservar corretamente o fluxo existente?
-
-Se não, não implementar agora.
-
----
-
-## Padrão de trabalho recomendado para agentes
+O objetivo é reduzir leituras repetidas e evitar análise desnecessária, sem impedir investigação quando realmente necessária.
 
 Para cada bloco:
 
-1. Ler o estado atual da branch.
-2. Ler este `AGENTS.md`.
-3. Identificar exatamente os arquivos relacionados ao bloco.
-4. Propor um plano curto antes de alterar.
-5. Implementar somente o escopo aprovado.
-6. Atualizar/adicionar testes pertinentes.
-7. Executar os testes relacionados.
-8. Executar build quando o ambiente permitir.
-9. Informar:
-   - arquivos alterados
-   - decisões tomadas
-   - testes executados
-   - resultado do build
-   - limitações
-   - etapas manuais necessárias
-10. Parar e aguardar aprovação antes de avançar para outro bloco.
+1. Ler este `AGENTS.md`.
+2. Inspecionar o estado atual da branch.
+3. Ler `AppShell.xaml` e `AppShell.xaml.cs` somente quando a tarefa envolver navegação.
+4. Ler `Colors.xaml` e `Styles.xaml` quando houver impacto em recursos compartilhados.
+5. Ler as páginas XAML do bloco atual.
+6. Ler code-behind e ViewModel apenas quando necessário para preservar bindings, commands ou navegação.
+7. Inspecionar Models/Services somente se um comportamento da tela não puder ser compreendido sem eles.
+8. Não fazer auditoria geral do repositório a cada bloco.
+9. Reutilizar decisões e estilos já estabelecidos nos blocos anteriores.
+10. Evitar reler arquivos grandes que não tenham relação com a tarefa atual.
+
+Se for necessário abrir arquivos fora do conjunto esperado, fazê-lo de forma objetiva e explicar a relação com o bloco atual.
 
 ---
 
-## Commits
+## 12. Regras de alteração durante o redesign
+
+Ao trabalhar no código:
+
+- alterar somente arquivos necessários para o bloco atual;
+- preservar bindings e commands existentes sempre que possível;
+- não mover lógica de negócio para XAML ou code-behind por conveniência visual;
+- não refatorar Firebase, Google Maps, matching ou precificação sem necessidade concreta;
+- não mudar modelos persistidos apenas para facilitar layout;
+- não remover validações existentes;
+- não substituir controles funcionais por elementos apenas decorativos;
+- não alterar nomes de propriedades apenas por estética;
+- não introduzir dependências externas apenas para aparência sem aprovação;
+- não inserir segredos/chaves no repositório;
+- manter compatibilidade com Android;
+- preservar compilação ao final de cada bloco.
+
+Se uma decisão visual exigir mudança funcional ainda não definida, parar e solicitar decisão ao usuário.
+
+---
+
+## 13. Testes e regressão
+
+A última baseline consolidada do incremento Google Maps registrou:
+
+- 154/154 testes .NET aprovados;
+- 20/20 testes Node aprovados;
+- build Android com 0 erros e 0 avisos;
+- fluxo principal validado manualmente em Android.
+
+O redesign não deve reduzir essa baseline sem causa identificada.
+
+Durante os blocos:
+
+- executar testes diretamente relacionados quando houver mudança de navegação ou code-behind;
+- validar XAML/build sempre que possível;
+- não transformar a fase visual em reescrita dos testes de negócio.
+
+No fechamento:
+
+- executar todos os testes .NET;
+- executar todos os testes Node quando houver qualquer impacto em Functions/configuração;
+- executar `git diff --check`;
+- executar build Android;
+- realizar smoke test manual do fluxo completo.
+
+Fluxo mínimo de regressão:
+
+```text
+Startup
+→ Login/Cadastro
+→ Home
+→ Minhas Rotas
+→ Nova Rota com autocomplete
+→ Encontrar Carona
+→ Resultados
+→ Detalhes no mapa
+→ Solicitar carona Once/Weekly
+→ Aguardando aprovação
+→ Solicitações recebidas
+→ Aceitar/Rejeitar
+→ Rotas confirmadas
+→ Logout/Login
+→ Restauração de sessão
+```
+
+---
+
+## 14. Fora do escopo desta fase
+
+Não implementar sem solicitação explícita:
+
+- nova fórmula de preço;
+- chat;
+- pagamentos;
+- reputação;
+- notificações reais;
+- GPS/localização atual automática;
+- rastreamento em tempo real;
+- navegação turn-by-turn;
+- Machine Learning/IA;
+- novas regras de capacidade/vagas;
+- cooldown após rejeição;
+- cancelamento/restauração de vaga;
+- novas coleções Firestore por conveniência visual;
+- backend tradicional;
+- SQL/PostgreSQL;
+- recursos de produto não existentes apenas porque aparecem como decoração em mockups.
+
+As pendências funcionais continuam sendo tratadas separadamente em `docs/PENDENCIAS.md`.
+
+---
+
+## 15. Padrão de trabalho recomendado
+
+Para cada bloco:
+
+1. Ler `AGENTS.md` e os arquivos diretamente relacionados.
+2. Resumir em poucas linhas os arquivos que pretende alterar.
+3. Implementar somente o bloco atual.
+4. Centralizar recursos visuais reutilizáveis em `Styles.xaml`.
+5. Centralizar cores e brushes em `Colors.xaml`.
+6. Preservar toda a funcionalidade existente.
+7. Executar validações pertinentes.
+8. Informar ao final:
+   - arquivos alterados;
+   - estilos/recursos compartilhados adicionados;
+   - decisões de UX tomadas;
+   - testes executados;
+   - resultado do build;
+   - limitações ou pontos para validação manual.
+9. Parar e aguardar aprovação antes do próximo bloco.
+
+---
+
+## 16. Commits
 
 Usar commits pequenos e semânticos, em português, seguindo o padrão do projeto.
 
 Exemplos:
 
 ```text
-feat(mapas): adiciona estrutura de endereços geográficos
-feat(mapas): integra autocomplete de endereços
-feat(rotas): calcula distância e duração reais
-feat(matching): adiciona compatibilidade por desvio de rota
-feat(preco): usa distância calculada na precificação
-feat(mapas): adiciona visualização do trajeto
-test(mapas): adiciona cenários geográficos
-docs(mapas): documenta integração com Google Maps
+feat(ui): consolida estilos visuais do UniRota
+feat(ui): redesenha telas de autenticação
+feat(navegacao): adota Shell TabBar na área autenticada
+feat(ui): redesenha home e rotas
+feat(ui): redesenha fluxo de matching e mapa
+feat(ui): redesenha solicitações e caronas
+fix(ui): corrige inconsistências visuais e regressões de navegação
 ```
 
----
-
-## Plataformas prioritárias
-
-O UniRota é mobile-first.
-
-Prioridades:
-
-1. Android — plataforma principal de desenvolvimento e demonstração.
-2. iOS — plataforma alvo e deve permanecer compatível quando possível.
-3. Windows/MacCatalyst — não são prioridade.
-
-Não adicionar complexidade apenas para suportar desktop.
-
-A visualização e interação devem ser projetadas prioritariamente para smartphones.
+Não misturar correções funcionais não relacionadas no mesmo commit de UI.
 
 ---
 
-## Definição de pronto de cada bloco
+## 17. Critério de conclusão do redesign
 
-Um bloco só está concluído quando:
+A fase visual estará concluída quando:
 
-- o código do escopo foi implementado
-- fluxos existentes relacionados continuam funcionando
-- testes pertinentes passam
-- o projeto compila no ambiente disponível
-- erros principais do bloco são tratados
-- nenhuma chave sensível foi adicionada ao repositório
-- alterações estão pequenas o suficiente para revisão
-- o agente descreveu claramente o que mudou
-- nenhuma etapa do bloco seguinte foi iniciada
+- as 13 páginas estiverem estilizadas de acordo com os mockups e o sistema visual comum;
+- a área autenticada utilizar Shell TabBar com Início, Rotas e Caronas;
+- recursos visuais repetidos estiverem centralizados, sem duplicação desnecessária por página;
+- espaços para logo/imagens oficiais estiverem preparados sem assets fictícios definitivos;
+- todas as informações funcionais atuais continuarem acessíveis;
+- autocomplete continuar funcionando;
+- Google Maps continuar funcionando;
+- matching continuar funcionando;
+- preço continuar funcionando;
+- solicitações continuarem funcionando;
+- consumo de vagas continuar funcionando;
+- autenticação continuar funcionando;
+- não houver regressão conhecida no fluxo principal;
+- testes relevantes estiverem aprovados;
+- build Android estiver aprovado;
+- o aplicativo estiver pronto para receber posteriormente os assets oficiais sem novo redesign estrutural.
+
+---
+
+## Regra de decisão
+
+Antes de qualquer alteração, perguntar:
+
+> Isso é necessário para reproduzir a experiência aprovada nos mockups, centralizar corretamente o sistema visual ou preservar a funcionalidade existente?
+
+Se não, não implementar nesta fase.
