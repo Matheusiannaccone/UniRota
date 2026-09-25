@@ -522,4 +522,41 @@
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Error}, Dark={StaticResource ErrorLight}}" />
         <Setter Property="SemanticProperties.Description" Value="{Binding ErrorMessage}" />
     </Style>
+<Style x:Key="ListCard" TargetType="Border" BasedOn="{StaticResource Card}">
+        <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
+    <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Error}, Dark={StaticResource ErrorLight}}" />
+    </Style>
+    <Style x:Key="StatusBadge" TargetType="Label" BasedOn="{StaticResource Caption}">
+        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="HorizontalOptions" Value="Start" />
+        <Setter Property="TextColor" Value="{StaticResource PrimaryDark}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}" />
+    </Style>
+    <Style x:Key="WaitingBadge" TargetType="Label" BasedOn="{StaticResource StatusBadge}">
+        <Setter Property="TextColor" Value="{StaticResource WarningText}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource WarningSurface}" />
+    </Style>
+    <Style x:Key="SuccessBadge" TargetType="Label" BasedOn="{StaticResource StatusBadge}">
+        <Setter Property="TextColor" Value="{StaticResource Success}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SuccessSurface}" />
+    </Style>
+    <Style x:Key="EmptyState" TargetType="Label" BasedOn="{StaticResource PageSubtitle}">
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+        <Setter Property="VerticalOptions" Value="Center" />
+        <Setter Property="Padding" Value="24" />
+    </Style>
+    <Style x:Key="ListLayout" TargetType="Grid">
+        <Setter Property="Padding" Value="{StaticResource PagePadding}" />
+        <Setter Property="RowSpacing" Value="{StaticResource ContentSpacing}" />
+        <Setter Property="MaximumWidthRequest" Value="640" />
+        <Setter Property="HorizontalOptions" Value="Fill" />
+    </Style>
+    <Style x:Key="DashboardAction" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceSecondary}, Dark={StaticResource Gray900}}" />
+        <Setter Property="MinimumHeightRequest" Value="112" />
+        <Setter Property="LineBreakMode" Value="WordWrap" />
+    </Style>
 </ResourceDictionary>

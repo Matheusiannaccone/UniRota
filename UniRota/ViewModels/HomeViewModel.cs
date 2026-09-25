@@ -99,9 +99,9 @@ public partial class HomeViewModel : ObservableObject
     [RelayCommand(AllowConcurrentExecutions = false)]
     private async Task GoToConfirmedRoutesAsync()
     {
-        await NavigateAsync(
-            nameof(ConfirmedRoutesPage),
-            "Não foi possível abrir suas rotas confirmadas. Tente novamente.");
+        if (!IsBusy && Shell.Current is AppShell shell)
+            shell.SelectMainTab("rides");
+        await Task.CompletedTask;
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]
@@ -117,7 +117,9 @@ public partial class HomeViewModel : ObservableObject
 
         try
         {
-            await Shell.Current.GoToAsync(nameof(MyRoutesPage));
+            if (Shell.Current is AppShell shell)
+                shell.SelectMainTab("routes");
+            await Task.CompletedTask;
         }
         catch (Exception exception)
         {

@@ -1,84 +1,41 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage
-    x:Class="UniRota.Views.HomePage"
+<ContentPage x:Class="UniRota.Views.HomePage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    Shell.NavBarIsVisible="False"
-    Title="Início">
-
+    Shell.NavBarIsVisible="False" Title="Início">
     <ScrollView>
-        <VerticalStackLayout
-            Padding="24,48,24,32"
-            MaximumWidthRequest="480"
-            HorizontalOptions="Fill"
-            Spacing="20">
-            <Label
-                Text="{Binding WelcomeMessage}"
-                FontSize="32"
-                FontAttributes="Bold"
-                HorizontalOptions="Center"
-                HorizontalTextAlignment="Center" />
-            <Label
-                Text="{Binding Email}"
-                HorizontalTextAlignment="Center"
-                TextColor="{DynamicResource TextSecondary}" />
-
-            <Border Padding="20">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="12" />
-                </Border.StrokeShape>
-                <VerticalStackLayout Spacing="8">
-                    <Label
-                        Text="Autenticação concluída"
-                        FontAttributes="Bold"
-                        FontSize="18" />
-                    <Label Text="Sua área autenticada está pronta. Cadastre e consulte suas rotas semanais." />
+        <VerticalStackLayout Style="{StaticResource PageContent}">
+            <Grid Style="{StaticResource BrandSlot}" ColumnDefinitions="*,Auto">
+                <Label Text="UniRota" Style="{StaticResource BrandText}" />
+                <Button Grid.Column="1" Text="Sair" Command="{Binding LogoutCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource LinkButton}" />
+            </Grid>
+            <VerticalStackLayout Style="{StaticResource DetailContent}">
+                <Label Text="{Binding WelcomeMessage}" Style="{StaticResource PageTitle}" />
+                <Label Text="Para onde vamos hoje?" Style="{StaticResource PageSubtitle}" />
+                <Label Text="{Binding Email}" Style="{StaticResource Caption}" />
+            </VerticalStackLayout>
+            <Border Style="{StaticResource Card}" BackgroundColor="{StaticResource Primary}" Stroke="{StaticResource PrimaryBrush}">
+                <VerticalStackLayout Style="{StaticResource SectionContent}">
+                    <Label Text="Encontrar carona" Style="{StaticResource SectionTitle}" TextColor="{StaticResource White}" />
+                    <Label Text="Veja rotas e conecte-se com colegas da Facens." Style="{StaticResource PageSubtitle}" TextColor="{StaticResource White}" />
+                    <Button Text="Buscar caronas →" Command="{Binding GoToFindRideCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" BackgroundColor="{StaticResource White}" TextColor="{StaticResource Primary}" />
                 </VerticalStackLayout>
             </Border>
-
-            <Button
-                Text="Encontrar carona"
-                Command="{Binding GoToFindRideCommand}"
-                IsEnabled="{Binding IsNotBusy}" />
-
-            <Button
-                Text="Aguardando aceite"
-                Command="{Binding GoToAwaitingApprovalCommand}"
-                IsEnabled="{Binding IsNotBusy}" />
-
-            <Button
-                Text="Solicitações recebidas"
-                Command="{Binding GoToReceivedRequestsCommand}"
-                IsEnabled="{Binding IsNotBusy}" />
-
-            <Button
-                Text="Rotas confirmadas"
-                Command="{Binding GoToConfirmedRoutesCommand}"
-                IsEnabled="{Binding IsNotBusy}" />
-
-            <Button
-                Text="Minhas rotas"
-                Command="{Binding GoToMyRoutesCommand}"
-                IsEnabled="{Binding IsNotBusy}" />
-
-            <Label
-                Text="{Binding ErrorMessage}"
-                IsVisible="{Binding HasError}"
-                TextColor="{DynamicResource Error}"
-                HorizontalTextAlignment="Center" />
-
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <Button
-                    Grid.Column="0"
-                    Text="Sair"
-                    Command="{Binding LogoutCommand}"
-                    IsEnabled="{Binding IsNotBusy}" />
-                <ActivityIndicator
-                    Grid.Column="1"
-                    IsRunning="{Binding IsBusy}"
-                    IsVisible="{Binding IsBusy}"
-                    VerticalOptions="Center" />
+            <Label Text="Suas atividades" Style="{StaticResource SectionTitle}" />
+            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="{StaticResource ContentSpacing}" RowSpacing="{StaticResource ContentSpacing}">
+                <Button Text="Solicitações recebidas" Command="{Binding GoToReceivedRequestsCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DashboardAction}" />
+                <Button Grid.Column="1" Text="Aguardando aceite" Command="{Binding GoToAwaitingApprovalCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DashboardAction}" />
+                <Button Grid.Row="1" Text="Caronas confirmadas" Command="{Binding GoToConfirmedRoutesCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DashboardAction}" />
+                <Button Grid.Row="1" Grid.Column="1" Text="Minhas rotas" Command="{Binding GoToMyRoutesCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DashboardAction}" />
             </Grid>
+            <Border Style="{StaticResource InfoCard}">
+                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                    <Label Text="Seu próximo trajeto" Style="{StaticResource CardTitle}" />
+                    <Label Text="Consulte os compromissos confirmados na aba Caronas." Style="{StaticResource PageSubtitle}" />
+                </VerticalStackLayout>
+            </Border>
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

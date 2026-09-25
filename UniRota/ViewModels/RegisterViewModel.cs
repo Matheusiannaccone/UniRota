@@ -58,7 +58,7 @@ public partial class RegisterViewModel : ObservableObject
             await _authService.RegisterAsync(Name.Trim(), Email.Trim(), Password, cancellationToken);
             Password = string.Empty;
             ConfirmPassword = string.Empty;
-            await Shell.Current.GoToAsync("//home");
+            await Shell.Current.GoToAsync(AppShell.HomeRoute);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
