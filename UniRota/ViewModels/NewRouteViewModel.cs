@@ -123,6 +123,8 @@ public partial class NewRouteViewModel : ObservableObject
 
     public bool IsDriver => SelectedRole?.Role == RouteRole.Driver;
 
+    public bool IsPassenger => SelectedRole?.Role == RouteRole.Passenger;
+
     public bool IsNotBusy => !IsBusy;
 
     public string PageTitle => IsEditing ? "Editar rota" : "Nova rota";
@@ -164,6 +166,7 @@ public partial class NewRouteViewModel : ObservableObject
 
     partial void OnSelectedRoleChanged(RouteRoleOption? value)
     {
+        OnPropertyChanged(nameof(IsPassenger));
         OnPropertyChanged(nameof(IsDriver));
 
         if (!IsDriver)
@@ -770,6 +773,7 @@ public sealed record RouteRoleOption(RouteRole Role, string DisplayName);
 public partial class SelectableDayViewModel : ObservableObject
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessibilityText))]
     private bool isSelected;
 
     public SelectableDayViewModel(DayOfWeek day, string displayName)
@@ -781,4 +785,8 @@ public partial class SelectableDayViewModel : ObservableObject
     public DayOfWeek Day { get; }
 
     public string DisplayName { get; }
+
+    public string ShortName => DisplayName[..3];
+
+    public string AccessibilityText => $"{DisplayName}, {(IsSelected ? "selecionado" : "não selecionado")}";
 }

@@ -1,92 +1,45 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage
-    x:Class="UniRota.Views.Matching.FindRidePage"
+<ContentPage x:Class="UniRota.Views.Matching.FindRidePage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
-    Shell.NavBarIsVisible="True"
-    Title="Encontrar carona">
-
-    <Grid
-        Padding="20,24,20,20"
-        MaximumWidthRequest="640"
-        HorizontalOptions="Fill"
-        RowDefinitions="Auto,Auto,Auto,*"
-        RowSpacing="16">
-
-        <VerticalStackLayout Grid.Row="0" Spacing="6">
-            <Label
-                Text="Encontrar carona"
-                FontSize="28"
-                FontAttributes="Bold" />
-            <Label
-                Text="Escolha uma de suas rotas de passageiro."
-                TextColor="{DynamicResource TextSecondary}" />
+    Shell.NavBarIsVisible="True" Title="Encontrar carona">
+    <Grid Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <VerticalStackLayout Style="{StaticResource DetailContent}">
+            <Label Text="Encontrar carona" Style="{StaticResource PageTitle}" />
+            <Label Text="Escolha uma rota para buscar motoristas compatíveis." Style="{StaticResource PageSubtitle}" />
         </VerticalStackLayout>
-
-        <ActivityIndicator
-            Grid.Row="1"
-            IsRunning="{Binding IsBusy}"
-            IsVisible="{Binding IsBusy}"
-            HorizontalOptions="Center" />
-
-        <VerticalStackLayout
-            Grid.Row="2"
-            Spacing="8"
-            IsVisible="{Binding HasError}">
-            <Label
-                Text="{Binding ErrorMessage}"
-                TextColor="{DynamicResource Error}"
-                HorizontalTextAlignment="Center" />
-            <Button
-                Text="Tentar novamente"
-                Command="{Binding LoadCommand}"
-                IsEnabled="{Binding IsNotBusy}"
-                HorizontalOptions="Center" />
+        <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
+            <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
+            <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
         </VerticalStackLayout>
-
         <Grid Grid.Row="3">
-            <Label
-                Text="Você ainda não possui uma rota de passageiro cadastrada."
-                IsVisible="{Binding ShowEmptyState}"
-                TextColor="{DynamicResource TextSecondary}"
-                HorizontalTextAlignment="Center"
-                VerticalOptions="Center" />
-
-            <CollectionView
-                ItemsSource="{Binding PassengerRoutes}"
-                SelectionMode="None">
+            <Label Text="Você ainda não possui uma rota de passageiro cadastrada." IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
+            <CollectionView ItemsSource="{Binding PassengerRoutes}" SelectionMode="Single"
+                SelectedItem="{Binding SelectedRoute, Mode=TwoWay}" IsEnabled="{Binding IsNotBusy}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:WeeklyRouteItemViewModel">
-                        <Border
-                            Margin="0,0,0,12"
-                            Padding="16"
-                            Stroke="{DynamicResource BorderBrush}"
-                            BackgroundColor="{DynamicResource SurfaceSecondary}">
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="12" />
-                            </Border.StrokeShape>
-                            <VerticalStackLayout Spacing="8">
-                                <Label
-                                    Text="{Binding OriginDestinationText}"
-                                    FontSize="17"
-                                    FontAttributes="Bold"
-                                    LineBreakMode="WordWrap" />
-                                <Label
-                                    Text="{Binding DaysText}"
-                                    TextColor="{DynamicResource TextSecondary}"
-                                    LineBreakMode="WordWrap" />
-                                <Label
-                                    Text="{Binding DepartureTimeText, StringFormat='Horário: {0}'}" />
-                                <Button
-                                    Text="Ver rotas compatíveis"
-                                    Clicked="OnFindMatchesClicked"
-                                    CommandParameter="{Binding .}" />
+                        <Border Style="{StaticResource SelectableCard}">
+                            <VerticalStackLayout Style="{StaticResource SectionContent}">
+                                <Label Text="Rota de passageiro" Style="{StaticResource StatusBadge}" />
+                                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                    <Label Text="{Binding Route.Origin, StringFormat='●  {0}'}" Style="{StaticResource CardTitle}" />
+                                    <Label Text="{Binding Route.Destination, StringFormat='○  {0}'}" Style="{StaticResource CardTitle}" />
+                                </VerticalStackLayout>
+                                <Label Text="{Binding DaysText}" Style="{StaticResource PageSubtitle}" />
+                                <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" />
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
         </Grid>
+        <VerticalStackLayout Grid.Row="4" Style="{StaticResource DetailContent}">
+            <Border Style="{StaticResource InfoCard}">
+                <Label Text="Não encontrou sua rota? Crie uma nova na aba Rotas como passageiro." Style="{StaticResource Caption}" />
+            </Border>
+            <Button Text="Encontrar motoristas →" Clicked="OnFindMatchesClicked" CommandParameter="{Binding SelectedRoute}" IsEnabled="{Binding CanFindMatches}" Style="{StaticResource PrimaryButton}" />
+        </VerticalStackLayout>
     </Grid>
 </ContentPage>

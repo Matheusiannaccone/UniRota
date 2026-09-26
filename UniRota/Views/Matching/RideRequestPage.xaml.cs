@@ -31,6 +31,13 @@ public partial class RideRequestPage : ContentPage, IQueryAttributable
                     : null);
     }
 
+    private void OnRequestTypeCheckedChanged(object sender, CheckedChangedEventArgs e)
+    {
+        if (e.Value && sender is RadioButton { Value: RideRequestTypeOption option }
+            && BindingContext is RideRequestViewModel viewModel && viewModel.CanSubmit)
+            viewModel.SelectedRequestType = option;
+    }
+
     private async void OnConfirmRequestClicked(object sender, EventArgs e)
     {
         if (_isConfirming

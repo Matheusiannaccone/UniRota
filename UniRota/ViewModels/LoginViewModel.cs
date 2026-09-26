@@ -51,7 +51,7 @@ public partial class LoginViewModel : ObservableObject
         {
             await _authService.LoginAsync(Email.Trim(), Password, cancellationToken);
             Password = string.Empty;
-            await Shell.Current.GoToAsync("//home");
+            await Shell.Current.GoToAsync(AppShell.HomeRoute);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

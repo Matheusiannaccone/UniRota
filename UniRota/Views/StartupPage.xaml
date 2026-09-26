@@ -1,45 +1,22 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage
-    x:Class="UniRota.Views.StartupPage"
+<ContentPage x:Class="UniRota.Views.StartupPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    Shell.NavBarIsVisible="False"
-    Title="Inicialização">
-
-    <Grid Padding="32">
-        <VerticalStackLayout
-            MaximumWidthRequest="480"
-            HorizontalOptions="Fill"
-            VerticalOptions="Center"
-            Spacing="16">
-            <Label
-                Text="UniRota"
-                FontSize="32"
-                FontAttributes="Bold"
-                HorizontalOptions="Center"
-                HorizontalTextAlignment="Center" />
-            <Label
-                Text="Caronas para a comunidade acadêmica"
-                HorizontalTextAlignment="Center"
-                TextColor="{DynamicResource TextSecondary}" />
-            <ActivityIndicator
-                IsRunning="{Binding IsBusy}"
-                IsVisible="{Binding IsBusy}"
-                HorizontalOptions="Center" />
-            <Label
-                Text="{Binding StatusMessage}"
-                HorizontalTextAlignment="Center"
-                IsVisible="{Binding IsBusy}" />
-            <Label
-                Text="{Binding ErrorMessage}"
-                IsVisible="{Binding HasError}"
-                TextColor="{DynamicResource Error}"
-                HorizontalTextAlignment="Center" />
-            <Button
-                Text="Tentar novamente"
-                Command="{Binding InitializeCommand}"
-                IsEnabled="{Binding IsNotBusy}"
-                IsVisible="{Binding HasError}" />
-        </VerticalStackLayout>
+    Shell.NavBarIsVisible="False" Title="Inicialização">
+    <Grid Padding="{StaticResource PagePadding}" RowDefinitions="*,Auto">
+        <ScrollView VerticalOptions="Center">
+            <VerticalStackLayout Style="{StaticResource AuthContent}">
+                <!-- Área substituível pela marca oficial. -->
+                <Grid Style="{StaticResource BrandSlot}" MinimumHeightRequest="112">
+                    <Label Text="UniRota" Style="{StaticResource BrandText}" FontSize="42" HorizontalOptions="Center" />
+                </Grid>
+                <Label Text="Conectando trajetos" Style="{StaticResource PageSubtitle}" HorizontalTextAlignment="Center" />
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Label Text="{Binding StatusMessage}" IsVisible="{Binding IsBusy}" Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" HorizontalTextAlignment="Center" />
+                <Button Text="Tentar novamente" Command="{Binding InitializeCommand}" IsEnabled="{Binding IsNotBusy}" IsVisible="{Binding HasError}" Style="{StaticResource PrimaryButton}" />
+            </VerticalStackLayout>
+        </ScrollView>
+        <Label Grid.Row="1" Text="Comunidade Facens" Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
     </Grid>
 </ContentPage>

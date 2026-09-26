@@ -1,127 +1,40 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage
-    x:Class="UniRota.Views.Matching.MatchResultsPage"
+<ContentPage x:Class="UniRota.Views.Matching.MatchResultsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
-    Shell.NavBarIsVisible="True"
-    Title="Rotas compatíveis">
-
-    <Grid
-        Padding="20,24,20,20"
-        MaximumWidthRequest="640"
-        HorizontalOptions="Fill"
-        RowDefinitions="Auto,Auto,Auto,Auto,*"
-        RowSpacing="16">
-
-        <Label
-            Grid.Row="0"
-            Text="Rotas compatíveis"
-            FontSize="28"
-            FontAttributes="Bold" />
-
-        <Border
-            Grid.Row="1"
-            Padding="14"
-            Stroke="{DynamicResource BorderBrush}"
-            BackgroundColor="{DynamicResource SurfaceSecondary}">
-            <Border.StrokeShape>
-                <RoundRectangle CornerRadius="12" />
-            </Border.StrokeShape>
-            <VerticalStackLayout Spacing="4">
-                <Label
-                    Text="Sua rota de passageiro"
-                    FontAttributes="Bold" />
-                <Label
-                    Text="{Binding PassengerRouteText}"
-                    LineBreakMode="WordWrap" />
-                <Label
-                    Text="{Binding PassengerRouteDetailsText}"
-                    TextColor="{DynamicResource TextSecondary}"
-                    LineBreakMode="WordWrap" />
+    Shell.NavBarIsVisible="True" Title="Motoristas disponíveis">
+    <Grid Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,*">
+        <Border Style="{StaticResource InfoCard}">
+            <VerticalStackLayout Style="{StaticResource DetailContent}">
+                <Label Text="Sua rota" Style="{StaticResource CardTitle}" />
+                <Label Text="{Binding PassengerRouteText}" />
+                <Label Text="{Binding PassengerRouteDetailsText}" Style="{StaticResource Caption}" />
             </VerticalStackLayout>
         </Border>
-
-        <ActivityIndicator
-            Grid.Row="2"
-            IsRunning="{Binding IsBusy}"
-            IsVisible="{Binding IsBusy}"
-            HorizontalOptions="Center" />
-
-        <VerticalStackLayout
-            Grid.Row="3"
-            Spacing="8"
-            IsVisible="{Binding HasError}">
-            <Label
-                Text="{Binding ErrorMessage}"
-                TextColor="{DynamicResource Error}"
-                HorizontalTextAlignment="Center" />
-            <Button
-                Text="Tentar novamente"
-                Command="{Binding LoadCommand}"
-                IsEnabled="{Binding IsNotBusy}"
-                HorizontalOptions="Center" />
+        <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
+            <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
+            <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
         </VerticalStackLayout>
-
-        <Grid Grid.Row="4">
-            <Label
-                Text="Nenhuma rota compatível foi encontrada."
-                IsVisible="{Binding ShowEmptyState}"
-                TextColor="{DynamicResource TextSecondary}"
-                HorizontalTextAlignment="Center"
-                VerticalOptions="Center" />
-
-            <CollectionView
-                ItemsSource="{Binding Results}"
-                SelectionMode="None">
+        <Grid Grid.Row="3">
+            <Label Text="Nenhuma rota compatível foi encontrada." IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
+            <CollectionView ItemsSource="{Binding Results}" SelectionMode="None">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:MatchResultItemViewModel">
-                        <Border
-                            Margin="0,0,0,12"
-                            Padding="16"
-                            Stroke="{DynamicResource BorderBrush}"
-                            BackgroundColor="{DynamicResource SurfaceSecondary}">
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="12" />
-                            </Border.StrokeShape>
-                            <VerticalStackLayout Spacing="8">
-                                <Label
-                                    Text="{Binding DriverNameText}"
-                                    FontSize="18"
-                                    FontAttributes="Bold" />
-                                <Label
-                                    Text="{Binding OriginDestinationText}"
-                                    FontSize="16"
-                                    FontAttributes="Bold"
-                                    LineBreakMode="WordWrap" />
-                                <Label
-                                    Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}"
-                                    TextColor="{DynamicResource TextSecondary}"
-                                    LineBreakMode="WordWrap" />
-                                <Label
-                                    Text="{Binding DetourText}"
-                                    TextColor="{DynamicResource TextSecondary}" />
-                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-                                    <Label
-                                        Grid.Column="0"
-                                        Text="{Binding DepartureTimeText, StringFormat='Saída: {0}'}" />
-                                    <Label
-                                        Grid.Column="1"
-                                        Text="{Binding AvailableSeatsText}"
-                                        HorizontalOptions="End" />
-                                </Grid>
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                                    <Button
-                                        Grid.Column="0"
-                                        Text="Ver trajeto"
-                                        Clicked="OnViewRouteClicked"
-                                        CommandParameter="{Binding .}" />
-                                    <Button
-                                        Grid.Column="1"
-                                        Text="Solicitar carona"
-                                        Clicked="OnRequestRideClicked"
-                                        CommandParameter="{Binding .}" />
-                                </Grid>
+                        <Border Style="{StaticResource ListCard}">
+                            <VerticalStackLayout Style="{StaticResource SectionContent}">
+                                <Label Text="{Binding DriverNameText}" Style="{StaticResource SectionTitle}" />
+                                <Label Text="Trajeto compatível" Style="{StaticResource SuccessBadge}" />
+                                <Label Text="{Binding OriginDestinationText}" Style="{StaticResource CardTitle}" />
+                                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                    <Label Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}" Style="{StaticResource PageSubtitle}" />
+                                    <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" />
+                                    <Label Text="{Binding AvailableSeatsText}" Style="{StaticResource SuccessBadge}" />
+                                    <Label Text="{Binding DetourText}" Style="{StaticResource Caption}" />
+                                </VerticalStackLayout>
+                                <Button Text="Solicitar" Clicked="OnRequestRideClicked" CommandParameter="{Binding .}" Style="{StaticResource PrimaryButton}" />
+                                <Button Text="Ver trajeto no mapa" Clicked="OnViewRouteClicked" CommandParameter="{Binding .}" Style="{StaticResource SecondaryButton}" />
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>

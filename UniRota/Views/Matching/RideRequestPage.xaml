@@ -1,132 +1,52 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage
-    x:Class="UniRota.Views.Matching.RideRequestPage"
+<ContentPage x:Class="UniRota.Views.Matching.RideRequestPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    Shell.NavBarIsVisible="True"
-    Title="Solicitar carona">
-
+    Shell.NavBarIsVisible="True" Title="Confirmar carona">
     <ScrollView>
-        <VerticalStackLayout
-            Padding="20,24,20,20"
-            MaximumWidthRequest="640"
-            HorizontalOptions="Fill"
-            Spacing="16">
-
-            <VerticalStackLayout Spacing="6">
-                <Label
-                    Text="Solicitar carona"
-                    FontSize="28"
-                    FontAttributes="Bold" />
-                <Label
-                    Text="Escolha como deseja realizar esta carona."
-                    TextColor="{DynamicResource TextSecondary}" />
-            </VerticalStackLayout>
-
-            <Border
-                Padding="14"
-                Stroke="{DynamicResource BorderBrush}"
-                BackgroundColor="{DynamicResource SurfaceSecondary}">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="12" />
-                </Border.StrokeShape>
-                <VerticalStackLayout Spacing="6">
-                    <Label
-                        Text="Motorista"
-                        TextColor="{DynamicResource TextSecondary}" />
-                    <Label
-                        Text="{Binding DriverNameText}"
-                        FontSize="18"
-                        FontAttributes="Bold" />
-                    <Label
-                        Text="{Binding OriginDestinationText}"
-                        FontAttributes="Bold"
-                        LineBreakMode="WordWrap" />
-                    <Label
-                        Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}"
-                        TextColor="{DynamicResource TextSecondary}"
-                        LineBreakMode="WordWrap" />
+        <VerticalStackLayout Style="{StaticResource PageContent}">
+            <Border Style="{StaticResource InfoCard}">
+                <VerticalStackLayout Style="{StaticResource SectionContent}">
+                    <VerticalStackLayout Style="{StaticResource DetailContent}">
+                        <Label Text="{Binding DriverNameText}" Style="{StaticResource SectionTitle}" />
+                        <Label Text="Motorista" Style="{StaticResource Caption}" />
+                    </VerticalStackLayout>
+                    <Label Text="{Binding OriginDestinationText}" Style="{StaticResource CardTitle}" />
+                    <VerticalStackLayout Style="{StaticResource DetailContent}">
+                        <Label Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}" Style="{StaticResource PageSubtitle}" />
+                        <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" Style="{StaticResource CardTitle}" />
+                    </VerticalStackLayout>
+                    <Label Text="{Binding SuggestedPriceText}" IsVisible="{Binding HasSuggestedPrice}" Style="{StaticResource SuccessBadge}" />
                 </VerticalStackLayout>
             </Border>
-
-            <Border
-                Padding="14"
-                Stroke="{DynamicResource BorderBrush}"
-                BackgroundColor="{DynamicResource SurfaceSecondary}"
-                IsVisible="{Binding HasSuggestedPrice}">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="12" />
-                </Border.StrokeShape>
-                <Label
-                    Text="{Binding SuggestedPriceText}"
-                    FontSize="18"
-                    FontAttributes="Bold"
-                    HorizontalTextAlignment="Center" />
-            </Border>
-
-            <VerticalStackLayout Spacing="8">
-                <Label
-                    Text="Tipo da solicitação"
-                    FontAttributes="Bold" />
-                <Picker
-                    Title="Selecione uma opção"
-                    ItemsSource="{Binding RequestTypes}"
-                    ItemDisplayBinding="{Binding DisplayName}"
-                    SelectedItem="{Binding SelectedRequestType}" />
+            <VerticalStackLayout Style="{StaticResource DetailContent}">
+                <Label Text="Como deseja viajar?" Style="{StaticResource SectionTitle}" />
+                <Label Text="Selecione a frequência da sua carona." Style="{StaticResource PageSubtitle}" />
             </VerticalStackLayout>
-
-            <VerticalStackLayout
-                Spacing="8"
-                IsVisible="{Binding IsOnceSelected}">
-                <Label
-                    Text="Data da carona"
-                    FontAttributes="Bold" />
-                <DatePicker
-                    Date="{Binding RequestedDate}"
-                    MinimumDate="{Binding MinimumDate}"
-                    Format="dd/MM/yyyy" />
-                <Label
-                    Text="A data precisa corresponder a um dos dias compatíveis."
-                    FontSize="13"
-                    TextColor="{DynamicResource TextSecondary}" />
+            <VerticalStackLayout Style="{StaticResource DetailContent}" IsEnabled="{Binding CanSubmit}">
+                <RadioButton Content="Uma única vez" Value="{Binding RequestTypes[0]}" GroupName="RequestType"
+                    IsChecked="{Binding IsOnceSelected, Mode=OneWay}" CheckedChanged="OnRequestTypeCheckedChanged" Style="{StaticResource ChoiceRadio}" />
+                <RadioButton Content="Toda semana" Value="{Binding RequestTypes[1]}" GroupName="RequestType"
+                    IsChecked="{Binding IsWeeklySelected, Mode=OneWay}" CheckedChanged="OnRequestTypeCheckedChanged" Style="{StaticResource ChoiceRadio}" />
             </VerticalStackLayout>
-
-            <Border
-                Padding="14"
-                Stroke="{DynamicResource BorderBrush}"
-                BackgroundColor="{DynamicResource SurfaceSecondary}"
-                IsVisible="{Binding IsWeeklySelected}">
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="12" />
-                </Border.StrokeShape>
-                <VerticalStackLayout Spacing="4">
-                    <Label
-                        Text="Compromisso semanal"
-                        FontAttributes="Bold" />
-                    <Label
-                        Text="Todos os dias compatíveis serão incluídos:" />
-                    <Label
-                        Text="{Binding CompatibleDaysText}"
-                        TextColor="{DynamicResource TextSecondary}"
-                        LineBreakMode="WordWrap" />
+            <VerticalStackLayout Style="{StaticResource DetailContent}" IsVisible="{Binding IsOnceSelected}">
+                <Label Text="Data da viagem" Style="{StaticResource SectionTitle}" />
+                <Border Style="{StaticResource InputContainer}">
+                    <DatePicker Date="{Binding RequestedDate}" MinimumDate="{Binding MinimumDate}" Format="dd/MM/yyyy" IsEnabled="{Binding CanSubmit}" />
+                </Border>
+                <Label Text="A data precisa corresponder a um dos dias compatíveis." Style="{StaticResource Caption}" />
+            </VerticalStackLayout>
+            <Border Style="{StaticResource InfoCard}" IsVisible="{Binding IsWeeklySelected}">
+                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                    <Label Text="Compromisso semanal" Style="{StaticResource CardTitle}" />
+                    <Label Text="Todos os dias compatíveis serão incluídos:" Style="{StaticResource PageSubtitle}" />
+                    <Label Text="{Binding CompatibleDaysText}" Style="{StaticResource CardTitle}" />
                 </VerticalStackLayout>
             </Border>
-
-            <ActivityIndicator
-                IsRunning="{Binding IsBusy}"
-                IsVisible="{Binding IsBusy}"
-                HorizontalOptions="Center" />
-
-            <Label
-                Text="{Binding ErrorMessage}"
-                IsVisible="{Binding HasError}"
-                TextColor="{DynamicResource Error}"
-                HorizontalTextAlignment="Center" />
-
-            <Button
-                Text="Confirmar solicitação"
-                Clicked="OnConfirmRequestClicked"
-                IsEnabled="{Binding CanSubmit}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
+            <Button Text="Confirmar solicitação" Clicked="OnConfirmRequestClicked" IsEnabled="{Binding CanSubmit}" Style="{StaticResource PrimaryButton}" />
+            <Label Text="Sua solicitação será enviada para o motorista." Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

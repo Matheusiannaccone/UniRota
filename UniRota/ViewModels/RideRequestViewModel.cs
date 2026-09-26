@@ -77,6 +77,10 @@ public partial class RideRequestViewModel : ObservableObject
     public bool IsWeeklySelected =>
         SelectedRequestType?.Type == RideRequestType.Weekly;
 
+    public string DepartureTimeText => _match is null
+        ? string.Empty
+        : RoutePresentationText.GetDepartureTimeText(_match.DriverRoute.DepartureTimeMinutes);
+
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(IsNotBusy));
@@ -101,6 +105,7 @@ public partial class RideRequestViewModel : ObservableObject
     {
         _passengerRoute = passengerRoute;
         _match = match;
+        OnPropertyChanged(nameof(DepartureTimeText));
         _pricingResult = null;
         SelectedRequestType = null;
         RequestedDate = DateTime.Today;

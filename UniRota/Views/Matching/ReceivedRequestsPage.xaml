@@ -1,110 +1,41 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage
-    x:Class="UniRota.Views.Matching.ReceivedRequestsPage"
-    x:Name="Page"
+<ContentPage x:Class="UniRota.Views.Matching.ReceivedRequestsPage" x:Name="Page"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
-    Shell.NavBarIsVisible="True"
-    Title="Solicitações recebidas">
-
-    <Grid
-        Padding="20,24,20,20"
-        MaximumWidthRequest="640"
-        HorizontalOptions="Fill"
-        RowDefinitions="Auto,Auto,Auto,Auto,*"
-        RowSpacing="16">
-
-        <VerticalStackLayout Grid.Row="0" Spacing="6">
-            <Label
-                Text="Solicitações recebidas"
-                FontSize="28"
-                FontAttributes="Bold" />
-            <Label
-                Text="Aceite ou recuse as solicitações das suas rotas."
-                TextColor="{DynamicResource TextSecondary}" />
+    Shell.NavBarIsVisible="True" Title="UniRota">
+    <Grid Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,Auto,*">
+        <VerticalStackLayout Style="{StaticResource DetailContent}">
+            <Label Text="Solicitações recebidas" Style="{StaticResource PageTitle}" />
+            <Label Text="Analise as solicitações e escolha com quem viajar." Style="{StaticResource PageSubtitle}" />
         </VerticalStackLayout>
-
-        <ActivityIndicator
-            Grid.Row="1"
-            IsRunning="{Binding IsBusy}"
-            IsVisible="{Binding IsBusy}"
-            HorizontalOptions="Center" />
-
-        <VerticalStackLayout
-            Grid.Row="2"
-            Spacing="8"
-            IsVisible="{Binding HasError}">
-            <Label
-                Text="{Binding ErrorMessage}"
-                TextColor="{DynamicResource Error}"
-                HorizontalTextAlignment="Center" />
-            <Button
-                Text="Tentar novamente"
-                Command="{Binding LoadCommand}"
-                IsEnabled="{Binding IsNotBusy}"
-                HorizontalOptions="Center" />
+        <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
+            <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
+            <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
         </VerticalStackLayout>
-
-        <Label
-            Grid.Row="3"
-            Text="{Binding FeedbackMessage}"
-            IsVisible="{Binding HasFeedback}"
-            TextColor="{DynamicResource Success}"
-            FontAttributes="Bold"
-            HorizontalTextAlignment="Center" />
-
+        <Label Grid.Row="3" Text="{Binding FeedbackMessage}" IsVisible="{Binding HasFeedback}" Style="{StaticResource SuccessBadge}" />
         <Grid Grid.Row="4">
-            <Label
-                Text="Você não possui solicitações pendentes recebidas."
-                IsVisible="{Binding ShowEmptyState}"
-                TextColor="{DynamicResource TextSecondary}"
-                HorizontalTextAlignment="Center"
-                VerticalOptions="Center" />
-
-            <CollectionView
-                ItemsSource="{Binding Requests}"
-                SelectionMode="None">
+            <Label Text="Você não possui solicitações pendentes recebidas." IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
+            <CollectionView ItemsSource="{Binding Requests}" SelectionMode="None">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:RideRequestItemViewModel">
-                        <Border
-                            Margin="0,0,0,12"
-                            Padding="16"
-                            Stroke="{DynamicResource BorderBrush}"
-                            BackgroundColor="{DynamicResource SurfaceSecondary}">
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="12" />
-                            </Border.StrokeShape>
-                            <VerticalStackLayout Spacing="7">
-                                <Label
-                                    Text="{Binding CounterpartyNameText}"
-                                    FontSize="18"
-                                    FontAttributes="Bold" />
-                                <Label
-                                    Text="{Binding TypeText, StringFormat='Tipo: {0}'}" />
-                                <Label
-                                    Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}"
-                                    TextColor="{DynamicResource TextSecondary}"
-                                    LineBreakMode="WordWrap" />
-                                <Label
-                                    Text="{Binding RequestedDateText, StringFormat='Data: {0}'}"
-                                    IsVisible="{Binding HasRequestedDate}" />
-                                <Grid
-                                    ColumnDefinitions="*,*"
-                                    ColumnSpacing="10">
-                                    <Button
-                                        Grid.Column="0"
-                                        Text="Recusar"
-                                        IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}"
-                                        Clicked="OnRejectClicked"
-                                        CommandParameter="{Binding .}" />
-                                    <Button
-                                        Grid.Column="1"
-                                        Text="Aceitar"
-                                        IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}"
-                                        Clicked="OnAcceptClicked"
-                                        CommandParameter="{Binding .}" />
-                                </Grid>
+                        <Border Style="{StaticResource ListCard}">
+                            <VerticalStackLayout Style="{StaticResource SectionContent}">
+                                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                    <Label Text="{Binding CounterpartyNameText}" Style="{StaticResource SectionTitle}" />
+                                    <Label Text="Passageiro" Style="{StaticResource Caption}" />
+                                    <Label Text="{Binding StatusText}" Style="{StaticResource WaitingBadge}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                    <Label Text="{Binding TypeText}" Style="{StaticResource CardTitle}" />
+                                    <Label Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}" Style="{StaticResource PageSubtitle}" />
+                                    <Label Text="{Binding RequestedDateText, StringFormat='Data: {0}'}" IsVisible="{Binding HasRequestedDate}" />
+                                </VerticalStackLayout>
+                                <Label Text="{Binding SuggestedPriceText}" Style="{StaticResource SuccessBadge}" />
+                                <Label Text="{Binding SentAtText}" IsVisible="{Binding HasCreatedAt}" Style="{StaticResource Caption}" />
+                                <Button Text="Aceitar" Clicked="OnAcceptClicked" CommandParameter="{Binding .}" IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}" Style="{StaticResource PrimaryButton}" />
+                                <Button Text="Recusar" Clicked="OnRejectClicked" CommandParameter="{Binding .}" IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}" Style="{StaticResource DangerButton}" />
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>

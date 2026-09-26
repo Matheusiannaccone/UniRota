@@ -25,6 +25,11 @@
     <Color x:Key="Success">#2E7D32</Color>
     <Color x:Key="Warning">#F59E0B</Color>
     <Color x:Key="Error">#D32F2F</Color>
+    <Color x:Key="ErrorLight">#FFB4AB</Color>
+    <Color x:Key="SuccessSurface">#EDF7EF</Color>
+    <Color x:Key="WarningSurface">#FFF6E4</Color>
+    <Color x:Key="WarningText">#8A5700</Color>
+    <Color x:Key="ErrorSurface">#FFF0EF</Color>
 
     <!-- Cores fundamentais -->
     <Color x:Key="White">#FFFFFF</Color>
