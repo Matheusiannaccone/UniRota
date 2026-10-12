@@ -84,10 +84,11 @@ A área autenticada usa Shell TabBar com:
 
 O header autenticado é reutilizável e padronizado:
 
-- Home: `UniRota` + `Sair`
+- Home: `UniRota` + `Perfil`
+- Perfil: `UniRota` + `Sair` + `Voltar`
 - demais telas autenticadas: `UniRota` + `Home` + `Voltar`
-- Home não exibe Home/Voltar
-- somente Home exibe logout
+- `Perfil` existe somente na tela Home e direciona para Perfil
+- `Sair` existe somente na tela de Perfil e usa estilo destrutivo
 - `Voltar` usa o stack real do Shell
 - `Home` retorna à raiz sem empilhar outra Home
 - não usar navbar visual nativa do Shell nas páginas autenticadas
