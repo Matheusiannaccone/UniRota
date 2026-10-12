@@ -4,7 +4,7 @@
 
 O UniRota é um aplicativo acadêmico de caronas para estudantes da Facens.
 
-O MVP funcional já está concluído e validado no Android. O fluxo consolidado é:
+O MVP funcional já está concluído, integrado e validado no Android. O fluxo consolidado é:
 
 1. Cadastro/Login
 2. Rotas semanais com endereços reais
@@ -15,11 +15,21 @@ O MVP funcional já está concluído e validado no Android. O fluxo consolidado 
 7. Preço sugerido
 8. Visualização do trajeto em mapa
 
-A fase atual é o **redesign completo da interface e da experiência de uso**, seguindo os mockups aprovados pelo grupo.
+O redesign visual principal também já foi concluído e validado.
 
-Os mockups **não são apenas referências estéticas**. Eles representam decisões de experiência do usuário, hierarquia de informação, navegação e organização das telas. A implementação deve reproduzir sua intenção de UX com fidelidade, adaptando apenas o necessário para respeitar os dados e comportamentos reais do aplicativo.
+A fase atual é de **preparação para beta test e validação com usuários reais**.
 
-O objetivo final desta fase é deixar **todas as 13 páginas do aplicativo devidamente estilizadas, visualmente consistentes e sem regressão funcional**.
+A prioridade agora é:
+
+- corrigir bugs e comportamentos inconsistentes;
+- reduzir atritos de navegação e uso;
+- padronizar experiências visuais que ainda estejam inconsistentes;
+- melhorar clareza e previsibilidade da interface;
+- preservar estabilidade;
+- evitar regressões funcionais;
+- preparar o aplicativo para uso por beta testers reais.
+
+Não tratar esta fase como uma oportunidade para reescrever arquitetura, expandir escopo ou adicionar recursos grandes sem solicitação explícita.
 
 ---
 
@@ -40,15 +50,15 @@ O objetivo final desta fase é deixar **todas as 13 páginas do aplicativo devid
 
 Manter um único projeto .NET MAUI e a arquitetura atual.
 
-Não criar novas camadas apenas por organização estética.
+Não criar novas camadas apenas por organização.
 
-Não refatorar serviços ou regras de negócio durante tarefas visuais, salvo necessidade concreta para preservar um comportamento existente ou implementar a nova navegação por Shell.
+Não refatorar serviços, regras de negócio ou persistência durante tarefas pontuais de UX, navegação ou visual, salvo necessidade concreta e diretamente relacionada à tarefa.
 
 ---
 
 ## 3. Baseline funcional protegida
 
-A implementação visual deve preservar integralmente os fluxos já validados.
+A implementação deve preservar integralmente os fluxos já validados.
 
 ### Autenticação
 
@@ -98,7 +108,7 @@ Preservar:
 - `SuggestedPrice` persistido como snapshot;
 - ausência de nova chamada ao Google apenas para recalcular preço.
 
-Não alterar a fórmula durante o redesign.
+Não alterar a fórmula sem solicitação explícita.
 
 ### Solicitações, vagas e concorrência
 
@@ -113,7 +123,7 @@ Preservar:
 - commits atômicos e tentativas limitadas;
 - prevenção de inconsistências em concorrência.
 
-Mudanças visuais não devem reimplementar essa lógica.
+Mudanças visuais ou de navegação não devem reimplementar essa lógica.
 
 ### Mapa
 
@@ -130,9 +140,31 @@ Preservar na `RouteDetailsPage`:
 
 ---
 
-## 4. Páginas que fazem parte do redesign
+## 4. Fase atual: preparação para beta test
 
-O redesign contempla exatamente estas 13 páginas atuais:
+A regra prática desta fase é:
+
+> “Isso melhora a estabilidade, a clareza, a navegação, a experiência de uso ou a validação real do aplicativo?”
+
+Se não, não implementar sem solicitação explícita.
+
+Prioridades:
+
+1. bugs;
+2. comportamentos confusos;
+3. inconsistências visuais;
+4. navegação;
+5. validações de formulário;
+6. mensagens de erro;
+7. estados de loading/vazio;
+8. pequenos ajustes de UX;
+9. refinamentos visuais de baixo risco.
+
+Não adicionar novas funcionalidades grandes por iniciativa própria.
+
+---
+
+## 5. Páginas atuais do aplicativo
 
 ### Inicialização e autenticação
 
@@ -156,17 +188,15 @@ O redesign contempla exatamente estas 13 páginas atuais:
 12. `Views/Matching/ReceivedRequestsPage.xaml`
 13. `Views/Matching/ConfirmedRoutesPage.xaml`
 
-A `RouteDetailsPage` não possui mockup próprio porque foi adicionada posteriormente com o incremento de Google Maps.
-
-Seu visual deve ser derivado do mesmo sistema visual e dos padrões das telas de matching aprovadas, sem alterar o funcionamento do mapa.
+Essas páginas fazem parte do fluxo funcional atual e devem permanecer coerentes visual e funcionalmente.
 
 ---
 
-## 5. Navegação — Shell TabBar é requisito desta fase
+## 6. Navegação principal — Shell TabBar
 
-A área autenticada do UniRota deve adotar **Shell TabBar nativa** como parte da experiência definida nos mockups.
+A área autenticada utiliza **Shell TabBar nativa**.
 
-As três áreas principais devem ser:
+As três áreas principais são:
 
 - **Início** → `HomePage`
 - **Rotas** → `MyRoutesPage`
@@ -174,7 +204,7 @@ As três áreas principais devem ser:
 
 `StartupPage`, `LoginPage` e `RegisterPage` permanecem fora da TabBar.
 
-As demais páginas autenticadas devem funcionar como rotas internas/navegação a partir das áreas principais, preservando o fluxo existente:
+As demais páginas autenticadas funcionam como rotas internas:
 
 - `NewRoutePage`
 - `FindRidePage`
@@ -184,26 +214,80 @@ As demais páginas autenticadas devem funcionar como rotas internas/navegação 
 - `AwaitingApprovalPage`
 - `ReceivedRequestsPage`
 
-A migração para TabBar pode exigir alterações em `AppShell.xaml` e `AppShell.xaml.cs`. Essas alterações são permitidas e fazem parte do escopo visual/UX.
+Regras:
 
-Ao implementar:
-
-- usar a navegação nativa do Shell;
-- não criar uma barra inferior manual duplicada dentro de cada página;
-- manter stacks de navegação coerentes por aba;
+- usar a navegação do Shell;
+- não criar uma barra inferior manual duplicada;
+- manter stacks coerentes por aba;
 - impedir criação indevida de páginas duplicadas;
-- evitar perda desnecessária de estado de navegação;
-- preservar rotas nomeadas necessárias ao fluxo interno;
-- garantir que autenticação e restauração de sessão continuem direcionando o usuário corretamente;
-- não duplicar a TabBar em XAML de páginas individuais.
+- evitar perda desnecessária de estado;
+- preservar rotas nomeadas necessárias;
+- preservar autenticação e restauração de sessão;
+- não duplicar a TabBar em páginas individuais.
 
 ---
 
-## 6. Sistema visual centralizado
+## 7. Header autenticado padronizado
 
-A identidade visual existente deve ser **evoluída, não recriada**.
+Todas as páginas autenticadas devem utilizar um **header visual padronizado e reutilizável**.
 
-Arquivos centrais atuais:
+A barra visual nativa do Shell não deve ser usada nas páginas autenticadas.
+
+### Home
+
+A `HomePage` deve exibir:
+
+- “UniRota” como identificação do aplicativo;
+- ação **Sair**.
+
+A Home:
+
+- não exibe botão Home;
+- não exibe botão Voltar;
+- é a única página autenticada com ação de logout no header.
+
+### Demais páginas autenticadas
+
+Todas as demais páginas autenticadas devem exibir:
+
+- “UniRota”;
+- ação **Home**;
+- ação **Voltar**.
+
+### Comportamento do botão Home
+
+O botão Home deve:
+
+- levar o usuário à Home principal;
+- utilizar a estrutura atual do Shell;
+- evitar criar páginas duplicadas;
+- preservar a navegação principal;
+- não empilhar novas instâncias da Home.
+
+### Comportamento do botão Voltar
+
+O botão Voltar deve:
+
+- retornar para a tela realmente anterior;
+- usar o stack real de navegação;
+- não usar destinos fixos específicos por página;
+- preservar o comportamento esperado do Shell.
+
+### Título das páginas
+
+O header identifica o aplicativo e controla a navegação.
+
+O título e o subtítulo específicos de cada tela devem permanecer abaixo do header.
+
+### Fluxo não autenticado
+
+`StartupPage`, `LoginPage` e `RegisterPage` não usam esse padrão de header autenticado.
+
+---
+
+## 8. Sistema visual centralizado
+
+Arquivos centrais:
 
 ```text
 Resources/Styles/Colors.xaml
@@ -217,263 +301,146 @@ Resources/Styles/Styles.xaml
 Todo recurso visual reutilizado em mais de uma página deve ser centralizado.
 
 - Cores e brushes semânticos ficam em `Colors.xaml`.
-- **Estilos, dimensões, tipografia, espaçamentos e padrões visuais reutilizáveis ficam centralizados em `Styles.xaml`.**
+- Estilos, dimensões, tipografia, espaçamentos e padrões visuais reutilizáveis ficam em `Styles.xaml`.
 - Não criar cópias locais do mesmo estilo em diferentes páginas.
-- Não espalhar valores repetidos de cor, `CornerRadius`, `Padding`, `FontSize`, alturas ou estados visuais se representam o mesmo componente/padrão.
-- Se um padrão visual aparecer em duas ou mais páginas, extrair para `Styles.xaml`.
-- Recursos locais de página só são aceitáveis quando forem realmente exclusivos daquela tela.
+- Não espalhar valores repetidos de cor, `CornerRadius`, `Padding`, `FontSize`, alturas ou estados visuais quando representam o mesmo padrão.
+- Se um padrão aparecer em duas ou mais páginas, centralizar.
+- Recursos locais de página só são aceitáveis quando realmente exclusivos.
 
-Priorizar estilos nomeados e semânticos, por exemplo para:
+Exemplos de padrões reutilizáveis:
 
 - títulos de página;
 - subtítulos;
 - texto auxiliar;
 - cards;
-- cards selecionados;
 - campos de formulário;
 - botões primários;
 - botões secundários;
 - botões destrutivos;
 - badges/status;
-- chips de dias;
+- chips;
 - blocos de informação;
 - estados vazio/erro/loading;
-- espaçamentos recorrentes.
+- header autenticado.
 
-Não criar uma biblioteca de componentes complexa sem necessidade real.
-
-Centralização deve reduzir repetição, não aumentar abstração desnecessariamente.
+Centralização deve reduzir repetição sem criar abstração desnecessária.
 
 ---
 
-## 7. Cores, tipografia e temas
+## 9. Cores, tipografia e identidade visual
 
-A paleta existente inspirada na Facens deve ser preservada como base.
+A paleta atual inspirada na Facens deve ser preservada.
 
 Não reintroduzir cores roxas do template MAUI.
 
-Não inserir cores hexadecimais diretamente nas páginas quando já existir ou puder existir um recurso semântico correspondente.
+Não inserir cores hexadecimais diretamente nas páginas quando houver ou puder existir recurso semântico correspondente.
 
-As fontes oficiais definitivas e outros assets de marca ainda não estão disponíveis.
+Não baixar fontes novas sem solicitação.
 
-Até que sejam adicionados:
+Não criar logos fictícios.
 
-- usar as fontes atualmente configuradas no projeto;
-- não baixar ou inventar fontes novas;
-- não adicionar logos fictícios;
-- não gerar imagens de marca provisórias;
-- preparar layouts e espaços de forma que logo/imagens oficiais possam ser substituídos depois sem reestruturar as telas.
+Não gerar identidade visual nova por conta própria.
+
+Ícones funcionais podem usar soluções nativas ou assets já existentes quando necessário.
 
 ---
 
-## 8. Logo, imagens e ícones ainda não oficiais
+## 10. Estratégia de contexto para agentes
 
-Outro integrante do grupo fornecerá futuramente o logo e os assets oficiais.
+O objetivo é reduzir consumo de tokens, leituras repetidas e análise desnecessária.
 
-Nesta fase:
-
-- reservar espaços adequados nos layouts quando os mockups exigirem logo ou imagem;
-- usar placeholders discretos ou elementos textuais existentes somente quando necessário para manter a composição;
-- não criar uma identidade visual definitiva por conta própria;
-- não adicionar imagens genéricas ou stock ao repositório;
-- manter o espaço adaptável para substituição posterior por `Image`/asset real;
-- ícones funcionais podem usar soluções nativas ou já existentes quando necessárias à usabilidade;
-- ícones provisórios não devem ser tratados como identidade final do projeto.
-
-O layout deve continuar funcional mesmo sem os assets finais.
-
----
-
-## 9. Fidelidade aos mockups
-
-Antes de implementar cada bloco visual, ler docs/ui/MOCKUPS.md e consultar somente as imagens correspondentes às páginas daquele bloco. Os mockups são fonte de verdade para UX e composição visual, enquanto o código atual é fonte de verdade para funcionalidades, dados e comportamentos existentes.
-
-Os mockups aprovados orientam:
-
-- hierarquia de informação;
-- densidade de conteúdo;
-- agrupamento de dados;
-- posição relativa das ações;
-- navegação;
-- prioridade dos botões;
-- estrutura de cards;
-- estados visuais;
-- clareza e simplicidade da experiência.
-
-Quando um mockup mostrar um dado ou recurso que **não existe funcionalmente** no aplicativo, não implementar nova regra de negócio apenas para copiar a imagem.
-
-Exemplos:
-
-- reputação;
-- chat;
-- notificações reais;
-- avaliações;
-- funcionalidades ainda não existentes.
-
-Nesses casos, adaptar o layout aos dados reais disponíveis mantendo a intenção visual.
-
-Não remover informações funcionais importantes que foram adicionadas após a criação dos mockups, como:
-
-- distância;
-- duração;
-- desvio;
-- dados geográficos;
-- estados reais do fluxo;
-- informações necessárias ao funcionamento atual.
-
----
-
-## 10. Organização da implementação visual
-
-Implementar em blocos para limitar contexto e facilitar validação.
-
-### Bloco 1 — Fundação visual e autenticação
-
-- revisar/evoluir `Colors.xaml` apenas quando necessário;
-- consolidar estilos semânticos em `Styles.xaml`;
-- preparar placeholders de marca;
-- `StartupPage`;
-- `LoginPage`;
-- `RegisterPage`.
-
-### Bloco 2 — Shell TabBar, Home e Minhas Rotas
-
-- migrar a área autenticada para Shell TabBar;
-- Início;
-- Rotas;
-- Caronas;
-- `HomePage`;
-- `MyRoutesPage`;
-- validar navegação e restauração de sessão.
-
-### Bloco 3 — Criação de rota, busca, matching e mapa
-
-- `NewRoutePage`;
-- `FindRidePage`;
-- `MatchResultsPage`;
-- `RouteDetailsPage`;
-- preservar Places, Routes, matching geográfico e Maps SDK.
-
-### Bloco 4 — Solicitações e caronas
-
-- `RideRequestPage`;
-- `AwaitingApprovalPage`;
-- `ReceivedRequestsPage`;
-- `ConfirmedRoutesPage`;
-- preservar Once/Weekly, preço, status, vagas e concorrência.
-
-### Fechamento — revisão integrada
-
-- validar as 13 páginas;
-- revisar consistência visual;
-- revisar TabBar e stacks de navegação;
-- verificar textos longos;
-- verificar estados vazios;
-- verificar estados de erro;
-- verificar loading;
-- verificar estados disabled;
-- testar teclado;
-- testar scroll;
-- testar telas menores;
-- executar suíte completa;
-- executar build Android;
-- registrar qualquer limitação restante.
-
-Quando a tarefa autorizar explicitamente a implementação completa do redesign, os blocos podem ser executados sequencialmente sem nova autorização. Cada bloco deve ser validado antes do próximo. Se houver falha de build, regressão funcional ou necessidade de decisão de produto não prevista, interromper a execução e solicitar orientação.
-
-
-## 11. Estratégia de contexto para agentes
-
-O objetivo é reduzir leituras repetidas e evitar análise desnecessária, sem impedir investigação quando realmente necessária.
-
-Para cada bloco:
+Para cada tarefa:
 
 1. Ler este `AGENTS.md`.
 2. Inspecionar o estado atual da branch.
-3. Ler `AppShell.xaml` e `AppShell.xaml.cs` somente quando a tarefa envolver navegação.
-4. Ler `Colors.xaml` e `Styles.xaml` quando houver impacto em recursos compartilhados.
-5. Ler as páginas XAML do bloco atual.
-6. Ler code-behind e ViewModel apenas quando necessário para preservar bindings, commands ou navegação.
-7. Inspecionar Models/Services somente se um comportamento da tela não puder ser compreendido sem eles.
-8. Não fazer auditoria geral do repositório a cada bloco.
-9. Reutilizar decisões e estilos já estabelecidos nos blocos anteriores.
-10. Evitar reler arquivos grandes que não tenham relação com a tarefa atual.
+3. Ler somente os arquivos diretamente relacionados à tarefa.
+4. Ler `AppShell.xaml` e `AppShell.xaml.cs` apenas quando a tarefa envolver navegação.
+5. Ler `Colors.xaml` e `Styles.xaml` quando houver impacto visual compartilhado.
+6. Ler os XAMLs da tarefa.
+7. Ler code-behind e ViewModels apenas quando necessário para preservar bindings, commands ou navegação.
+8. Inspecionar Models, Services, Firebase, Functions ou lógica de negócio somente quando uma dependência concreta exigir.
+9. Não fazer auditoria geral do repositório a cada tarefa.
+10. Reutilizar decisões já estabelecidas.
+11. Evitar reler arquivos grandes sem relação direta com a tarefa.
+12. Não produzir relatórios longos quando um resumo objetivo for suficiente.
 
-Se for necessário abrir arquivos fora do conjunto esperado, fazê-lo de forma objetiva e explicar a relação com o bloco atual.
+Se for necessário abrir arquivos fora do conjunto esperado, fazer isso de forma objetiva.
 
 ---
 
-## 12. Regras de alteração durante o redesign
+## 11. Regras de alteração
 
 Ao trabalhar no código:
 
-- alterar somente arquivos necessários para o bloco atual;
-- preservar bindings e commands existentes sempre que possível;
-- não mover lógica de negócio para XAML ou code-behind por conveniência visual;
+- alterar somente arquivos necessários;
+- preservar bindings e commands existentes;
+- não mover lógica de negócio para XAML ou code-behind por conveniência;
 - não refatorar Firebase, Google Maps, matching ou precificação sem necessidade concreta;
-- não mudar modelos persistidos apenas para facilitar layout;
+- não mudar modelos persistidos apenas para facilitar UI;
 - não remover validações existentes;
 - não substituir controles funcionais por elementos apenas decorativos;
 - não alterar nomes de propriedades apenas por estética;
-- não introduzir dependências externas apenas para aparência sem aprovação;
+- não introduzir dependências externas sem aprovação;
 - não inserir segredos/chaves no repositório;
 - manter compatibilidade com Android;
-- preservar compilação ao final de cada bloco.
+- preservar compilação.
 
-Se uma decisão visual exigir mudança funcional ainda não definida, parar e solicitar decisão ao usuário.
+Se uma tarefa exigir decisão de produto não definida, interromper e solicitar orientação.
 
 ---
 
-## 13. Testes e regressão
+## 12. Testes e regressão
 
-A última baseline consolidada do incremento Google Maps registrou:
+Baseline conhecida consolidada:
 
 - 154/154 testes .NET aprovados;
 - 20/20 testes Node aprovados;
 - build Android com 0 erros e 0 avisos;
 - fluxo principal validado manualmente em Android.
 
-O redesign não deve reduzir essa baseline sem causa identificada.
+As alterações não devem reduzir essa baseline sem causa identificada.
 
-Durante os blocos:
+Durante ajustes pontuais:
 
-- executar testes diretamente relacionados quando houver mudança de navegação ou code-behind;
-- validar XAML/build sempre que possível;
-- não transformar a fase visual em reescrita dos testes de negócio.
+- executar testes diretamente relacionados à alteração;
+- validar build quando houver impacto em XAML, navegação, DI ou code-behind;
+- evitar executar suítes irrelevantes apenas por rotina.
 
-No fechamento:
+Quando a alteração tiver impacto transversal, considerar:
 
-- executar todos os testes .NET;
-- executar todos os testes Node quando houver qualquer impacto em Functions/configuração;
-- executar `git diff --check`;
-- executar build Android;
-- realizar smoke test manual do fluxo completo.
+- testes .NET;
+- testes Node quando Functions/configuração forem afetadas;
+- `git diff --check`;
+- build Android;
+- smoke test manual.
 
-Fluxo mínimo de regressão:
+Fluxo mínimo de regressão quando a navegação for alterada:
 
 ```text
 Startup
 → Login/Cadastro
 → Home
 → Minhas Rotas
-→ Nova Rota com autocomplete
+→ Nova Rota
 → Encontrar Carona
 → Resultados
-→ Detalhes no mapa
-→ Solicitar carona Once/Weekly
+→ Detalhes
+→ Solicitar carona
 → Aguardando aprovação
 → Solicitações recebidas
 → Aceitar/Rejeitar
 → Rotas confirmadas
+→ Home
+→ Voltar
 → Logout/Login
 → Restauração de sessão
 ```
 
 ---
 
-## 14. Fora do escopo desta fase
+## 13. Fora do escopo sem solicitação explícita
 
-Não implementar sem solicitação explícita:
+Não implementar por iniciativa própria:
 
 - nova fórmula de preço;
 - chat;
@@ -490,74 +457,73 @@ Não implementar sem solicitação explícita:
 - novas coleções Firestore por conveniência visual;
 - backend tradicional;
 - SQL/PostgreSQL;
-- recursos de produto não existentes apenas porque aparecem como decoração em mockups.
+- recursos grandes que não sejam necessários para o beta test.
 
-As pendências funcionais continuam sendo tratadas separadamente em `docs/PENDENCIAS.md`.
+As pendências funcionais continuam separadas em `docs/PENDENCIAS.md`.
 
 ---
 
-## 15. Padrão de trabalho recomendado
+## 14. Padrão de trabalho recomendado
 
-Para cada bloco:
+Para cada tarefa:
 
-1. Ler `AGENTS.md` e os arquivos diretamente relacionados.
-2. Resumir em poucas linhas os arquivos que pretende alterar.
-3. Implementar somente o bloco atual.
-4. Centralizar recursos visuais reutilizáveis em `Styles.xaml`.
-5. Centralizar cores e brushes em `Colors.xaml`.
-6. Preservar toda a funcionalidade existente.
-7. Executar validações pertinentes.
-8. Informar ao final:
+1. Ler `AGENTS.md`.
+2. Ler somente os arquivos diretamente relacionados.
+3. Resumir brevemente o plano quando necessário.
+4. Implementar apenas o escopo solicitado.
+5. Reutilizar estilos e componentes existentes.
+6. Centralizar recursos compartilhados.
+7. Preservar a funcionalidade existente.
+8. Executar validações pertinentes.
+9. Informar ao final, de forma concisa:
    - arquivos alterados;
-   - estilos/recursos compartilhados adicionados;
-   - decisões de UX tomadas;
+   - comportamento implementado;
    - testes executados;
    - resultado do build;
-   - limitações ou pontos para validação manual.
-9. Parar e aguardar aprovação antes do próximo bloco.
+   - pontos para validação manual.
+10. Encerrar a tarefa sem avançar automaticamente para outras pendências.
 
 ---
 
-## 16. Commits
+## 15. Commits
 
-Usar commits pequenos e semânticos, em português, seguindo o padrão do projeto.
+Usar commits pequenos, semânticos e em português.
 
 Exemplos:
 
 ```text
-feat(ui): consolida estilos visuais do UniRota
-feat(ui): redesenha telas de autenticação
-feat(navegacao): adota Shell TabBar na área autenticada
-feat(ui): redesenha home e rotas
-feat(ui): redesenha fluxo de matching e mapa
-feat(ui): redesenha solicitações e caronas
-fix(ui): corrige inconsistências visuais e regressões de navegação
+fix(navegacao): padroniza header e comportamento de voltar
+fix(ui): corrige inconsistências visuais em solicitações
+fix(rotas): ajusta validação do formulário de rota
+fix(auth): corrige fluxo de logout e restauração de sessão
+feat(ui): adiciona ajuste pontual aprovado para beta test
 ```
 
-Não misturar correções funcionais não relacionadas no mesmo commit de UI.
+Não misturar correções não relacionadas no mesmo commit.
 
 ---
 
-## 17. Critério de conclusão do redesign
+## 16. Critério de qualidade da fase atual
 
-A fase visual estará concluída quando:
+O aplicativo está pronto para beta test quando:
 
-- as 13 páginas estiverem estilizadas de acordo com os mockups e o sistema visual comum;
-- a área autenticada utilizar Shell TabBar com Início, Rotas e Caronas;
-- recursos visuais repetidos estiverem centralizados, sem duplicação desnecessária por página;
-- espaços para logo/imagens oficiais estiverem preparados sem assets fictícios definitivos;
-- todas as informações funcionais atuais continuarem acessíveis;
-- autocomplete continuar funcionando;
-- Google Maps continuar funcionando;
-- matching continuar funcionando;
-- preço continuar funcionando;
-- solicitações continuarem funcionando;
-- consumo de vagas continuar funcionando;
-- autenticação continuar funcionando;
-- não houver regressão conhecida no fluxo principal;
-- testes relevantes estiverem aprovados;
-- build Android estiver aprovado;
-- o aplicativo estiver pronto para receber posteriormente os assets oficiais sem novo redesign estrutural.
+- o fluxo principal permanece estável;
+- a navegação é previsível;
+- headers e ações principais são consistentes;
+- não há regressões conhecidas;
+- mensagens de erro são compreensíveis;
+- estados vazio/loading/erro funcionam;
+- telas menores continuam utilizáveis;
+- autenticação funciona;
+- rotas funcionam;
+- matching funciona;
+- Google Maps funciona;
+- preço funciona;
+- solicitações funcionam;
+- vagas funcionam;
+- caronas confirmadas funcionam;
+- logout funciona;
+- o aplicativo pode ser usado por um usuário novo sem depender de explicações constantes.
 
 ---
 
@@ -565,6 +531,6 @@ A fase visual estará concluída quando:
 
 Antes de qualquer alteração, perguntar:
 
-> Isso é necessário para reproduzir a experiência aprovada nos mockups, centralizar corretamente o sistema visual ou preservar a funcionalidade existente?
+> Isso é necessário para corrigir um problema real, reduzir atrito para o beta tester, padronizar a experiência ou preservar a estabilidade do aplicativo?
 
-Se não, não implementar nesta fase.
+Se não, não implementar sem solicitação explícita.
