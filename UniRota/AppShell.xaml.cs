@@ -27,6 +27,8 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(nameof(Views.Matching.AwaitingApprovalPage), typeof(Views.Matching.AwaitingApprovalPage));
         Routing.RegisterRoute(nameof(Views.Matching.ReceivedRequestsPage), typeof(Views.Matching.ReceivedRequestsPage));
 
+        Routing.RegisterRoute(nameof(Views.ProfilePage), typeof(Views.ProfilePage));
+
         StartupContent.Content = startupPage;
         LoginContent.Content = loginPage;
         RegisterContent.Content = registerPage;

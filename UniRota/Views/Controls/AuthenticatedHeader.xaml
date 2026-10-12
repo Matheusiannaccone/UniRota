@@ -5,19 +5,27 @@
     <Grid Style="{StaticResource AuthenticatedHeaderLayout}" ColumnDefinitions="*,Auto">
         <Label Text="UniRota" Style="{StaticResource BrandText}" />
         <HorizontalStackLayout Grid.Column="1" Spacing="{StaticResource DetailSpacing}" VerticalOptions="Center">
+            <Button x:Name="ProfileButton" Text="Perfil" Clicked="OnProfileClicked" Style="{StaticResource HeaderAction}"
+                IsVisible="{Binding IsHome, Source={x:Reference Header}}" />
+            <Button Text="Sair" Style="{StaticResource DestructiveHeaderAction}"
+                IsVisible="{Binding IsProfile, Source={x:Reference Header}}"
+                Command="{Binding LogoutCommand, Source={x:Reference Header}}"
+                IsEnabled="{Binding LogoutIsEnabled, Source={x:Reference Header}}" />
             <HorizontalStackLayout Spacing="{StaticResource DetailSpacing}">
                 <HorizontalStackLayout.Triggers>
                     <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding IsHome, Source={x:Reference Header}}" Value="True">
                         <Setter Property="IsVisible" Value="False" />
                     </DataTrigger>
                 </HorizontalStackLayout.Triggers>
-                <Button x:Name="HomeButton" Text="Home" Clicked="OnHomeClicked" Style="{StaticResource HeaderAction}" />
+                <Button x:Name="HomeButton" Text="Home" Clicked="OnHomeClicked" Style="{StaticResource HeaderAction}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsProfile, Source={x:Reference Header}}" Value="True">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
                 <Button x:Name="BackButton" Text="Voltar" Clicked="OnBackClicked" Style="{StaticResource HeaderAction}" />
             </HorizontalStackLayout>
-            <Button Text="Sair" Style="{StaticResource HeaderAction}"
-                IsVisible="{Binding IsHome, Source={x:Reference Header}}"
-                Command="{Binding LogoutCommand, Source={x:Reference Header}}"
-                IsEnabled="{Binding LogoutIsEnabled, Source={x:Reference Header}}" />
         </HorizontalStackLayout>
     </Grid>
 </ContentView>

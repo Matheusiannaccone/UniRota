@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <?xaml-comp compile="true" ?>
 <ResourceDictionary 
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
@@ -619,5 +619,14 @@
     <Style x:Key="SuggestionCard" TargetType="Border" BasedOn="{StaticResource InfoCard}">
         <Setter Property="Padding" Value="12,10" />
         <Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
+    <Style x:Key="DestructiveHeaderAction" TargetType="Button" BasedOn="{StaticResource HeaderAction}">
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Error}, Dark={StaticResource ErrorLight}}" />
+    </Style>
+    <Style x:Key="ProfileAvatar" TargetType="Border" BasedOn="{StaticResource InfoCard}">
+        <Setter Property="WidthRequest" Value="80" />
+        <Setter Property="HeightRequest" Value="80" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 40" />
+        <Setter Property="HorizontalOptions" Value="Center" />
     </Style>
 </ResourceDictionary>
