@@ -19,6 +19,12 @@ public partial class ProfileViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string errorMessage = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSuccess))]
+    private string successMessage = string.Empty;
+
+    public bool HasSuccess => !string.IsNullOrEmpty(SuccessMessage);
+
     public bool IsNotBusy => !IsBusy;
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
@@ -34,6 +40,28 @@ public partial class ProfileViewModel : ObservableObject
         }
         Name = user.Name;
         ErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task SaveNameAsync()
+    {
+        if (IsBusy) return;
+        ErrorMessage = SuccessMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            ErrorMessage = "Informe seu nome.";
+            return;
+        }
+        IsBusy = true;
+        try
+        {
+            await _authService.UpdateNameAsync(Name);
+            Name = _authService.CurrentUser?.Name ?? Name.Trim();
+            SuccessMessage = "Nome atualizado.";
+        }
+        catch (Exception exception) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]

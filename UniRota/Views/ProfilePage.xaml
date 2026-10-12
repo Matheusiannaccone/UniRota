@@ -15,7 +15,11 @@
                         <Border Style="{StaticResource ProfileAvatar}" SemanticProperties.Description="Avatar de perfil. Foto ainda indisponível.">
                             <Label Text="U" Style="{StaticResource BrandText}" HorizontalOptions="Center" VerticalOptions="Center" />
                         </Border>
-                        <Label Text="{Binding Name}" Style="{StaticResource CardTitle}" />
+                        <Label Text="Nome" Style="{StaticResource Caption}" />
+                        <Border Style="{StaticResource InputContainer}">
+                            <Entry Text="{Binding Name}" Placeholder="Seu nome" IsEnabled="{Binding IsNotBusy}" ReturnType="Done" SemanticProperties.Description="Nome" />
+                        </Border>
+                        <Button Text="Salvar nome" Command="{Binding SaveNameCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" />
                     </VerticalStackLayout>
                 </Border>
                 <Border Style="{StaticResource Card}">
@@ -26,6 +30,7 @@
                     </VerticalStackLayout>
                 </Border>
                 <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
+                <Label Text="{Binding SuccessMessage}" IsVisible="{Binding HasSuccess}" Style="{StaticResource SuccessBadge}" />
                 <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
             </VerticalStackLayout>
         </ScrollView>

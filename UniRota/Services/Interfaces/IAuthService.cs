@@ -21,5 +21,7 @@ public interface IAuthService
 
     Task<string> GetValidIdTokenAsync(CancellationToken cancellationToken = default);
 
+    Task UpdateNameAsync(string name, CancellationToken cancellationToken = default);
+
     Task LogoutAsync();
 }

@@ -480,6 +480,8 @@ public sealed class FirebaseRideRequestServicePricingTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult("test-token");
 
+        public Task UpdateNameAsync(string name, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task LogoutAsync() => Task.CompletedTask;
     }
 

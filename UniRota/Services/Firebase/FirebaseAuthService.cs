@@ -247,6 +247,43 @@ public sealed class FirebaseAuthService : IAuthService
         return Task.CompletedTask;
     }
 
+    public async Task UpdateNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Informe seu nome.", nameof(name));
+
+        var user = CurrentUser ?? throw new InvalidOperationException("Entre novamente para editar seu perfil.");
+        var idToken = await GetValidIdTokenAsync(cancellationToken);
+        await _tokenRefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureCurrentUser(user);
+            await UpdateProfileFieldAsync(user.Id, "name", name.Trim(), idToken, cancellationToken);
+            EnsureCurrentUser(user);
+            CurrentUser = new User
+            {
+                Id = user.Id, Name = name.Trim(), Email = user.Email, CreatedAtUtc = user.CreatedAtUtc
+            };
+        }
+        finally { _tokenRefreshLock.Release(); }
+    }
+
+    private void EnsureCurrentUser(User user)
+    {
+        if (!ReferenceEquals(CurrentUser, user))
+            throw new InvalidOperationException("A sessão foi alterada. Abra o perfil novamente para continuar.");
+    }
+
+    private async Task UpdateProfileFieldAsync(
+        string userId, string field, string value, string idToken, CancellationToken cancellationToken)
+    {
+        using var request = CreateJsonRequest(HttpMethod.Patch,
+            $"{BuildUserDocumentUrl(userId)}?updateMask.fieldPaths={Escape(field)}&currentDocument.exists=true",
+            new { fields = new Dictionary<string, object> { [field] = new { stringValue = value } } });
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", idToken);
+        EnsureSuccess(await SendAsync(request, cancellationToken));
+    }
+
     private async Task CreateUserProfileAsync(
         User user,
         string idToken,
