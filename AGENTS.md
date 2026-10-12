@@ -12,7 +12,7 @@ Fluxo principal protegido:
 2. Rotas semanais com endereços reais
 3. Matching determinístico e geográfico
 4. Solicitação de carona Once/Weekly
-5. Aceite/rejeição e consumo de vagas
+5. Aceite/rejeição e controle de vagas por dia/data
 6. Caronas confirmadas
 7. Preço sugerido
 8. Visualização de trajeto em mapa
@@ -31,6 +31,7 @@ Preservar:
 - Dependency Injection
 - Firebase Authentication
 - Cloud Firestore
+- Firebase Functions
 - Google Places API (New)
 - Google Routes API
 - Maps SDK for Android
@@ -65,10 +66,31 @@ Não alterar sem solicitação explícita:
 - snapshot de `SuggestedPrice`;
 - fluxo Once/Weekly;
 - estados Pending / Accepted / Rejected;
-- consumo de vagas e concorrência;
+- controle de vagas por dia/data e concorrência, conforme modelo aprovado;
 - mapa, polyline, pins e viewport.
 
 Mudanças de UI ou navegação não devem reimplementar regras de negócio.
+
+### Modelo de vagas aprovado
+
+A disponibilidade de vagas não é mais global por rota.
+
+Para rotas de motorista:
+
+- o motorista informa uma única capacidade ao criar a rota;
+- essa capacidade inicial vale igualmente para todos os dias da semana selecionados;
+- passageiros semanais consomem uma vaga apenas nos dias incluídos na solicitação aceita;
+- passageiros pontuais ocupam uma vaga somente na data específica da solicitação;
+- reservas pontuais futuras são registradas na própria `weeklyRoute`, associadas ao `requestId`, data e dia da semana;
+- reservas pontuais passadas não participam do cálculo de disponibilidade;
+- o matching deve remover dias compatíveis cuja disponibilidade efetiva seja zero;
+- a quantidade de vagas exibida ao passageiro deve ser o menor valor entre os dias compatíveis restantes;
+- se nenhum dia compatível possuir vaga, a rota não deve aparecer como compatível;
+- aceite e atualização de disponibilidade devem preservar consistência e concorrência atômica.
+
+O motorista, neste momento, **não escolhe capacidades diferentes por dia**. Todos os dias selecionados começam com a mesma capacidade informada na criação da rota.
+
+Não implementar limpeza automática de reservas pontuais antigas nesta etapa. Uma Firebase Function para remoção futura poderá ser criada posteriormente.
 
 ---
 
@@ -140,9 +162,9 @@ Relatórios finais devem ser curtos e objetivos.
 
 Baseline conhecida:
 
-- 154/154 testes .NET aprovados
-- 20/20 testes Node aprovados
-- build Android com 0 erros e 0 avisos
+- 201/201 testes .NET aprovados
+- 26/26 testes Node aprovados
+- build Android Release validado
 - fluxo principal validado manualmente
 
 Para cada tarefa, executar apenas validações pertinentes.
@@ -175,9 +197,9 @@ Não implementar por iniciativa própria:
 - rastreamento em tempo real;
 - navegação turn-by-turn;
 - IA/Machine Learning;
-- novas regras de vagas;
 - cooldown após rejeição;
 - cancelamento/restauração de vaga;
+- limpeza automática de reservas pontuais antigas;
 - backend tradicional;
 - SQL/PostgreSQL.
 
