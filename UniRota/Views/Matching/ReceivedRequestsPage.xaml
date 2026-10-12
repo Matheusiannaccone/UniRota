@@ -2,45 +2,49 @@
 <ContentPage x:Class="UniRota.Views.Matching.ReceivedRequestsPage" x:Name="Page"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:UniRota.Views.Controls"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
-    Shell.NavBarIsVisible="True" Title="UniRota">
-    <Grid Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,Auto,*">
-        <VerticalStackLayout Style="{StaticResource DetailContent}">
-            <Label Text="Solicitações recebidas" Style="{StaticResource PageTitle}" />
-            <Label Text="Analise as solicitações e escolha com quem viajar." Style="{StaticResource PageSubtitle}" />
-        </VerticalStackLayout>
-        <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-        <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
-            <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
-            <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
-        </VerticalStackLayout>
-        <Label Grid.Row="3" Text="{Binding FeedbackMessage}" IsVisible="{Binding HasFeedback}" Style="{StaticResource SuccessBadge}" />
-        <Grid Grid.Row="4">
-            <Label Text="Você não possui solicitações pendentes recebidas." IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
-            <CollectionView ItemsSource="{Binding Requests}" SelectionMode="None">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:RideRequestItemViewModel">
-                        <Border Style="{StaticResource ListCard}">
-                            <VerticalStackLayout Style="{StaticResource SectionContent}">
-                                <VerticalStackLayout Style="{StaticResource DetailContent}">
-                                    <Label Text="{Binding CounterpartyNameText}" Style="{StaticResource SectionTitle}" />
-                                    <Label Text="Passageiro" Style="{StaticResource Caption}" />
-                                    <Label Text="{Binding StatusText}" Style="{StaticResource WaitingBadge}" />
+    Shell.NavBarIsVisible="False" Title="UniRota">
+    <Grid RowDefinitions="Auto,*">
+        <controls:AuthenticatedHeader />
+        <Grid Grid.Row="1" Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,Auto,*">
+            <VerticalStackLayout Style="{StaticResource DetailContent}">
+                <Label Text="Solicitações recebidas" Style="{StaticResource PageTitle}" />
+                <Label Text="Analise as solicitações e escolha com quem viajar." Style="{StaticResource PageSubtitle}" />
+            </VerticalStackLayout>
+            <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
+                <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
+                <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+            </VerticalStackLayout>
+            <Label Grid.Row="3" Text="{Binding FeedbackMessage}" IsVisible="{Binding HasFeedback}" Style="{StaticResource SuccessBadge}" />
+            <Grid Grid.Row="4">
+                <Label Text="Você não possui solicitações pendentes recebidas." IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
+                <CollectionView ItemsSource="{Binding Requests}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:RideRequestItemViewModel">
+                            <Border Style="{StaticResource ListCard}">
+                                <VerticalStackLayout Style="{StaticResource SectionContent}">
+                                    <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                        <Label Text="{Binding CounterpartyNameText}" Style="{StaticResource SectionTitle}" />
+                                        <Label Text="Passageiro" Style="{StaticResource Caption}" />
+                                        <Label Text="{Binding StatusText}" Style="{StaticResource WaitingBadge}" />
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                        <Label Text="{Binding TypeText}" Style="{StaticResource CardTitle}" />
+                                        <Label Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}" Style="{StaticResource PageSubtitle}" />
+                                        <Label Text="{Binding RequestedDateText, StringFormat='Data: {0}'}" IsVisible="{Binding HasRequestedDate}" />
+                                    </VerticalStackLayout>
+                                    <Label Text="{Binding SuggestedPriceText}" Style="{StaticResource SuccessBadge}" />
+                                    <Label Text="{Binding SentAtText}" IsVisible="{Binding HasCreatedAt}" Style="{StaticResource Caption}" />
+                                    <Button Text="Aceitar" Clicked="OnAcceptClicked" CommandParameter="{Binding .}" IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}" Style="{StaticResource PrimaryButton}" />
+                                    <Button Text="Recusar" Clicked="OnRejectClicked" CommandParameter="{Binding .}" IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}" Style="{StaticResource DangerButton}" />
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Style="{StaticResource DetailContent}">
-                                    <Label Text="{Binding TypeText}" Style="{StaticResource CardTitle}" />
-                                    <Label Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}" Style="{StaticResource PageSubtitle}" />
-                                    <Label Text="{Binding RequestedDateText, StringFormat='Data: {0}'}" IsVisible="{Binding HasRequestedDate}" />
-                                </VerticalStackLayout>
-                                <Label Text="{Binding SuggestedPriceText}" Style="{StaticResource SuccessBadge}" />
-                                <Label Text="{Binding SentAtText}" IsVisible="{Binding HasCreatedAt}" Style="{StaticResource Caption}" />
-                                <Button Text="Aceitar" Clicked="OnAcceptClicked" CommandParameter="{Binding .}" IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}" Style="{StaticResource PrimaryButton}" />
-                                <Button Text="Recusar" Clicked="OnRejectClicked" CommandParameter="{Binding .}" IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}" Style="{StaticResource DangerButton}" />
-                            </VerticalStackLayout>
-                        </Border>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
         </Grid>
     </Grid>
 </ContentPage>

@@ -2,63 +2,64 @@
 <ContentPage x:Class="UniRota.Views.Matching.ConfirmedRoutesPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:UniRota.Views.Controls"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
     Shell.NavBarIsVisible="False" Title="Suas caronas">
-    <Grid Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,*">
-        <VerticalStackLayout Style="{StaticResource SectionContent}">
-            <Grid Style="{StaticResource BrandSlot}">
-                <Label Text="UniRota" Style="{StaticResource BrandText}" />
-            </Grid>
-            <VerticalStackLayout Style="{StaticResource DetailContent}">
-                <Label Text="Suas caronas" Style="{StaticResource PageTitle}" />
-                <Label Text="Acompanhe suas viagens confirmadas e recorrências." Style="{StaticResource PageSubtitle}" />
+    <Grid RowDefinitions="Auto,*">
+        <controls:AuthenticatedHeader />
+        <Grid Grid.Row="1" Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,*">
+            <VerticalStackLayout Style="{StaticResource SectionContent}">
+                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                    <Label Text="Suas caronas" Style="{StaticResource PageTitle}" />
+                    <Label Text="Acompanhe suas viagens confirmadas e recorrências." Style="{StaticResource PageSubtitle}" />
+                </VerticalStackLayout>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DetailSpacing}">
+                    <Button Text="Pontuais" Command="{Binding ShowOnceRidesCommand}" Style="{StaticResource SecondaryButton}">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding ShowRecurring}" Value="False">
+                                <Setter Property="Style" Value="{StaticResource PrimaryButton}" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                    <Button Grid.Column="1" Text="Recorrentes" Command="{Binding ShowWeeklyRidesCommand}" Style="{StaticResource SecondaryButton}">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding ShowRecurring}" Value="True">
+                                <Setter Property="Style" Value="{StaticResource PrimaryButton}" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                </Grid>
             </VerticalStackLayout>
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DetailSpacing}">
-                <Button Text="Pontuais" Command="{Binding ShowOnceRidesCommand}" Style="{StaticResource SecondaryButton}">
-                    <Button.Triggers>
-                        <DataTrigger TargetType="Button" Binding="{Binding ShowRecurring}" Value="False">
-                            <Setter Property="Style" Value="{StaticResource PrimaryButton}" />
-                        </DataTrigger>
-                    </Button.Triggers>
-                </Button>
-                <Button Grid.Column="1" Text="Recorrentes" Command="{Binding ShowWeeklyRidesCommand}" Style="{StaticResource SecondaryButton}">
-                    <Button.Triggers>
-                        <DataTrigger TargetType="Button" Binding="{Binding ShowRecurring}" Value="True">
-                            <Setter Property="Style" Value="{StaticResource PrimaryButton}" />
-                        </DataTrigger>
-                    </Button.Triggers>
-                </Button>
+            <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
+                <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
+                <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+            </VerticalStackLayout>
+            <Grid Grid.Row="3">
+                <Label Text="{Binding EmptyStateText}" IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
+                <CollectionView ItemsSource="{Binding VisibleRoutes}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:ConfirmedRideItemViewModel">
+                            <Border Style="{StaticResource ListCard}">
+                                <VerticalStackLayout Style="{StaticResource SectionContent}">
+                                    <Label Text="{Binding TypeText}" Style="{StaticResource StatusBadge}" />
+                                    <Label Text="{Binding CurrentUserRoleText}" Style="{StaticResource SectionTitle}" />
+                                    <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                        <Label Text="{Binding PassengerNameText, StringFormat='Passageiro: {0}'}" Style="{StaticResource CardTitle}" />
+                                        <Label Text="{Binding DriverNameText, StringFormat='Motorista: {0}'}" Style="{StaticResource CardTitle}" />
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                        <Label Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}" Style="{StaticResource PageSubtitle}" />
+                                        <Label Text="{Binding RequestedDateText, StringFormat='Data: {0}'}" IsVisible="{Binding HasRequestedDate}" />
+                                    </VerticalStackLayout>
+                                    <Label Text="{Binding SuggestedPriceText}" Style="{StaticResource SuccessBadge}" />
+                                    <Label Text="{Binding StatusText}" Style="{StaticResource SuccessBadge}" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
             </Grid>
-        </VerticalStackLayout>
-        <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-        <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
-            <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
-            <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
-        </VerticalStackLayout>
-        <Grid Grid.Row="3">
-            <Label Text="{Binding EmptyStateText}" IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
-            <CollectionView ItemsSource="{Binding VisibleRoutes}" SelectionMode="None">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:ConfirmedRideItemViewModel">
-                        <Border Style="{StaticResource ListCard}">
-                            <VerticalStackLayout Style="{StaticResource SectionContent}">
-                                <Label Text="{Binding TypeText}" Style="{StaticResource StatusBadge}" />
-                                <Label Text="{Binding CurrentUserRoleText}" Style="{StaticResource SectionTitle}" />
-                                <VerticalStackLayout Style="{StaticResource DetailContent}">
-                                    <Label Text="{Binding PassengerNameText, StringFormat='Passageiro: {0}'}" Style="{StaticResource CardTitle}" />
-                                    <Label Text="{Binding DriverNameText, StringFormat='Motorista: {0}'}" Style="{StaticResource CardTitle}" />
-                                </VerticalStackLayout>
-                                <VerticalStackLayout Style="{StaticResource DetailContent}">
-                                    <Label Text="{Binding CompatibleDaysText, StringFormat='Dias: {0}'}" Style="{StaticResource PageSubtitle}" />
-                                    <Label Text="{Binding RequestedDateText, StringFormat='Data: {0}'}" IsVisible="{Binding HasRequestedDate}" />
-                                </VerticalStackLayout>
-                                <Label Text="{Binding SuggestedPriceText}" Style="{StaticResource SuccessBadge}" />
-                                <Label Text="{Binding StatusText}" Style="{StaticResource SuccessBadge}" />
-                            </VerticalStackLayout>
-                        </Border>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
         </Grid>
     </Grid>
 </ContentPage>

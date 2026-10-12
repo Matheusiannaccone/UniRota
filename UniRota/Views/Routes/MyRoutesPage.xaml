@@ -2,58 +2,59 @@
 <ContentPage x:Class="UniRota.Views.Routes.MyRoutesPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:UniRota.Views.Controls"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
     Shell.NavBarIsVisible="False" Title="Minhas rotas">
-    <Grid Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,*">
-        <VerticalStackLayout Style="{StaticResource SectionContent}">
-            <Grid Style="{StaticResource BrandSlot}">
-                <Label Text="UniRota" Style="{StaticResource BrandText}" />
-            </Grid>
-            <Label Text="Minhas rotas" Style="{StaticResource PageTitle}" />
-            <Label Text="Suas rotas ativas e agendadas." Style="{StaticResource PageSubtitle}" />
-            <Button Text="+ Nova rota" Clicked="OnNewRouteClicked" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" HorizontalOptions="End" />
-        </VerticalStackLayout>
-        <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-        <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
-            <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
-            <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
-        </VerticalStackLayout>
-        <Grid Grid.Row="3">
-            <Label Text="Você ainda não cadastrou nenhuma rota semanal.&#10;Toque em Nova rota para começar." IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
-            <CollectionView ItemsSource="{Binding Routes}" SelectionMode="None">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:WeeklyRouteItemViewModel">
-                        <Border Style="{StaticResource ListCard}">
-                            <VerticalStackLayout Style="{StaticResource SectionContent}">
-                                <Label Text="{Binding RoleText}" Style="{StaticResource StatusBadge}">
-                                    <Label.Triggers>
-                                        <DataTrigger TargetType="Label" Binding="{Binding RoleText}" Value="Passageiro">
-                                            <Setter Property="BackgroundColor" Value="{StaticResource WarningSurface}" />
-                                            <Setter Property="TextColor" Value="{StaticResource WarningText}" />
-                                        </DataTrigger>
-                                    </Label.Triggers>
-                                </Label>
-                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="{StaticResource DetailSpacing}" RowSpacing="{StaticResource ContentSpacing}">
-                                    <Label Text="●" TextColor="{StaticResource Primary}" />
-                                    <Label Grid.Column="1" Text="{Binding Route.Origin}" Style="{StaticResource CardTitle}" />
-                                    <Label Grid.Row="1" Text="○" TextColor="{StaticResource Primary}" />
-                                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding Route.Destination}" Style="{StaticResource CardTitle}" />
-                                </Grid>
-                                <VerticalStackLayout Style="{StaticResource DetailContent}">
-                                    <Label Text="{Binding DaysText}" Style="{StaticResource PageSubtitle}" />
-                                    <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" />
-                                    <Label Text="{Binding AvailableSeatsText}" IsVisible="{Binding HasAvailableSeats}" Style="{StaticResource SuccessBadge}" />
-                                    <Label Text="{Binding EstimatedDistanceText}" IsVisible="{Binding HasEstimatedDistance}" Style="{StaticResource Caption}" />
+    <Grid RowDefinitions="Auto,*">
+        <controls:AuthenticatedHeader />
+        <Grid Grid.Row="1" Style="{StaticResource ListLayout}" RowDefinitions="Auto,Auto,Auto,*">
+            <VerticalStackLayout Style="{StaticResource SectionContent}">
+                <Label Text="Minhas rotas" Style="{StaticResource PageTitle}" />
+                <Label Text="Suas rotas ativas e agendadas." Style="{StaticResource PageSubtitle}" />
+                <Button Text="+ Nova rota" Clicked="OnNewRouteClicked" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" HorizontalOptions="End" />
+            </VerticalStackLayout>
+            <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <VerticalStackLayout Grid.Row="2" Style="{StaticResource DetailContent}" IsVisible="{Binding HasError}">
+                <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorMessage}" />
+                <Button Text="Tentar novamente" Command="{Binding LoadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+            </VerticalStackLayout>
+            <Grid Grid.Row="3">
+                <Label Text="Você ainda não cadastrou nenhuma rota semanal.&#10;Toque em Nova rota para começar." IsVisible="{Binding ShowEmptyState}" Style="{StaticResource EmptyState}" />
+                <CollectionView ItemsSource="{Binding Routes}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:WeeklyRouteItemViewModel">
+                            <Border Style="{StaticResource ListCard}">
+                                <VerticalStackLayout Style="{StaticResource SectionContent}">
+                                    <Label Text="{Binding RoleText}" Style="{StaticResource StatusBadge}">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding RoleText}" Value="Passageiro">
+                                                <Setter Property="BackgroundColor" Value="{StaticResource WarningSurface}" />
+                                                <Setter Property="TextColor" Value="{StaticResource WarningText}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="{StaticResource DetailSpacing}" RowSpacing="{StaticResource ContentSpacing}">
+                                        <Label Text="●" TextColor="{StaticResource Primary}" />
+                                        <Label Grid.Column="1" Text="{Binding Route.Origin}" Style="{StaticResource CardTitle}" />
+                                        <Label Grid.Row="1" Text="○" TextColor="{StaticResource Primary}" />
+                                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding Route.Destination}" Style="{StaticResource CardTitle}" />
+                                    </Grid>
+                                    <VerticalStackLayout Style="{StaticResource DetailContent}">
+                                        <Label Text="{Binding DaysText}" Style="{StaticResource PageSubtitle}" />
+                                        <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" />
+                                        <Label Text="{Binding AvailableSeatsText}" IsVisible="{Binding HasAvailableSeats}" Style="{StaticResource SuccessBadge}" />
+                                        <Label Text="{Binding EstimatedDistanceText}" IsVisible="{Binding HasEstimatedDistance}" Style="{StaticResource Caption}" />
+                                    </VerticalStackLayout>
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DetailSpacing}">
+                                        <Button Text="Editar" Clicked="OnEditRouteClicked" CommandParameter="{Binding .}" Style="{StaticResource SecondaryButton}" />
+                                        <Button Grid.Column="1" Text="Excluir" Clicked="OnDeleteRouteClicked" CommandParameter="{Binding .}" Style="{StaticResource DangerButton}" />
+                                    </Grid>
                                 </VerticalStackLayout>
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DetailSpacing}">
-                                    <Button Text="Editar" Clicked="OnEditRouteClicked" CommandParameter="{Binding .}" Style="{StaticResource SecondaryButton}" />
-                                    <Button Grid.Column="1" Text="Excluir" Clicked="OnDeleteRouteClicked" CommandParameter="{Binding .}" Style="{StaticResource DangerButton}" />
-                                </Grid>
-                            </VerticalStackLayout>
-                        </Border>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
         </Grid>
     </Grid>
 </ContentPage>

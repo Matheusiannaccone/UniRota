@@ -2,108 +2,113 @@
 <ContentPage x:Class="UniRota.Views.Routes.NewRoutePage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:UniRota.Views.Controls"
     xmlns:models="clr-namespace:UniRota.Models"
     xmlns:viewModels="clr-namespace:UniRota.ViewModels"
-    Shell.NavBarIsVisible="True" Title="{Binding PageTitle}">
-    <ScrollView>
-        <VerticalStackLayout Style="{StaticResource PageContent}">
-            <VerticalStackLayout Style="{StaticResource DetailContent}">
-                <Label Text="1. Como você vai?" Style="{StaticResource SectionTitle}" />
-                <Label Text="Selecione seu papel nesta rota." Style="{StaticResource PageSubtitle}" />
-            </VerticalStackLayout>
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DetailSpacing}"
-                IsEnabled="{Binding IsNotBusy}">
-                <RadioButton Content="{Binding RoleOptions[0].DisplayName}" Value="{Binding RoleOptions[0]}" GroupName="RouteRole" IsChecked="{Binding IsDriver, Mode=OneWay}" CheckedChanged="OnRoleCheckedChanged" Style="{StaticResource ChoiceRadio}" />
-                <RadioButton Grid.Column="1" Content="{Binding RoleOptions[1].DisplayName}" Value="{Binding RoleOptions[1]}" GroupName="RouteRole" IsChecked="{Binding IsPassenger, Mode=OneWay}" CheckedChanged="OnRoleCheckedChanged" Style="{StaticResource ChoiceRadio}" />
-            </Grid>
-            <Label Text="Motorista: ofereça vagas. Passageiro: encontre uma carona." Style="{StaticResource Caption}" />
-            <VerticalStackLayout Style="{StaticResource DetailContent}">
-                <Label Text="2. Trajeto" Style="{StaticResource SectionTitle}" />
-                <Label Text="Digite e selecione os endereços nas sugestões." Style="{StaticResource PageSubtitle}" />
-            </VerticalStackLayout>
-
-            <VerticalStackLayout Style="{StaticResource DetailContent}">
-                <Border Style="{StaticResource InputContainer}">
-                    <VerticalStackLayout Spacing="0">
-                        <Label Text="Origem" Style="{StaticResource Caption}" />
-                        <Entry Text="{Binding Origin, Mode=TwoWay}" Placeholder="Meu endereço, bairro ou referência" ReturnType="Next" IsEnabled="{Binding IsNotBusy}" />
-                    </VerticalStackLayout>
-                </Border>
-                <ActivityIndicator IsRunning="{Binding IsSearchingOrigin}" IsVisible="{Binding IsSearchingOrigin}" />
-                <VerticalStackLayout IsVisible="{Binding HasOriginSuggestions}" Style="{StaticResource DetailContent}">
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding OriginSuggestions}" Style="{StaticResource DetailContent}">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="models:PlaceSuggestion">
-                                <Border Style="{StaticResource SuggestionCard}">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectOriginCommand}" CommandParameter="{Binding .}" />
-                                    </Border.GestureRecognizers>
-                                    <Label Text="{Binding DisplayText}" LineBreakMode="WordWrap" />
-                                </Border>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </VerticalStackLayout>
-                    <Label Text="Google Maps" Style="{StaticResource Caption}" HorizontalOptions="End" />
-                </VerticalStackLayout>
-                <Label Text="{Binding OriginSearchError}" IsVisible="{Binding HasOriginSearchError}" Style="{StaticResource ErrorMessage}" />
-            </VerticalStackLayout>
-
-            <VerticalStackLayout Style="{StaticResource DetailContent}">
-                <Border Style="{StaticResource InputContainer}">
-                    <VerticalStackLayout Spacing="0">
-                        <Label Text="Destino" Style="{StaticResource Caption}" />
-                        <Entry Text="{Binding Destination, Mode=TwoWay}" Placeholder="Facens, shopping, terminal…" ReturnType="Next" IsEnabled="{Binding IsNotBusy}" />
-                    </VerticalStackLayout>
-                </Border>
-                <ActivityIndicator IsRunning="{Binding IsSearchingDestination}" IsVisible="{Binding IsSearchingDestination}" />
-                <VerticalStackLayout IsVisible="{Binding HasDestinationSuggestions}" Style="{StaticResource DetailContent}">
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding DestinationSuggestions}" Style="{StaticResource DetailContent}">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="models:PlaceSuggestion">
-                                <Border Style="{StaticResource SuggestionCard}">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectDestinationCommand}" CommandParameter="{Binding .}" />
-                                    </Border.GestureRecognizers>
-                                    <Label Text="{Binding DisplayText}" LineBreakMode="WordWrap" />
-                                </Border>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </VerticalStackLayout>
-                    <Label Text="Google Maps" Style="{StaticResource Caption}" HorizontalOptions="End" />
-                </VerticalStackLayout>
-                <Label Text="{Binding DestinationSearchError}" IsVisible="{Binding HasDestinationSearchError}" Style="{StaticResource ErrorMessage}" />
-            </VerticalStackLayout>
-            <VerticalStackLayout Style="{StaticResource DetailContent}">
-                <Label Text="3. Quando?" Style="{StaticResource SectionTitle}" />
-                <Label Text="Selecione os dias e o horário da sua rota." Style="{StaticResource PageSubtitle}" />
-            </VerticalStackLayout>
-            <FlexLayout Wrap="Wrap" BindableLayout.ItemsSource="{Binding Days}" IsEnabled="{Binding IsNotBusy}">
-                <BindableLayout.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:SelectableDayViewModel">
-                        <Button Text="{Binding ShortName}" SemanticProperties.Description="{Binding AccessibilityText}" Clicked="OnDayClicked" CommandParameter="{Binding .}" Style="{StaticResource DayChip}" />
-                    </DataTemplate>
-                </BindableLayout.ItemTemplate>
-            </FlexLayout>
-            <Border Style="{StaticResource InputContainer}">
+    Shell.NavBarIsVisible="False" Title="{Binding PageTitle}">
+    <Grid RowDefinitions="Auto,*">
+        <controls:AuthenticatedHeader />
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Style="{StaticResource PageContent}">
+                <Label Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
                 <VerticalStackLayout Style="{StaticResource DetailContent}">
-                    <Label Text="Horário de saída" Style="{StaticResource Caption}" />
-                    <TimePicker Time="{Binding DepartureTime, Mode=TwoWay}" Format="HH:mm" IsEnabled="{Binding IsNotBusy}" />
+                    <Label Text="1. Como você vai?" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Selecione seu papel nesta rota." Style="{StaticResource PageSubtitle}" />
                 </VerticalStackLayout>
-            </Border>
-            <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsDriver}">
-                <Label Text="4. Detalhes" Style="{StaticResource SectionTitle}" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DetailSpacing}"
+                    IsEnabled="{Binding IsNotBusy}">
+                    <RadioButton Content="{Binding RoleOptions[0].DisplayName}" Value="{Binding RoleOptions[0]}" GroupName="RouteRole" IsChecked="{Binding IsDriver, Mode=OneWay}" CheckedChanged="OnRoleCheckedChanged" Style="{StaticResource ChoiceRadio}" />
+                    <RadioButton Grid.Column="1" Content="{Binding RoleOptions[1].DisplayName}" Value="{Binding RoleOptions[1]}" GroupName="RouteRole" IsChecked="{Binding IsPassenger, Mode=OneWay}" CheckedChanged="OnRoleCheckedChanged" Style="{StaticResource ChoiceRadio}" />
+                </Grid>
+                <Label Text="Motorista: ofereça vagas. Passageiro: encontre uma carona." Style="{StaticResource Caption}" />
+                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                    <Label Text="2. Trajeto" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Digite e selecione os endereços nas sugestões." Style="{StaticResource PageSubtitle}" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                    <Border Style="{StaticResource InputContainer}">
+                        <VerticalStackLayout Spacing="0">
+                            <Label Text="Origem" Style="{StaticResource Caption}" />
+                            <Entry Text="{Binding Origin, Mode=TwoWay}" Placeholder="Meu endereço, bairro ou referência" ReturnType="Next" IsEnabled="{Binding IsNotBusy}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <ActivityIndicator IsRunning="{Binding IsSearchingOrigin}" IsVisible="{Binding IsSearchingOrigin}" />
+                    <VerticalStackLayout IsVisible="{Binding HasOriginSuggestions}" Style="{StaticResource DetailContent}">
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding OriginSuggestions}" Style="{StaticResource DetailContent}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:PlaceSuggestion">
+                                    <Border Style="{StaticResource SuggestionCard}">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectOriginCommand}" CommandParameter="{Binding .}" />
+                                        </Border.GestureRecognizers>
+                                        <Label Text="{Binding DisplayText}" LineBreakMode="WordWrap" />
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Google Maps" Style="{StaticResource Caption}" HorizontalOptions="End" />
+                    </VerticalStackLayout>
+                    <Label Text="{Binding OriginSearchError}" IsVisible="{Binding HasOriginSearchError}" Style="{StaticResource ErrorMessage}" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                    <Border Style="{StaticResource InputContainer}">
+                        <VerticalStackLayout Spacing="0">
+                            <Label Text="Destino" Style="{StaticResource Caption}" />
+                            <Entry Text="{Binding Destination, Mode=TwoWay}" Placeholder="Facens, shopping, terminal…" ReturnType="Next" IsEnabled="{Binding IsNotBusy}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <ActivityIndicator IsRunning="{Binding IsSearchingDestination}" IsVisible="{Binding IsSearchingDestination}" />
+                    <VerticalStackLayout IsVisible="{Binding HasDestinationSuggestions}" Style="{StaticResource DetailContent}">
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding DestinationSuggestions}" Style="{StaticResource DetailContent}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:PlaceSuggestion">
+                                    <Border Style="{StaticResource SuggestionCard}">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectDestinationCommand}" CommandParameter="{Binding .}" />
+                                        </Border.GestureRecognizers>
+                                        <Label Text="{Binding DisplayText}" LineBreakMode="WordWrap" />
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Google Maps" Style="{StaticResource Caption}" HorizontalOptions="End" />
+                    </VerticalStackLayout>
+                    <Label Text="{Binding DestinationSearchError}" IsVisible="{Binding HasDestinationSearchError}" Style="{StaticResource ErrorMessage}" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Style="{StaticResource DetailContent}">
+                    <Label Text="3. Quando?" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Selecione os dias e o horário da sua rota." Style="{StaticResource PageSubtitle}" />
+                </VerticalStackLayout>
+                <FlexLayout Wrap="Wrap" BindableLayout.ItemsSource="{Binding Days}" IsEnabled="{Binding IsNotBusy}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:SelectableDayViewModel">
+                            <Button Text="{Binding ShortName}" SemanticProperties.Description="{Binding AccessibilityText}" Clicked="OnDayClicked" CommandParameter="{Binding .}" Style="{StaticResource DayChip}" />
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </FlexLayout>
                 <Border Style="{StaticResource InputContainer}">
                     <VerticalStackLayout Style="{StaticResource DetailContent}">
-                        <Label Text="Vagas disponíveis" Style="{StaticResource Caption}" />
-                        <Entry Text="{Binding AvailableSeats, Mode=TwoWay}" Placeholder="Quantidade de vagas" Keyboard="Numeric" ReturnType="Done" IsEnabled="{Binding IsNotBusy}" />
+                        <Label Text="Horário de saída" Style="{StaticResource Caption}" />
+                        <TimePicker Time="{Binding DepartureTime, Mode=TwoWay}" Format="HH:mm" IsEnabled="{Binding IsNotBusy}" />
                     </VerticalStackLayout>
                 </Border>
-                <Label Text="A distância do trajeto é calculada automaticamente." Style="{StaticResource Caption}" />
+                <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsDriver}">
+                    <Label Text="4. Detalhes" Style="{StaticResource SectionTitle}" />
+                    <Border Style="{StaticResource InputContainer}">
+                        <VerticalStackLayout Style="{StaticResource DetailContent}">
+                            <Label Text="Vagas disponíveis" Style="{StaticResource Caption}" />
+                            <Entry Text="{Binding AvailableSeats, Mode=TwoWay}" Placeholder="Quantidade de vagas" Keyboard="Numeric" ReturnType="Done" IsEnabled="{Binding IsNotBusy}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Label Text="A distância do trajeto é calculada automaticamente." Style="{StaticResource Caption}" />
+                </VerticalStackLayout>
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
+                <Label Text="{Binding SuccessMessage}" IsVisible="{Binding HasSavedSuccessfully}" Style="{StaticResource SuccessBadge}" />
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Button Text="{Binding ActionButtonText}" Command="{Binding SaveCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" />
             </VerticalStackLayout>
-            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
-            <Label Text="{Binding SuccessMessage}" IsVisible="{Binding HasSavedSuccessfully}" Style="{StaticResource SuccessBadge}" />
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-            <Button Text="{Binding ActionButtonText}" Command="{Binding SaveCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" />
-        </VerticalStackLayout>
-    </ScrollView>
+        </ScrollView>
+    </Grid>
 </ContentPage>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView x:Class="UniRota.Views.Controls.AuthenticatedHeader" x:Name="Header"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <Grid Style="{StaticResource AuthenticatedHeaderLayout}" ColumnDefinitions="*,Auto">
+        <Label Text="UniRota" Style="{StaticResource BrandText}" />
+        <HorizontalStackLayout Grid.Column="1" Spacing="{StaticResource DetailSpacing}" VerticalOptions="Center">
+            <HorizontalStackLayout Spacing="{StaticResource DetailSpacing}">
+                <HorizontalStackLayout.Triggers>
+                    <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding IsHome, Source={x:Reference Header}}" Value="True">
+                        <Setter Property="IsVisible" Value="False" />
+                    </DataTrigger>
+                </HorizontalStackLayout.Triggers>
+                <Button x:Name="HomeButton" Text="Home" Clicked="OnHomeClicked" Style="{StaticResource HeaderAction}" />
+                <Button x:Name="BackButton" Text="Voltar" Clicked="OnBackClicked" Style="{StaticResource HeaderAction}" />
+            </HorizontalStackLayout>
+            <Button Text="Sair" Style="{StaticResource HeaderAction}"
+                IsVisible="{Binding IsHome, Source={x:Reference Header}}"
+                Command="{Binding LogoutCommand, Source={x:Reference Header}}"
+                IsEnabled="{Binding LogoutIsEnabled, Source={x:Reference Header}}" />
+        </HorizontalStackLayout>
+    </Grid>
+</ContentView>
