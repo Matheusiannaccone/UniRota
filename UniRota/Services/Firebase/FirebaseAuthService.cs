@@ -9,7 +9,7 @@ using UniRota.Services.Interfaces;
 
 namespace UniRota.Services.Firebase;
 
-public sealed class FirebaseAuthService : IAuthService
+public sealed partial class FirebaseAuthService : IAuthService
 {
     private const string RefreshTokenStorageKey = "firebase_refresh_token";
     private const string IdentityToolkitBaseUrl = "https://identitytoolkit.googleapis.com/v1";
@@ -26,19 +26,23 @@ public sealed class FirebaseAuthService : IAuthService
     private readonly HttpClient _httpClient;
     private readonly ISecureStorage _secureStorage;
     private readonly FirebaseOptions _options;
+    private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _tokenRefreshLock = new(1, 1);
     private string? _idToken;
     private string? _refreshToken;
     private DateTimeOffset _idTokenExpiresAtUtc;
+    private DateTimeOffset _reauthenticatedUntilUtc;
 
     public FirebaseAuthService(
         HttpClient httpClient,
         ISecureStorage secureStorage,
-        FirebaseOptions options)
+        FirebaseOptions options,
+        TimeProvider? timeProvider = null)
     {
         _httpClient = httpClient;
         _secureStorage = secureStorage;
         _options = options;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public User? CurrentUser { get; private set; }
@@ -98,6 +102,8 @@ public sealed class FirebaseAuthService : IAuthService
         ValidateRequiredValue(email, nameof(email));
         ValidateRequiredValue(password, nameof(password));
 
+        await LoadPendingEmailChangeAsync();
+
         var requestBody = new
         {
             email = email.Trim(),
@@ -115,6 +121,10 @@ public sealed class FirebaseAuthService : IAuthService
         var idTokenExpiresAtUtc = GetIdTokenExpiration(authResponse.ExpiresIn);
         var userId = RequireResponseValue(authResponse.LocalId, "identificador do usuário");
         var user = await GetUserProfileAsync(userId, idToken, cancellationToken);
+        if (PendingEmailChange is { } pending && pending.UserId != userId)
+            throw new InvalidOperationException("Conclua a alteração de e-mail da conta anterior antes de trocar de conta.");
+        if (PendingEmailChange is null)
+            user = await SynchronizeEmailAsync(user, RequireResponseValue(authResponse.Email, "e-mail"), idToken, cancellationToken);
 
         await SetCurrentSessionAsync(
             user,
@@ -130,6 +140,7 @@ public sealed class FirebaseAuthService : IAuthService
     {
         EnsureFirebaseIsConfigured();
         cancellationToken.ThrowIfCancellationRequested();
+        await LoadPendingEmailChangeAsync();
 
         var storedRefreshToken = await GetStoredRefreshTokenAsync();
 
@@ -153,6 +164,14 @@ public sealed class FirebaseAuthService : IAuthService
             refreshedTokens.UserId,
             refreshedTokens.IdToken,
             cancellationToken);
+
+        if (PendingEmailChange is { } pending && pending.UserId != user.Id)
+            throw new InvalidOperationException("A sessão salva não corresponde à alteração de e-mail pendente.");
+        if (PendingEmailChange is null)
+        {
+            var account = await LookupAccountAsync(refreshedTokens.IdToken, user.Id, cancellationToken);
+            user = await SynchronizeEmailAsync(user, account.Email!, refreshedTokens.IdToken, cancellationToken);
+        }
 
         await SetCurrentSessionAsync(
             user,
@@ -243,12 +262,43 @@ public sealed class FirebaseAuthService : IAuthService
 
     public Task LogoutAsync()
     {
+        if (PendingEmailChange is not null)
+            throw new InvalidOperationException("Conclua ou cancele a alteração de e-mail antes de sair.");
         ClearLocalSession();
         return Task.CompletedTask;
     }
 
+    public async Task ReauthenticateAsync(string currentPassword, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(currentPassword))
+            throw new ArgumentException("Informe sua senha atual.", nameof(currentPassword));
+
+        var user = CurrentUser ?? throw new InvalidOperationException("Sua sessão não é válida. Entre novamente.");
+        await _tokenRefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureCurrentUser(user);
+            _reauthenticatedUntilUtc = default;
+            var response = await PostJsonAsync<FirebaseAuthResponseDto>(
+                $"{IdentityToolkitBaseUrl}/accounts:signInWithPassword?key={Escape(_options.ApiKey)}",
+                new { email = user.Email, password = currentPassword, returnSecureToken = true }, cancellationToken);
+            EnsureCurrentUser(user);
+            if (!string.Equals(response.LocalId, user.Id, StringComparison.Ordinal))
+                throw new InvalidOperationException("A autenticação não corresponde à conta atual.");
+
+            await SetCurrentSessionAsync(user,
+                RequireResponseValue(response.IdToken, "ID token"),
+                RequireResponseValue(response.RefreshToken, "refresh token"),
+                GetIdTokenExpiration(response.ExpiresIn), cancellationToken);
+            _reauthenticatedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(5);
+        }
+        finally { _tokenRefreshLock.Release(); }
+    }
+
     public async Task UpdateNameAsync(string name, CancellationToken cancellationToken = default)
     {
+        if (PendingEmailChange is not null)
+            throw new InvalidOperationException("Conclua ou cancele a alteração de e-mail antes de editar seu nome.");
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Informe seu nome.", nameof(name));
 
@@ -272,6 +322,16 @@ public sealed class FirebaseAuthService : IAuthService
     {
         if (!ReferenceEquals(CurrentUser, user))
             throw new InvalidOperationException("A sessão foi alterada. Abra o perfil novamente para continuar.");
+    }
+
+    private void EnsureRecentAuthentication()
+    {
+        if (DateTimeOffset.UtcNow >= _reauthenticatedUntilUtc)
+        {
+            var exception = new InvalidOperationException("Confirme sua senha novamente para continuar.");
+            exception.Data["FirebaseCode"] = "CREDENTIAL_TOO_OLD_LOGIN_AGAIN";
+            throw exception;
+        }
     }
 
     private async Task UpdateProfileFieldAsync(
@@ -459,6 +519,10 @@ public sealed class FirebaseAuthService : IAuthService
                 "Não foi possível conectar aos serviços do Firebase. Verifique sua conexão.",
                 exception);
         }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException("O Firebase demorou para responder. Verifique sua conexão e tente novamente.", exception);
+        }
     }
 
     private static HttpRequestMessage CreateJsonRequest(
@@ -507,6 +571,15 @@ public sealed class FirebaseAuthService : IAuthService
         {
             using var document = JsonDocument.Parse(content);
 
+            // Identity Toolkit pode retornar status genérico junto do código específico em message.
+            if (document.RootElement.TryGetProperty("error", out var authError)
+                && authError.TryGetProperty("message", out var authMessage))
+            {
+                var code = authMessage.GetString()?.Split(':', 2)[0].Trim();
+                if (!string.IsNullOrEmpty(code) && code.All(c => char.IsUpper(c) || c == '_'))
+                    return code;
+            }
+
             if (document.RootElement.TryGetProperty("error", out var error)
                 && error.TryGetProperty("status", out var status))
             {
@@ -542,6 +615,11 @@ public sealed class FirebaseAuthService : IAuthService
         var message = firebaseCode switch
         {
             "EMAIL_EXISTS" => "Já existe uma conta cadastrada com este e-mail.",
+            "INVALID_EMAIL" => "Informe um e-mail válido.",
+            "INVALID_ID_TOKEN" or "TOKEN_EXPIRED" or "INVALID_REFRESH_TOKEN" or "USER_NOT_FOUND" =>
+                "Sua sessão não é válida. Confirme sua senha novamente para continuar.",
+            "CREDENTIAL_TOO_OLD_LOGIN_AGAIN" or "REQUIRES_RECENT_LOGIN" =>
+                "Confirme sua senha novamente para continuar.",
             "EMAIL_NOT_FOUND" or "INVALID_PASSWORD" or "INVALID_LOGIN_CREDENTIALS" =>
                 "E-mail ou senha inválidos.",
             "USER_DISABLED" => "Esta conta foi desativada.",
@@ -629,6 +707,7 @@ public sealed class FirebaseAuthService : IAuthService
 
     private void ClearSessionInMemory()
     {
+        _reauthenticatedUntilUtc = default;
         _idToken = null;
         _refreshToken = null;
         _idTokenExpiresAtUtc = default;

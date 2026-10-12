@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="UniRota.Views.AwaitingEmailConfirmationPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False" Shell.TabBarIsVisible="False" Title="Confirmação de e-mail">
+    <ScrollView>
+        <VerticalStackLayout Style="{StaticResource PageContent}">
+            <Label Text="Aguardando confirmação de e-mail" Style="{StaticResource PageTitle}" />
+            <Border Style="{StaticResource InfoCard}">
+                <VerticalStackLayout Style="{StaticResource SectionContent}">
+                    <Label Text="Um link de confirmação foi solicitado para:" Style="{StaticResource PageSubtitle}" />
+                    <Label Text="{Binding DestinationEmail}" Style="{StaticResource CardTitle}" LineBreakMode="CharacterWrap" />
+                    <Label Text="Abra o link recebido e depois retorne ao UniRota. A confirmação será verificada automaticamente. Confira também a pasta de spam." Style="{StaticResource PageSubtitle}" />
+                    <Label Text="Aguardando confirmação…" Style="{StaticResource StatusBadge}" />
+                    <Label Text="{Binding CooldownMessage}" Style="{StaticResource Caption}" />
+                </VerticalStackLayout>
+            </Border>
+            <Label Text="{Binding StatusMessage}" Style="{StaticResource PageSubtitle}" />
+            <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding NeedsRecovery}">
+                <Label Text="Confirme sua senha para recuperar a sessão" Style="{StaticResource CardTitle}" />
+                <Border Style="{StaticResource InputContainer}">
+                    <Entry Text="{Binding RecoveryPassword}" IsPassword="True" Placeholder="Senha atual" IsEnabled="{Binding IsNotBusy}" />
+                </Border>
+                <Button Text="Recuperar sessão" Command="{Binding RecoverSessionCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" />
+            </VerticalStackLayout>
+            <Button Text="Reenviar link" Command="{Binding ResendCommand}" IsEnabled="{Binding CanResend}" Style="{StaticResource SecondaryButton}" />
+            <Label Text="Limite de dois reenvios atingido para esta alteração." IsVisible="{Binding ResendLimitReached}" Style="{StaticResource Caption}" />
+            <Button Text="Verificar confirmação" Command="{Binding VerifyCommand}" IsEnabled="{Binding CanVerify}" Style="{StaticResource PrimaryButton}" />
+            <Button Text="Cancelar" Command="{Binding CancelCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DangerButton}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

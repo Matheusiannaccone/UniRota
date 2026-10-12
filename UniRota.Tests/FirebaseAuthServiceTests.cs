@@ -5,8 +5,52 @@ using UniRota.Services.Firebase;
 
 namespace UniRota.Tests;
 
-public sealed class FirebaseAuthServiceTests
+public sealed partial class FirebaseAuthServiceTests
 {
+    [Fact]
+    public async Task Reauthenticate_UsesCurrentEmail_RenewsTokens_WithoutPersistingPassword()
+    {
+        using var fixture = new AuthFixture();
+        var before = await fixture.Service.LoginAsync("old@example.com", "password");
+        fixture.Handle = async request =>
+        {
+            Assert.EndsWith("accounts:signInWithPassword", request.RequestUri!.AbsolutePath);
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            Assert.Equal(before.Email, body.RootElement.GetProperty("email").GetString());
+            Assert.Equal("current-password", body.RootElement.GetProperty("password").GetString());
+            return Json("""{"localId":"user-1","email":"old@example.com","idToken":"reauth-token","refreshToken":"reauth-refresh","expiresIn":"3600"}""");
+        };
+        await fixture.Service.ReauthenticateAsync("current-password");
+        Assert.Same(before, fixture.Service.CurrentUser);
+        Assert.Equal("reauth-token", await fixture.Service.GetValidIdTokenAsync());
+        Assert.Equal("reauth-refresh", Assert.Single(fixture.Storage.Values).Value);
+    }
+
+    [Theory]
+    [InlineData("INVALID_PASSWORD")]
+    [InlineData("INVALID_LOGIN_CREDENTIALS")]
+    public async Task Reauthenticate_IncorrectPassword_PreservesSession(string error)
+    {
+        using var fixture = new AuthFixture();
+        var before = await fixture.Service.LoginAsync("old@example.com", "password");
+        fixture.Handle = _ => Task.FromResult(Json(
+            JsonSerializer.Serialize(new { error = new { message = error } }), HttpStatusCode.BadRequest));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.ReauthenticateAsync("wrong-password"));
+        Assert.Same(before, fixture.Service.CurrentUser);
+        Assert.Equal("token", await fixture.Service.GetValidIdTokenAsync());
+    }
+
+    [Fact]
+    public async Task Reauthenticate_DifferentUid_DoesNotReplaceSession()
+    {
+        using var fixture = new AuthFixture();
+        var before = await fixture.Service.LoginAsync("old@example.com", "password");
+        fixture.Handle = _ => Task.FromResult(Json("""{"localId":"other-user","idToken":"other-token","refreshToken":"other-refresh","expiresIn":"3600"}"""));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.ReauthenticateAsync("password"));
+        Assert.Same(before, fixture.Service.CurrentUser);
+        Assert.Equal("refresh", Assert.Single(fixture.Storage.Values).Value);
+    }
+
     [Fact]
     public async Task UpdateName_PatchesOnlyName_AndPreservesIdentity()
     {
@@ -78,26 +122,57 @@ public sealed class FirebaseAuthServiceTests
     private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK) =>
         new(status) { Content = new StringContent(body) };
 
+    private sealed class TestClock : TimeProvider
+    {
+        private DateTimeOffset _now = DateTimeOffset.UtcNow;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(int seconds = 61) => _now = _now.AddSeconds(seconds);
+    }
+
     private sealed class AuthFixture : IDisposable
     {
         private readonly HttpClient _client;
-        public MemoryStorage Storage { get; } = new();
+        public MemoryStorage Storage { get; }
+        public TestClock Clock { get; }
         public FirebaseAuthService Service { get; }
-        public Func<HttpRequestMessage, Task<HttpResponseMessage>> Handle { get; set; } = request =>
-            Task.FromResult(Json(request.RequestUri!.AbsolutePath.Contains("signInWithPassword")
-                ? """{"localId":"user-1","email":"old@example.com","idToken":"token","refreshToken":"refresh","expiresIn":"3600"}"""
-                : """{"fields":{"id":{"stringValue":"user-1"},"name":{"stringValue":"Original"},"email":{"stringValue":"old@example.com"},"createdAtUtc":{"timestampValue":"2026-01-01T00:00:00Z"}}}"""));
+        public string AccountEmail { get; set; } = "old@example.com";
+        public string ProfileEmail { get; set; } = "old@example.com";
+        public List<string> Requests { get; } = [];
+        public Func<HttpRequestMessage, Task<HttpResponseMessage>> Handle { get; set; }
 
-        public AuthFixture()
+        public AuthFixture(MemoryStorage? storage = null, TestClock? clock = null)
         {
+            Storage = storage ?? new MemoryStorage();
+            Clock = clock ?? new TestClock();
+            Handle = RespondAsync;
             _client = new HttpClient(new Handler(request => Handle(request)));
             Service = new FirebaseAuthService(_client, Storage,
-                new FirebaseOptions { ApiKey = "test-key", ProjectId = "test-project" });
+                new FirebaseOptions { ApiKey = "test-key", ProjectId = "test-project" }, Clock);
+        }
+
+        private async Task<HttpResponseMessage> RespondAsync(HttpRequestMessage request)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            Requests.Add(request.Method + " " + path);
+            var account = new { localId = "user-1", email = AccountEmail, idToken = "token", refreshToken = "refresh", expiresIn = "3600" };
+            if (path.Contains("signInWithPassword")) return Json(JsonSerializer.Serialize(account));
+            if (path.Contains("accounts:lookup")) return Json(JsonSerializer.Serialize(new { users = new[] { account } }));
+            if (path.EndsWith("/token")) return Json("""{"user_id":"user-1","id_token":"token","refresh_token":"refresh","expires_in":"3600"}""");
+            if (path.Contains("sendOobCode")) return Json("{}");
+            if (request.Method == HttpMethod.Patch)
+            {
+                using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+                if (body.RootElement.GetProperty("fields").TryGetProperty("email", out var email)) ProfileEmail = email.GetProperty("stringValue").GetString()!;
+                return Json("{}");
+            }
+            return Json(JsonSerializer.Serialize(new { fields = new {
+                id = new { stringValue = "user-1" }, name = new { stringValue = "Original" },
+                email = new { stringValue = ProfileEmail }, createdAtUtc = new { timestampValue = "2026-01-01T00:00:00Z" }
+            } }));
         }
 
         public void Dispose() => _client.Dispose();
     }
-
     private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> handle) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => handle(request);

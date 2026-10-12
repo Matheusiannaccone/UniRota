@@ -5,6 +5,8 @@ namespace UniRota;
 public partial class AppShell : Shell
 {
     public const string HomeRoute = "//main/home/HomePage";
+    public const string ProfileRoute = HomeRoute + "/ProfilePage";
+    public const string EmailConfirmationRoute = "//email-confirmation";
     private readonly IServiceProvider _services;
     private readonly IAuthService _authService;
 
@@ -32,6 +34,7 @@ public partial class AppShell : Shell
         StartupContent.Content = startupPage;
         LoginContent.Content = loginPage;
         RegisterContent.Content = registerPage;
+        EmailConfirmationContent.ContentTemplate = new DataTemplate(() => _services.GetRequiredService<Views.AwaitingEmailConfirmationPage>());
         CreateAuthenticatedTabs();
     }
 
@@ -57,7 +60,7 @@ public partial class AppShell : Shell
 
     public void SelectMainTab(string route)
     {
-        if (_authService.CurrentUser is null)
+        if (_authService.CurrentUser is null || _authService.PendingEmailChange is not null)
             return;
 
         // Trocar a aba conserva seu stack; não empilha outra página raiz.
@@ -67,6 +70,13 @@ public partial class AppShell : Shell
 
     protected override void OnNavigating(ShellNavigatingEventArgs args)
     {
+        if (_authService?.PendingEmailChange is not null
+            && !args.Target.Location.OriginalString.Contains("/email-confirmation", StringComparison.Ordinal)
+            && args.CanCancel)
+        {
+            args.Cancel();
+            return;
+        }
         if (_authService is not null && _authService.CurrentUser is null
             && args.Target.Location.OriginalString.Contains("//main", StringComparison.Ordinal)
             && args.CanCancel)

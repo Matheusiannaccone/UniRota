@@ -47,14 +47,18 @@ public partial class StartupViewModel : ObservableObject
         try
         {
             var user = await _authService.RestoreSessionAsync(cancellationToken);
-            await Shell.Current.GoToAsync(user is null ? "//login" : AppShell.HomeRoute);
+            await Shell.Current.GoToAsync(_authService.PendingEmailChange is not null
+                ? AppShell.EmailConfirmationRoute : user is null ? "//login" : AppShell.HomeRoute);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception exception)
         {
-            SetError(exception.Message);
+            if (_authService.PendingEmailChange is not null)
+                await Shell.Current.GoToAsync(AppShell.EmailConfirmationRoute);
+            else
+                SetError(exception.Message);
         }
         finally
         {

@@ -17,4 +17,12 @@ public partial class ProfilePage : ContentPage
         base.OnAppearing();
         await _viewModel.LoadCommand.ExecuteAsync(null);
     }
+
+    protected override void OnDisappearing()
+    {
+        _viewModel.ClearSensitiveFields();
+        base.OnDisappearing();
+    }
+
+    protected override bool OnBackButtonPressed() => _viewModel.IsBusy || base.OnBackButtonPressed();
 }

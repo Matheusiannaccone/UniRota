@@ -1,12 +1,11 @@
 # Perfil — progresso
 
-- Blocos concluídos: 1 e 2. Atual: preparação do Bloco 3, aguardando decisão sobre verificação do novo e-mail por link quando exigida pelo Firebase.
-- Estado: tela, header, navegação e logout integrados; edição de nome com PATCH apenas de name, atualização de CurrentUser após sucesso e recarga da Home ao retornar. User preservado.
-- Arquivos principais do último bloco: IAuthService, FirebaseAuthService, ProfileViewModel, ProfilePage, FirebaseAuthServiceTests e quatro doubles de IAuthService existentes.
-- Bloco imediatamente anterior: 2 — nome obrigatório, identidade/e-mail/data preservados, falhas não substituem CurrentUser nem restauram sessão encerrada.
-- Próximo: 3 — reautenticação e alteração de e-mail; depois 4 (senha) e 5 (integração).
-- Pendências/riscos: decidir etapa de link, obrigatória se proteção contra enumeração estiver ativa (configuração remota não verificada); definir recuperação explícita de gravação parcial Auth/Firestore; regras Firestore remotas não disponíveis no repositório. Nenhuma regra/configuração alterada.
-- Validações: Bloco 1 — 159/159 testes; Bloco 2 — 6/6 testes focados novos; builds Android dos dois blocos com 0 erros e 5 avisos NU1900; diff sem erros.
-- Commits: Bloco 1 `9f5d6de`; Bloco 2 `feat(perfil): adiciona edição do nome do usuário`.
-- Testes manuais pendentes: Home → Perfil → Voltar/Sair, headers nas abas, nome persistido e refletido na Home, teclado/tela pequena e permissão de atualização de users no Firebase real.
-- Alteração prévia em AGENTS.md preservada fora dos commits. Sem alterações de versão, Functions ou regras.
+- Concluídos: Blocos 1, 2 e 3. Próximo: 4 — alteração de senha; depois 5 — integração/regressão.
+- Estado: Perfil/nome prontos; e-mail exige reautenticação, envio de link e consulta real ao Auth antes de sincronizar Firestore/CurrentUser. Recuperação excepcional por senha autorizada e implementada sem persistir senha.
+- Arquivos principais do último bloco: FirebaseAuthService (.cs e .Profile.cs), IAuthService, PendingEmailChange, ProfilePage/ViewModel, AwaitingEmailConfirmationPage/ViewModel, AppShell, StartupViewModel, DI e testes FirebaseAuthService.
+- Bloco imediatamente anterior: espera sem header/TabBar/voltar/logout; verificação automática no retorno ao primeiro plano e fallback manual; Cancelar consulta Auth e conclui se já confirmado; falhas de sincronização mantêm estado recuperável.
+- Reenvios/cooldown: inicial + 2 adicionais; 60 s após envios/verificações; automação e Cancelar independem do timer. Destino/contador/prazo no SecureStorage, sem senha, preservados após recriação/reinício. Resposta de envio perdida conta como tentativa por segurança.
+- Validações: 183/183 testes na regressão; 24/24 focados após ajustes finais; build Android final do bloco com 0 erros e 5 avisos NU1900; diff sem erros.
+- Commits: 1 `9f5d6de`; 2 `746eef7`; 3 `feat(perfil): adiciona alteração segura de email`.
+- Pendências/riscos: testes reais Android/Firebase (retorno do navegador, gesto voltar, tokens invalidados, link/reenvios, regras users). Cancelamento é local e não revoga links; login/restauração reconciliam alterações posteriores. Proteção contra enumeração pode ocultar endereço já cadastrado/entrega do link.
+- Preservados: AGENTS.md prévio fora dos commits; versão, User, Functions e regras sem alteração. Senha ainda não implementada.
