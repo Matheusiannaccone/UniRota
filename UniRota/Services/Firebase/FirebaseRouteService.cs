@@ -10,7 +10,6 @@ namespace UniRota.Services.Firebase;
 
 public sealed class FirebaseRouteService : IRouteService
 {
-    private const string FirestoreBaseUrl = "https://firestore.googleapis.com/v1";
     private const string CollectionName = "weeklyRoutes";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -961,7 +960,7 @@ public sealed class FirebaseRouteService : IRouteService
 
     private string BuildDocumentsBaseUrl()
     {
-        return $"{FirestoreBaseUrl}/projects/{Escape(_options.ProjectId)}" +
+        return $"{_options.FirestoreBaseUrl}/projects/{Escape(_options.ProjectId)}" +
                "/databases/(default)/documents";
     }
 

@@ -50,6 +50,10 @@
 	  <AndroidPackageFormat>apk</AndroidPackageFormat>
 	</PropertyGroup>
 
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<AndroidManifest>Platforms\Android\AndroidManifest.Debug.xml</AndroidManifest>
+	</PropertyGroup>
+
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
 		<GoogleMapsAndroidApiKey Condition="'$(GoogleMapsAndroidApiKey)' == ''">$(GOOGLE_MAPS_ANDROID_API_KEY)</GoogleMapsAndroidApiKey>
 		<GoogleMapsAndroidApiKey Condition="'$(GoogleMapsAndroidApiKey)' == ''">UNCONFIGURED_MAPS_ANDROID_API_KEY</GoogleMapsAndroidApiKey>

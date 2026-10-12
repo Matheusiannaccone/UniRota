@@ -10,7 +10,6 @@ namespace UniRota.Services.Firebase;
 
 public sealed class FirebaseRideRequestService : IRideRequestService
 {
-    private const string FirestoreBaseUrl = "https://firestore.googleapis.com/v1";
     private const string CollectionName = "rideRequests";
     private const int MaxConcurrencyAttempts = 3;
 
@@ -1680,7 +1679,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
 
     private string BuildDocumentsBaseUrl()
     {
-        return $"{FirestoreBaseUrl}/{BuildDatabaseName()}/documents";
+        return $"{_options.FirestoreBaseUrl}/{BuildDatabaseName()}/documents";
     }
 
     private string BuildDatabaseName()

@@ -28,7 +28,10 @@ namespace UniRota
                 .UseMauiMaps();
 
 #if DEBUG
+			const bool useFirebaseEmulators = true;
     		builder.Logging.AddDebug();
+#else
+			const bool useFirebaseEmulators = false;
 #endif
 
             // Preencha com os valores do Firebase Console antes de usar a autenticação.
@@ -36,7 +39,9 @@ namespace UniRota
             {
                 ApiKey = "AIzaSyAzpxdWWh1ZnpYW1L8tREBbLvywpUPzUvc",
                 ProjectId = "unirota-f0a63",
-                FunctionsRegion = "southamerica-east1"
+                FunctionsRegion = "southamerica-east1",
+                UseEmulators = useFirebaseEmulators,
+                EmulatorHost = "10.0.2.2"
             });
             builder.Services.AddSingleton(new HttpClient());
             builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);

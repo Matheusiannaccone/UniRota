@@ -27,7 +27,7 @@ public sealed partial class FirebaseAuthService
             EnsureCurrentUser(user);
             EnsureRecentAuthentication();
             var response = await PostJsonAsync<FirebaseAuthResponseDto>(
-                $"{IdentityToolkitBaseUrl}/accounts:update?key={Escape(_options.ApiKey)}",
+                $"{_options.IdentityToolkitBaseUrl}/accounts:update?key={Escape(_options.ApiKey)}",
                 new { idToken = token, password = newPassword, returnSecureToken = true }, cancellationToken);
             changed = true;
             EnsureCurrentUser(user);
@@ -187,13 +187,13 @@ public sealed partial class FirebaseAuthService
     }
 
     private Task<FirebaseAuthResponseDto> SignInForRecoveryAsync(string email, string password, CancellationToken ct) =>
-        PostJsonAsync<FirebaseAuthResponseDto>($"{IdentityToolkitBaseUrl}/accounts:signInWithPassword?key={Escape(_options.ApiKey)}",
+        PostJsonAsync<FirebaseAuthResponseDto>($"{_options.IdentityToolkitBaseUrl}/accounts:signInWithPassword?key={Escape(_options.ApiKey)}",
             new { email, password, returnSecureToken = true }, ct);
 
     private async Task SendEmailLinkAsync(string token, string newEmail, CancellationToken ct)
     {
         using var request = CreateJsonRequest(HttpMethod.Post,
-            $"{IdentityToolkitBaseUrl}/accounts:sendOobCode?key={Escape(_options.ApiKey)}",
+            $"{_options.IdentityToolkitBaseUrl}/accounts:sendOobCode?key={Escape(_options.ApiKey)}",
             new { requestType = "VERIFY_AND_CHANGE_EMAIL", idToken = token, newEmail });
         request.Headers.Add("X-Firebase-Locale", "pt-BR");
         EnsureSuccess(await SendAsync(request, ct));
@@ -201,7 +201,7 @@ public sealed partial class FirebaseAuthService
 
     private async Task<FirebaseAuthResponseDto> LookupAccountAsync(string token, string userId, CancellationToken ct)
     {
-        var response = await PostJsonAsync<AccountLookupDto>($"{IdentityToolkitBaseUrl}/accounts:lookup?key={Escape(_options.ApiKey)}",
+        var response = await PostJsonAsync<AccountLookupDto>($"{_options.IdentityToolkitBaseUrl}/accounts:lookup?key={Escape(_options.ApiKey)}",
             new { idToken = token }, ct);
         var account = response.Users.SingleOrDefault();
         if (account?.LocalId != userId || string.IsNullOrWhiteSpace(account.Email))

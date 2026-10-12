@@ -218,9 +218,7 @@ public sealed class GoogleMapRouteService : IMapRouteService
 
     private string BuildFunctionUrl()
     {
-        return $"https://{Uri.EscapeDataString(_options.FunctionsRegion)}-" +
-               $"{Uri.EscapeDataString(_options.ProjectId)}.cloudfunctions.net/" +
-               ComputeRouteFunctionName;
+        return _options.BuildFunctionUrl(ComputeRouteFunctionName);
     }
 
     private static InvalidOperationException CreateServiceException(

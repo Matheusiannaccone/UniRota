@@ -12,9 +12,6 @@ namespace UniRota.Services.Firebase;
 public sealed partial class FirebaseAuthService : IAuthService
 {
     private const string RefreshTokenStorageKey = "firebase_refresh_token";
-    private const string IdentityToolkitBaseUrl = "https://identitytoolkit.googleapis.com/v1";
-    private const string SecureTokenBaseUrl = "https://securetoken.googleapis.com/v1";
-    private const string FirestoreBaseUrl = "https://firestore.googleapis.com/v1";
 
     private static readonly TimeSpan TokenRefreshMargin = TimeSpan.FromMinutes(2);
 
@@ -66,7 +63,7 @@ public sealed partial class FirebaseAuthService : IAuthService
         };
 
         var authResponse = await PostJsonAsync<FirebaseAuthResponseDto>(
-            $"{IdentityToolkitBaseUrl}/accounts:signUp?key={Escape(_options.ApiKey)}",
+            $"{_options.IdentityToolkitBaseUrl}/accounts:signUp?key={Escape(_options.ApiKey)}",
             requestBody,
             cancellationToken);
 
@@ -112,7 +109,7 @@ public sealed partial class FirebaseAuthService : IAuthService
         };
 
         var authResponse = await PostJsonAsync<FirebaseAuthResponseDto>(
-            $"{IdentityToolkitBaseUrl}/accounts:signInWithPassword?key={Escape(_options.ApiKey)}",
+            $"{_options.IdentityToolkitBaseUrl}/accounts:signInWithPassword?key={Escape(_options.ApiKey)}",
             requestBody,
             cancellationToken);
 
@@ -280,7 +277,7 @@ public sealed partial class FirebaseAuthService : IAuthService
             EnsureCurrentUser(user);
             _reauthenticatedUntilUtc = default;
             var response = await PostJsonAsync<FirebaseAuthResponseDto>(
-                $"{IdentityToolkitBaseUrl}/accounts:signInWithPassword?key={Escape(_options.ApiKey)}",
+                $"{_options.IdentityToolkitBaseUrl}/accounts:signInWithPassword?key={Escape(_options.ApiKey)}",
                 new { email = user.Email, password = currentPassword, returnSecureToken = true }, cancellationToken);
             EnsureCurrentUser(user);
             if (!string.Equals(response.LocalId, user.Id, StringComparison.Ordinal))
@@ -447,7 +444,7 @@ public sealed partial class FirebaseAuthService : IAuthService
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"{SecureTokenBaseUrl}/token?key={Escape(_options.ApiKey)}")
+            $"{_options.SecureTokenBaseUrl}/token?key={Escape(_options.ApiKey)}")
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -693,7 +690,7 @@ public sealed partial class FirebaseAuthService : IAuthService
 
     private string BuildUserDocumentUrl(string userId)
     {
-        return $"{FirestoreBaseUrl}/projects/{Escape(_options.ProjectId)}" +
+        return $"{_options.FirestoreBaseUrl}/projects/{Escape(_options.ProjectId)}" +
                $"/databases/(default)/documents/users/{Escape(userId)}";
     }
 
