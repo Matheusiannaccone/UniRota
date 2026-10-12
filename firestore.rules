@@ -1,0 +1,833 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================
+    // Helpers gerais
+    // =========================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasExactly(data, fields) {
+      return data.keys().hasAll(fields)
+          && data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredAndOnly(data, required, optional) {
+      return data.keys().hasAll(required)
+          && data.keys().hasOnly(required.concat(optional));
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function weeklyRoutePath(routeId) {
+      return /databases/$(database)/documents/weeklyRoutes/$(routeId);
+    }
+
+    function weeklyRouteBefore(routeId) {
+      return get(weeklyRoutePath(routeId)).data;
+    }
+
+    function weeklyRouteAfter(routeId) {
+      return getAfter(weeklyRoutePath(routeId)).data;
+    }
+
+    function isValidDays(days) {
+      return days is list
+          && days.size() > 0
+          && days.size() == days.toSet().size()
+          && days.toSet().hasOnly([
+            'Sunday',
+            'Monday',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday'
+          ]);
+    }
+
+    function isValidUserName(name) {
+      return name is string
+          && name == name.trim()
+          && name.size() > 0
+          && name.size() <= 100;
+    }
+
+    function isValidUserEmail(email) {
+      return email is string
+          && email == email.trim()
+          && email.size() > 0
+          && email.size() <= 100;
+    }
+
+    function userNameMatchesProfile(uid, userName) {
+      return uid is string
+          && uid.size() > 0
+          && userName is string
+          && exists(userPath(uid))
+          && get(userPath(uid)).data.name is string
+          && userName == get(userPath(uid)).data.name;
+    }
+
+    // =========================================================
+    // users/{uid}
+    // =========================================================
+
+    function hasValidUserShape(uid, data) {
+      return hasExactly(data, [
+            'id',
+            'name',
+            'email',
+            'createdAtUtc'
+          ])
+
+          && data.id is string
+          && data.id == uid
+          && data.id == request.auth.uid
+
+          && isValidUserName(data.name)
+          && isValidUserEmail(data.email)
+
+          && data.createdAtUtc is timestamp;
+    }
+
+    function isValidUserCreate(uid) {
+      let data = request.resource.data;
+
+      return hasValidUserShape(uid, data)
+
+          // O e-mail inicial do perfil precisa ser o e-mail
+          // presente no token autenticado que criou o documento.
+          && request.auth.token.email is string
+          && data.email == request.auth.token.email;
+    }
+
+    function isValidUserNameUpdate(uid) {
+      let before = resource.data;
+      let after = request.resource.data;
+
+      return hasValidUserShape(uid, after)
+
+          // Somente o nome pode mudar.
+          && after
+              .diff(before)
+              .affectedKeys()
+              .hasOnly([
+                'name'
+              ])
+
+          // Campos de identidade e criação são imutáveis.
+          && after.id == before.id
+          && after.email == before.email
+          && after.createdAtUtc == before.createdAtUtc;
+    }
+
+    function isValidUserEmailUpdate(uid) {
+      let before = resource.data;
+      let after = request.resource.data;
+
+      return hasValidUserShape(uid, after)
+
+          // Somente o e-mail pode mudar.
+          && after
+              .diff(before)
+              .affectedKeys()
+              .hasOnly([
+                'email'
+              ])
+
+          // Demais campos são imutáveis nesta operação.
+          && after.id == before.id
+          && after.name == before.name
+          && after.createdAtUtc == before.createdAtUtc
+
+          // O novo valor só entra no Firestore quando o próprio
+          // Firebase Authentication já o reconhece e confirma.
+          && request.auth.token.email is string
+          && request.auth.token.email_verified == true
+          && after.email == request.auth.token.email;
+    }
+
+    match /users/{uid} {
+
+      // Cada usuário lê somente o próprio perfil.
+      allow get: if isSignedIn()
+                 && request.auth.uid == uid;
+
+      allow list: if false;
+
+      allow create: if isSignedIn()
+                    && request.auth.uid == uid
+                    && isValidUserCreate(uid);
+
+      // Nome e e-mail são atualizações separadas e estritamente
+      // limitadas aos respectivos campos.
+      allow update: if isSignedIn()
+                    && request.auth.uid == uid
+                    && (
+                      isValidUserNameUpdate(uid)
+                      || isValidUserEmailUpdate(uid)
+                    );
+
+      allow delete: if false;
+    }
+
+    // =========================================================
+    // weeklyRoutes/{routeId}
+    // =========================================================
+
+    // Rotas novas precisam nascer com o nome atual do perfil.
+    //
+    // Em rotas existentes, userName é imutável para o cliente.
+    // A Cloud Function syncWeeklyRouteUserNames mantém esse
+    // snapshot sincronizado após alterações em users/{uid}.name.
+    function routeUserNameMatchesProfile(data) {
+      return userNameMatchesProfile(
+          data.userId,
+          data.userName
+        );
+    }
+
+    // Aceita dois estados estruturais:
+    //
+    // 1. rota legada sem Place IDs;
+    // 2. rota geográfica atual com os dois Place IDs.
+    //
+    // Nunca aceita somente um dos dois.
+    function hasValidPlaceIdPair(data) {
+      let keys = data.keys();
+      let hasOriginPlaceId = keys.hasAny(['originPlaceId']);
+      let hasDestinationPlaceId = keys.hasAny(['destinationPlaceId']);
+
+      return (
+          !hasOriginPlaceId
+          && !hasDestinationPlaceId
+        )
+        ||
+        (
+          hasOriginPlaceId
+          && hasDestinationPlaceId
+
+          && data.originPlaceId is string
+          && data.originPlaceId.trim().size() > 0
+          && data.originPlaceId.size() <= 512
+
+          && data.destinationPlaceId is string
+          && data.destinationPlaceId.trim().size() > 0
+          && data.destinationPlaceId.size() <= 512
+
+          && data.originPlaceId != data.destinationPlaceId
+        );
+    }
+
+    // Novas gravações e edições pelo fluxo atual precisam usar
+    // os dois Place IDs.
+    function hasCurrentPlaceIds(data) {
+      return data.keys().hasAll([
+            'originPlaceId',
+            'destinationPlaceId'
+          ])
+          && hasValidPlaceIdPair(data);
+    }
+
+    function isValidWeeklyRouteData(data) {
+      return hasRequiredAndOnly(
+            data,
+            [
+              'userId',
+              'userName',
+              'role',
+              'origin',
+              'destination',
+              'daysOfWeek',
+              'departureTimeMinutes',
+              'availableSeats',
+              'estimatedDistanceKm',
+              'requestRevision',
+              'createdAtUtc'
+            ],
+            [
+              'originPlaceId',
+              'destinationPlaceId'
+            ]
+          )
+
+          && data.userId is string
+          && data.userId.size() > 0
+
+          && isValidUserName(data.userName)
+
+          && data.role is string
+          && (
+            data.role == 'driver'
+            || data.role == 'passenger'
+          )
+
+          && data.origin is string
+          && data.origin.trim().size() > 0
+          && data.origin.size() <= 200
+
+          && data.destination is string
+          && data.destination.trim().size() > 0
+          && data.destination.size() <= 200
+
+          && data.origin.trim().lower()
+              != data.destination.trim().lower()
+
+          && hasValidPlaceIdPair(data)
+
+          && isValidDays(data.daysOfWeek)
+
+          && data.departureTimeMinutes is int
+          && data.departureTimeMinutes >= 0
+          && data.departureTimeMinutes <= 1439
+
+          && data.requestRevision is int
+          && data.requestRevision >= 0
+
+          && data.createdAtUtc is timestamp
+
+          && (
+            (
+              data.role == 'driver'
+
+              && data.availableSeats is int
+              && data.availableSeats >= 1
+
+              && data.estimatedDistanceKm is number
+              && data.estimatedDistanceKm > 0
+            )
+
+            ||
+
+            (
+              data.role == 'passenger'
+
+              && data.availableSeats == null
+
+              && data.estimatedDistanceKm is number
+              && data.estimatedDistanceKm == 0
+            )
+          );
+    }
+
+    function isOwnerRouteCreate() {
+      return isSignedIn()
+
+          && request.resource.data.userId
+              == request.auth.uid
+
+          && request.resource.data.requestRevision == 0
+
+          // O cliente não escolhe arbitrariamente o nome exibido.
+          && routeUserNameMatchesProfile(
+              request.resource.data
+            )
+
+          // Rotas novas pertencem ao fluxo geográfico atual.
+          && hasCurrentPlaceIds(
+              request.resource.data
+            )
+
+          && isValidWeeklyRouteData(
+              request.resource.data
+            );
+    }
+
+    // Edição normal feita pelo proprietário.
+    //
+    // userId, userName, role, requestRevision e createdAtUtc
+    // permanecem imutáveis para o cliente.
+    //
+    // userName NÃO é comparado ao perfil atual durante a edição:
+    // existe uma pequena janela de consistência eventual enquanto
+    // a Cloud Function propaga uma alteração de nome.
+    function isOwnerRouteEdit() {
+      return isSignedIn()
+
+          && resource.data.userId
+              == request.auth.uid
+
+          && request.resource.data.userId
+              == request.auth.uid
+
+          && request.resource.data.role
+              == resource.data.role
+
+          && request.resource.data
+              .diff(resource.data)
+              .affectedKeys()
+              .hasOnly([
+                'origin',
+                'originPlaceId',
+                'destination',
+                'destinationPlaceId',
+                'daysOfWeek',
+                'departureTimeMinutes',
+                'availableSeats',
+                'estimatedDistanceKm'
+              ])
+
+          && hasCurrentPlaceIds(
+              request.resource.data
+            )
+
+          && isValidWeeklyRouteData(
+              request.resource.data
+            );
+    }
+
+    // Update técnico usado na criação de uma RideRequest.
+    //
+    // Somente requestRevision pode mudar, e apenas N -> N + 1.
+    //
+    // Limitação conhecida do modelo atual:
+    // as Rules não conseguem provar, no sentido inverso, qual
+    // requestId aleatório foi criado junto com este incremento.
+    function isTechnicalRequestRevisionIncrement() {
+      return isSignedIn()
+
+          && request.auth.uid
+              != resource.data.userId
+
+          && resource.data.role == 'driver'
+
+          && resource.data.availableSeats is int
+          && resource.data.availableSeats > 0
+
+          && resource.data.requestRevision is int
+          && resource.data.requestRevision >= 0
+
+          && request.resource.data.requestRevision is int
+
+          && request.resource.data
+              .diff(resource.data)
+              .affectedKeys()
+              .hasOnly([
+                'requestRevision'
+              ])
+
+          && request.resource.data.requestRevision
+              == resource.data.requestRevision + 1;
+    }
+
+    // Update técnico usado no aceite de uma RideRequest.
+    //
+    // Somente availableSeats pode mudar, e apenas N -> N - 1.
+    function isTechnicalSeatDecrement() {
+      return isSignedIn()
+
+          && resource.data.userId
+              == request.auth.uid
+
+          && request.resource.data.userId
+              == request.auth.uid
+
+          && resource.data.role == 'driver'
+          && request.resource.data.role == 'driver'
+
+          && resource.data.availableSeats is int
+          && resource.data.availableSeats > 0
+
+          && request.resource.data.availableSeats is int
+          && request.resource.data.availableSeats >= 0
+
+          && request.resource.data
+              .diff(resource.data)
+              .affectedKeys()
+              .hasOnly([
+                'availableSeats'
+              ])
+
+          && request.resource.data.availableSeats
+              == resource.data.availableSeats - 1;
+    }
+
+    match /weeklyRoutes/{routeId} {
+
+      // O proprietário lê a própria rota.
+      // Qualquer autenticado pode ler DriverRoutes porque o
+      // matching do MVP é executado no cliente.
+      allow get, list: if isSignedIn()
+                       && (
+                         resource.data.userId
+                           == request.auth.uid
+                         ||
+                         resource.data.role
+                           == 'driver'
+                       );
+
+      allow create: if isOwnerRouteCreate();
+
+      allow update: if isOwnerRouteEdit()
+                    || isTechnicalRequestRevisionIncrement()
+                    || isTechnicalSeatDecrement();
+
+      allow delete: if isSignedIn()
+                    && resource.data.userId
+                        == request.auth.uid;
+    }
+
+    // =========================================================
+    // rideRequests/{requestId}
+    // =========================================================
+
+    function isValidRequestedDate(data) {
+      return (
+          data.type == 'weekly'
+          && data.requestedDate == null
+        )
+        ||
+        (
+          data.type == 'once'
+
+          && data.requestedDate is string
+          && data.requestedDate.size() == 10
+
+          // Validação estrutural yyyy-MM-dd com faixas básicas
+          // de mês e dia.
+          && data.requestedDate.matches(
+            '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
+          )
+        );
+    }
+
+    function compatibleDaysMatchRoutes(
+      compatibleDays,
+      passengerRoute,
+      driverRoute
+    ) {
+      let expectedDays =
+        passengerRoute.daysOfWeek
+          .toSet()
+          .intersection(
+            driverRoute.daysOfWeek.toSet()
+          );
+
+      return compatibleDays.toSet()
+          == expectedDays;
+    }
+
+    function isCreationCoupledToRevisionIncrement(data) {
+      let before =
+        weeklyRouteBefore(
+          data.driverRouteId
+        );
+
+      let after =
+        weeklyRouteAfter(
+          data.driverRouteId
+        );
+
+      return before.requestRevision is int
+          && after.requestRevision is int
+
+          && after
+              .diff(before)
+              .affectedKeys()
+              .hasOnly([
+                'requestRevision'
+              ])
+
+          && after.requestRevision
+              == before.requestRevision + 1;
+    }
+
+    function isValidRideRequestCreate() {
+      let data = request.resource.data;
+
+      let passengerRoute =
+        weeklyRouteBefore(
+          data.passengerRouteId
+        );
+
+      let driverRoute =
+        weeklyRouteBefore(
+          data.driverRouteId
+        );
+
+      return hasExactly(data, [
+            'passengerUserId',
+            'passengerUserName',
+            'driverUserId',
+            'driverUserName',
+            'passengerRouteId',
+            'driverRouteId',
+            'compatibleDays',
+            'type',
+            'status',
+            'requestedDate',
+            'suggestedPrice',
+            'createdAtUtc'
+          ])
+
+          // -----------------------------------------------
+          // Passageiro
+          // -----------------------------------------------
+
+          && data.passengerUserId is string
+          && data.passengerUserId
+              == request.auth.uid
+
+          && isValidUserName(
+              data.passengerUserName
+            )
+
+          // Usa o perfil atual do passageiro como fonte de
+          // verdade. Isso evita falha durante a pequena janela
+          // antes da Function atualizar weeklyRoutes.userName.
+          && userNameMatchesProfile(
+              request.auth.uid,
+              data.passengerUserName
+            )
+
+          // -----------------------------------------------
+          // IDs
+          // -----------------------------------------------
+
+          && data.passengerRouteId is string
+          && data.passengerRouteId.size() > 0
+          && data.passengerRouteId.size() <= 128
+
+          && data.driverRouteId is string
+          && data.driverRouteId.size() > 0
+          && data.driverRouteId.size() <= 128
+
+          && data.passengerRouteId
+              != data.driverRouteId
+
+          // -----------------------------------------------
+          // PassengerRoute
+          // -----------------------------------------------
+
+          && passengerRoute.userId
+              == request.auth.uid
+
+          && passengerRoute.role
+              == 'passenger'
+
+          // -----------------------------------------------
+          // DriverRoute
+          // -----------------------------------------------
+
+          && data.driverUserId is string
+          && data.driverUserId.size() > 0
+
+          && isValidUserName(
+              data.driverUserName
+            )
+
+          && driverRoute.role
+              == 'driver'
+
+          && driverRoute.userId
+              == data.driverUserId
+
+          && driverRoute.userId
+              != request.auth.uid
+
+          && data.driverUserId
+              != data.passengerUserId
+
+          // driverUserName é um snapshot da DriverRoute no
+          // instante da solicitação.
+          && driverRoute.userName
+              == data.driverUserName
+
+          && driverRoute.availableSeats is int
+          && driverRoute.availableSeats > 0
+
+          // -----------------------------------------------
+          // Dias compatíveis
+          // -----------------------------------------------
+
+          && isValidDays(
+              data.compatibleDays
+            )
+
+          && compatibleDaysMatchRoutes(
+              data.compatibleDays,
+              passengerRoute,
+              driverRoute
+            )
+
+          // -----------------------------------------------
+          // Tipo/data
+          // -----------------------------------------------
+
+          && data.type is string
+
+          && (
+            data.type == 'once'
+            || data.type == 'weekly'
+          )
+
+          && isValidRequestedDate(data)
+
+          // -----------------------------------------------
+          // Estado inicial
+          // -----------------------------------------------
+
+          && data.status is string
+          && data.status == 'pending'
+
+          // -----------------------------------------------
+          // Snapshot de preço
+          // -----------------------------------------------
+
+          // As Rules validam estrutura e faixa básica, mas não
+          // conseguem recalcular o valor retornado pelo Google
+          // Routes.
+          && data.suggestedPrice is number
+          && data.suggestedPrice > 0
+
+          // -----------------------------------------------
+          // Timestamp
+          // -----------------------------------------------
+
+          && data.createdAtUtc is timestamp
+
+          // -----------------------------------------------
+          // Concorrência
+          // -----------------------------------------------
+
+          // A RideRequest só nasce se a DriverRoute também
+          // incrementar requestRevision no mesmo commit.
+          && isCreationCoupledToRevisionIncrement(
+              data
+            );
+    }
+
+    function userParticipatesInRequest() {
+      return isSignedIn()
+          && (
+            resource.data.passengerUserId
+              == request.auth.uid
+            ||
+            resource.data.driverUserId
+              == request.auth.uid
+          );
+    }
+
+    // Necessário para o fluxo de aceite que consulta Pending
+    // RideRequests por driverRouteId. Como Rules não são filtros,
+    // a propriedade da DriverRoute precisa ser demonstrável para
+    // cada documento retornado.
+    function userOwnsReferencedDriverRoute() {
+      let route =
+        get(
+          weeklyRoutePath(
+            resource.data.driverRouteId
+          )
+        ).data;
+
+      return isSignedIn()
+          && route.role == 'driver'
+          && route.userId
+              == request.auth.uid;
+    }
+
+    function userCanReadRequest() {
+      return userParticipatesInRequest()
+          || userOwnsReferencedDriverRoute();
+    }
+
+    function driverCanDecideRequest() {
+      return isSignedIn()
+
+          && resource.data.driverUserId
+              == request.auth.uid
+
+          && resource.data.status
+              == 'pending'
+
+          // Depois de criada, somente status pode mudar.
+          && request.resource.data
+              .diff(resource.data)
+              .affectedKeys()
+              .hasOnly([
+                'status'
+              ]);
+    }
+
+    function acceptedRequestConsumesExactlyOneSeat() {
+      let before =
+        weeklyRouteBefore(
+          resource.data.driverRouteId
+        );
+
+      let after =
+        weeklyRouteAfter(
+          resource.data.driverRouteId
+        );
+
+      return before.userId
+              == request.auth.uid
+
+          && before.role
+              == 'driver'
+
+          && before.availableSeats is int
+          && before.availableSeats > 0
+
+          && after
+              .diff(before)
+              .affectedKeys()
+              .hasOnly([
+                'availableSeats'
+              ])
+
+          && after.availableSeats is int
+
+          && after.availableSeats
+              == before.availableSeats - 1
+
+          && after.availableSeats >= 0;
+    }
+
+    function isValidRideRequestUpdate() {
+      return driverCanDecideRequest()
+          && (
+            request.resource.data.status
+              == 'rejected'
+
+            ||
+
+            (
+              request.resource.data.status
+                == 'accepted'
+
+              && acceptedRequestConsumesExactlyOneSeat()
+            )
+          );
+    }
+
+    match /rideRequests/{requestId} {
+
+      // Somente os participantes ou o proprietário da
+      // DriverRoute referenciada podem ler a solicitação.
+      allow get, list: if userCanReadRequest();
+
+      allow create: if isSignedIn()
+                    && isValidRideRequestCreate();
+
+      allow update: if isValidRideRequestUpdate();
+
+      allow delete: if false;
+    }
+
+    // =========================================================
+    // Default deny
+    // =========================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
