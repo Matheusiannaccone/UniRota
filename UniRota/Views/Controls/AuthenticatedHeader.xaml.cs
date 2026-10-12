@@ -13,6 +13,15 @@ public partial class AuthenticatedHeader : ContentView
     public static readonly BindableProperty LogoutIsEnabledProperty =
         BindableProperty.Create(nameof(LogoutIsEnabled), typeof(bool), typeof(AuthenticatedHeader), true);
 
+    public static readonly BindableProperty IsProfileProperty =
+        BindableProperty.Create(nameof(IsProfile), typeof(bool), typeof(AuthenticatedHeader), false);
+
+    public bool IsProfile
+    {
+        get => (bool)GetValue(IsProfileProperty);
+        set => SetValue(IsProfileProperty, value);
+    }
+
     private Shell? _shell;
     private bool _isNavigating;
 
@@ -65,9 +74,16 @@ public partial class AuthenticatedHeader : ContentView
 
     private void UpdateNavigationActions()
     {
+        ProfileButton.IsEnabled = !_isNavigating && _shell is not null;
         HomeButton.IsEnabled = !_isNavigating && _shell is not null;
         // Nas raízes das abas não há página anterior no stack do Shell.
         BackButton.IsEnabled = !_isNavigating && _shell?.Navigation.NavigationStack.Count > 1;
+    }
+
+    private async void OnProfileClicked(object? sender, EventArgs e)
+    {
+        if (_shell?.CurrentPage is not ProfilePage)
+            await NavigateAsync(nameof(ProfilePage));
     }
 
     private async void OnHomeClicked(object? sender, EventArgs e) => await NavigateAsync(AppShell.HomeRoute);

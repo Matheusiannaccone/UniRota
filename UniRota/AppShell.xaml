@@ -6,5 +6,6 @@
     <ShellContent x:Name="StartupContent" Title="Inicialização" Route="startup" Shell.TabBarIsVisible="False" />
     <ShellContent x:Name="LoginContent" Title="Entrar" Route="login" Shell.TabBarIsVisible="False" />
     <ShellContent x:Name="RegisterContent" Title="Criar conta" Route="register" Shell.TabBarIsVisible="False" />
+    <ShellContent x:Name="EmailConfirmationContent" Title="Confirmação de e-mail" Route="email-confirmation" Shell.TabBarIsVisible="False" />
     <TabBar x:Name="MainTabs" Route="main" />
 </Shell>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="UniRota.Views.ProfilePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:UniRota.Views.Controls"
+    Shell.NavBarIsVisible="False" Title="Perfil">
+    <Grid RowDefinitions="Auto,*">
+        <controls:AuthenticatedHeader IsProfile="True" LogoutCommand="{Binding LogoutCommand}" LogoutIsEnabled="{Binding IsNotBusy}" IsEnabled="{Binding IsNotBusy}" />
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Style="{StaticResource PageContent}">
+                <Label Text="Perfil" Style="{StaticResource PageTitle}" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Style="{StaticResource SectionContent}">
+                        <Label Text="Dados Pessoais" Style="{StaticResource SectionTitle}" />
+                        <Border Style="{StaticResource ProfileAvatar}" SemanticProperties.Description="Avatar de perfil. Foto ainda indisponível.">
+                            <Label Text="U" Style="{StaticResource BrandText}" HorizontalOptions="Center" VerticalOptions="Center" />
+                        </Border>
+                        <Label Text="Nome" Style="{StaticResource Caption}" />
+                        <Border Style="{StaticResource InputContainer}">
+                            <Entry Text="{Binding Name}" Placeholder="Seu nome" IsEnabled="{Binding IsNotBusy}" ReturnType="Done" SemanticProperties.Description="Nome" />
+                        </Border>
+                        <Button Text="Salvar nome" Command="{Binding SaveNameCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Style="{StaticResource SectionContent}">
+                        <Label Text="Segurança" Style="{StaticResource SectionTitle}" />
+                        <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsSecurityIdle}">
+                            <Button Text="Alterar e-mail" Command="{Binding BeginEmailChangeCommand}" Style="{StaticResource DangerButton}" IsEnabled="{Binding IsNotBusy}" />
+                            <Button Text="Alterar senha" Command="{Binding BeginPasswordChangeCommand}" Style="{StaticResource DangerButton}" IsEnabled="{Binding IsNotBusy}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsConfirmingPassword}">
+                            <Label Text="Confirme sua senha" Style="{StaticResource CardTitle}" />
+                            <Border Style="{StaticResource InputContainer}">
+                                <Entry Text="{Binding CurrentPassword}" IsPassword="True" Placeholder="Senha atual" IsEnabled="{Binding IsNotBusy}" />
+                            </Border>
+                            <Button Text="Continuar" Command="{Binding ConfirmCurrentPasswordCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" />
+                            <Button Text="Cancelar" Command="{Binding CancelSecurityChangeCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsEnteringEmail}">
+                            <Border Style="{StaticResource InputContainer}">
+                                <Entry Text="{Binding NewEmail}" Keyboard="Email" Placeholder="Novo e-mail" IsEnabled="{Binding IsNotBusy}" />
+                            </Border>
+                            <Button Text="Confirmar alteração" Command="{Binding SubmitEmailCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DangerButton}" />
+                            <Button Text="Cancelar" Command="{Binding CancelSecurityChangeCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsEnteringPassword}">
+                            <Border Style="{StaticResource InputContainer}">
+                                <Entry Text="{Binding NewPassword}" IsPassword="True" Placeholder="Nova senha (mínimo 6 caracteres)" IsEnabled="{Binding IsNotBusy}" />
+                            </Border>
+                            <Border Style="{StaticResource InputContainer}">
+                                <Entry Text="{Binding ConfirmNewPassword}" IsPassword="True" Placeholder="Confirme a nova senha" IsEnabled="{Binding IsNotBusy}" />
+                            </Border>
+                            <Button Text="Confirmar alteração" Command="{Binding SubmitPasswordCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DangerButton}" />
+                            <Button Text="Cancelar" Command="{Binding CancelSecurityChangeCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
+                <Label Text="{Binding SuccessMessage}" IsVisible="{Binding HasSuccess}" Style="{StaticResource SuccessBadge}" />
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

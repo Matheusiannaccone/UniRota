@@ -5,7 +5,7 @@
     xmlns:controls="clr-namespace:UniRota.Views.Controls"
     Shell.NavBarIsVisible="False" Title="Início">
     <Grid RowDefinitions="Auto,*">
-        <controls:AuthenticatedHeader IsHome="True" LogoutCommand="{Binding LogoutCommand}" LogoutIsEnabled="{Binding IsNotBusy}" />
+        <controls:AuthenticatedHeader IsHome="True" />
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Style="{StaticResource PageContent}">
                 <VerticalStackLayout Style="{StaticResource DetailContent}">

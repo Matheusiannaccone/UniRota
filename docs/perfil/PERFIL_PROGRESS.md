@@ -1,0 +1,14 @@
+# Perfil — progresso
+
+- Concluídos: Blocos 1–5; implementação concluída. Próximo: validação manual no Android pelo usuário.
+- Estado: Perfil/nome prontos; e-mail exige reautenticação, envio de link e consulta real ao Auth antes de sincronizar Firestore/CurrentUser. Recuperação excepcional por senha autorizada e implementada sem persistir senha.
+- Arquivos principais do último bloco: AwaitingEmailConfirmationPage.xaml.cs, ProfileViewModel.cs, FirebaseAuthServiceEmailTests.cs e FirebaseAuthServicePasswordTests.cs.
+- Bloco imediatamente anterior: 5 — detecção automática ligada a Window.Activated (retorno após pausa), assinatura também em Loaded e remoção em Unloaded; senha de recuperação limpa ao desativar a janela; resposta tardia de reautenticação não reabre etapa abandonada. Testes cobrem cooldown e retorno durante operação em andamento.
+- Reenvios/cooldown: inicial + 2 adicionais; 60 s após envios/verificações; automação e Cancelar independem do timer. Destino/contador/prazo no SecureStorage, sem senha, preservados após recriação/reinício. Resposta de envio perdida conta como tentativa por segurança.
+- Validações finais: `git diff --check` sem erros; `dotnet test UniRota.Tests/UniRota.Tests.csproj -c Release` com 197/197 aprovados; `dotnet build UniRota/UniRota.csproj -c Release -f net8.0-android` com 0 erros e 0 avisos. Node não executado (Functions/configuração sem alteração). Usuário já validou e-mail pelo botão Verificar.
+- Commits: 1 `9f5d6de`; 2 `746eef7`; 3 `b133737`; 4 `78c9cf1`; 5 `fix(perfil): corrige verificação automática e valida integração`.
+- Testes manuais pendentes: confirmar link e retornar sem tocar Verificar (inclusive antes de 60 s); trocar senha e testar login com nova/antiga; restaurar sessão; senha incorreta/fraca/confirmação diferente; nome/Home, headers/Voltar/Sair, tela pequena/teclado; cancelar antes/depois de confirmar, dois reenvios e recuperação de sessão inválida.
+- Limitações: correção automática validada em código/testes, ainda requer reteste no aparelho. Cancelamento é local e não revoga links; login/restauração reconciliam alterações posteriores. Proteção contra enumeração pode ocultar endereço já cadastrado/entrega do link; regras remotas não foram modificadas.
+- Preservados: AGENTS.md prévio e MauiProgram.cs local fora do commit; versão, User, Functions e regras sem alteração neste bloco.
+- Ajuste pós-validação: falhas de credenciais na reautenticação do Perfil agora mostram `Senha inválida.`; Login mantém sua mensagem genérica. O envio inicial e os dois reenvios de `sendOobCode` usam `X-Firebase-Locale: pt-BR`.
+- Validações do ajuste: testes de autenticação/perfil 42/42 e suíte .NET 201/201 aprovados; build Android Release concluído com 0 erros (5 avisos NU1900 por indisponibilidade da consulta de vulnerabilidades do NuGet). Node não executado.

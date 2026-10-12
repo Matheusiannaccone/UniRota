@@ -133,32 +133,6 @@ public partial class HomeViewModel : ObservableObject
         }
     }
 
-    [RelayCommand(AllowConcurrentExecutions = false)]
-    private async Task LogoutAsync()
-    {
-        if (IsBusy)
-        {
-            return;
-        }
-
-        IsBusy = true;
-        ClearError();
-
-        try
-        {
-            await _authService.LogoutAsync();
-            await Shell.Current.GoToAsync("//login");
-        }
-        catch (Exception exception)
-        {
-            SetError(exception.Message, "Não foi possível sair. Tente novamente.");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
     private async Task NavigateAsync(string route, string fallbackMessage)
     {
         if (IsBusy)

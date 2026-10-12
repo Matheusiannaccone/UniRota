@@ -222,6 +222,19 @@ public sealed class FirebaseRouteServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult("test-token");
 
+        public Task UpdateNameAsync(string name, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task ReauthenticateAsync(string currentPassword, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public PendingEmailChange? PendingEmailChange => null;
+        public void ClearReauthentication() { }
+        public Task BeginEmailChangeAsync(string newEmail, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task ResendEmailConfirmationAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<EmailConfirmationResult> CheckEmailConfirmationAsync(EmailConfirmationAction action, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task RecoverEmailChangeSessionAsync(string password, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task ChangePasswordAsync(string newPassword, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task LogoutAsync() => Task.CompletedTask;
     }
 }
