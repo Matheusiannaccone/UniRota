@@ -68,6 +68,21 @@ public sealed partial class FirebaseAuthServiceTests
     }
 
     [Fact]
+    public async Task Login_StoresRefreshTokenInEnvironmentSpecificKey()
+    {
+        using var production = new AuthFixture();
+        using var emulator = new AuthFixture(useEmulators: true);
+
+        await production.Service.LoginAsync("production@example.com", "password");
+        await emulator.Service.LoginAsync("emulator@example.com", "password");
+
+        Assert.Contains("firebase_refresh_token", production.Storage.Values.Keys);
+        Assert.DoesNotContain("firebase_emulator_refresh_token", production.Storage.Values.Keys);
+        Assert.Contains("firebase_emulator_refresh_token", emulator.Storage.Values.Keys);
+        Assert.DoesNotContain("firebase_refresh_token", emulator.Storage.Values.Keys);
+    }
+
+    [Fact]
     public async Task UpdateName_PatchesOnlyName_AndPreservesIdentity()
     {
         using var fixture = new AuthFixture();
@@ -156,14 +171,23 @@ public sealed partial class FirebaseAuthServiceTests
         public List<string> Requests { get; } = [];
         public Func<HttpRequestMessage, Task<HttpResponseMessage>> Handle { get; set; }
 
-        public AuthFixture(MemoryStorage? storage = null, TestClock? clock = null)
+        public AuthFixture(
+            MemoryStorage? storage = null,
+            TestClock? clock = null,
+            bool useEmulators = false)
         {
             Storage = storage ?? new MemoryStorage();
             Clock = clock ?? new TestClock();
             Handle = RespondAsync;
             _client = new HttpClient(new Handler(request => Handle(request)));
             Service = new FirebaseAuthService(_client, Storage,
-                new FirebaseOptions { ApiKey = "test-key", ProjectId = "test-project" }, Clock);
+                new FirebaseOptions
+                {
+                    ApiKey = "test-key",
+                    ProjectId = "test-project",
+                    UseEmulators = useEmulators
+                },
+                Clock);
         }
 
         private async Task<HttpResponseMessage> RespondAsync(HttpRequestMessage request)

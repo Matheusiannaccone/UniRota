@@ -11,7 +11,8 @@ namespace UniRota.Services.Firebase;
 
 public sealed partial class FirebaseAuthService : IAuthService
 {
-    private const string RefreshTokenStorageKey = "firebase_refresh_token";
+    private const string ProductionRefreshTokenStorageKey = "firebase_refresh_token";
+    private const string EmulatorRefreshTokenStorageKey = "firebase_emulator_refresh_token";
 
     private static readonly TimeSpan TokenRefreshMargin = TimeSpan.FromMinutes(2);
 
@@ -43,6 +44,10 @@ public sealed partial class FirebaseAuthService : IAuthService
     }
 
     public User? CurrentUser { get; private set; }
+
+    private string RefreshTokenStorageKey => _options.UseEmulators
+        ? EmulatorRefreshTokenStorageKey
+        : ProductionRefreshTokenStorageKey;
 
     public async Task<User> RegisterAsync(
         string name,
