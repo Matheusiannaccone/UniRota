@@ -70,6 +70,7 @@ public sealed partial class FirebaseAuthServiceTests
                 Assert.Equal("VERIFY_AND_CHANGE_EMAIL", body.RootElement.GetProperty("requestType").GetString());
                 Assert.Equal("new@example.com", body.RootElement.GetProperty("newEmail").GetString());
                 Assert.False(body.RootElement.TryGetProperty("password", out _));
+                Assert.Equal("pt-BR", Assert.Single(request.Headers.GetValues("X-Firebase-Locale")));
             }
             return await normal(request);
         };
@@ -79,6 +80,31 @@ public sealed partial class FirebaseAuthServiceTests
         Assert.Equal(0, f.Service.PendingEmailChange!.ResendCount);
         Assert.DoesNotContain(f.Requests, r => r.StartsWith("PATCH"));
         Assert.DoesNotContain(f.Storage.Values.Values, value => value.Contains("password"));
+    }
+
+    [Fact]
+    public async Task EmailLinks_UsePortugueseLocale_ForInitialSendAndResends()
+    {
+        using var f = new AuthFixture();
+        await f.Service.LoginAsync("old@example.com", "password");
+        await f.Service.ReauthenticateAsync("password");
+        var normal = f.Handle;
+        var locales = new List<string>();
+        f.Handle = async request =>
+        {
+            if (request.RequestUri!.AbsolutePath.Contains("sendOobCode"))
+                locales.Add(Assert.Single(request.Headers.GetValues("X-Firebase-Locale")));
+            return await normal(request);
+        };
+
+        await f.Service.BeginEmailChangeAsync("new@example.com");
+        for (var i = 0; i < 2; i++)
+        {
+            f.Clock.Advance();
+            await f.Service.ResendEmailConfirmationAsync();
+        }
+
+        Assert.Equal(["pt-BR", "pt-BR", "pt-BR"], locales);
     }
 
     [Theory]
@@ -191,6 +217,21 @@ public sealed partial class FirebaseAuthServiceTests
         Assert.Equal(EmailConfirmationResult.Confirmed, await restarted.Service.CheckEmailConfirmationAsync(EmailConfirmationAction.Automatic));
         Assert.Equal("new@example.com", restarted.Service.CurrentUser!.Email);
         Assert.Single(restarted.Storage.Values);
+    }
+
+    [Fact]
+    public async Task EmailChangeSessionRecovery_WithIncorrectPassword_UsesProfileSpecificMessage()
+    {
+        using var f = await BeginEmailFlowAsync();
+        var normal = f.Handle;
+        f.Handle = request => request.RequestUri!.AbsolutePath.Contains("signInWithPassword")
+            ? Task.FromResult(Json("""{"error":{"message":"INVALID_PASSWORD"}}""", System.Net.HttpStatusCode.BadRequest))
+            : normal(request);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => f.Service.RecoverEmailChangeSessionAsync("wrong-password"));
+
+        Assert.Equal("Senha inválida.", exception.Message);
     }
 
     [Fact]

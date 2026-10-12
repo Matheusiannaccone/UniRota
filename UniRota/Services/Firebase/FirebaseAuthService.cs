@@ -292,6 +292,10 @@ public sealed partial class FirebaseAuthService : IAuthService
                 GetIdTokenExpiration(response.ExpiresIn), cancellationToken);
             _reauthenticatedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(5);
         }
+        catch (InvalidOperationException exception) when (IsInvalidCredentialsException(exception))
+        {
+            throw CreateInvalidProfilePasswordException(exception);
+        }
         finally { _tokenRefreshLock.Release(); }
     }
 
@@ -637,6 +641,16 @@ public sealed partial class FirebaseAuthService : IAuthService
         var exception = new InvalidOperationException(message);
         exception.Data["FirebaseCode"] = firebaseCode;
         return exception;
+    }
+
+    private static bool IsInvalidCredentialsException(InvalidOperationException exception) =>
+        exception.Data["FirebaseCode"] is "EMAIL_NOT_FOUND" or "INVALID_PASSWORD" or "INVALID_LOGIN_CREDENTIALS";
+
+    private static InvalidOperationException CreateInvalidProfilePasswordException(InvalidOperationException exception)
+    {
+        var profileException = new InvalidOperationException("Senha inválida.", exception);
+        profileException.Data["FirebaseCode"] = exception.Data["FirebaseCode"];
+        return profileException;
     }
 
     private static bool IsInvalidSessionError(string firebaseCode)

@@ -162,10 +162,17 @@ public sealed partial class FirebaseAuthService
         {
             var pending = RequirePendingEmailChange();
             FirebaseAuthResponseDto response;
-            try { response = await SignInForRecoveryAsync(pending.NewEmail, password, cancellationToken); }
-            catch (InvalidOperationException ex) when (ex.Data["FirebaseCode"] is "EMAIL_NOT_FOUND" or "INVALID_PASSWORD" or "INVALID_LOGIN_CREDENTIALS")
+            try
             {
-                response = await SignInForRecoveryAsync(pending.OriginalEmail, password, cancellationToken);
+                try { response = await SignInForRecoveryAsync(pending.NewEmail, password, cancellationToken); }
+                catch (InvalidOperationException ex) when (IsInvalidCredentialsException(ex))
+                {
+                    response = await SignInForRecoveryAsync(pending.OriginalEmail, password, cancellationToken);
+                }
+            }
+            catch (InvalidOperationException ex) when (IsInvalidCredentialsException(ex))
+            {
+                throw CreateInvalidProfilePasswordException(ex);
             }
             if (response.LocalId != pending.UserId)
                 throw new InvalidOperationException("A senha informada não autenticou a conta deste fluxo.");
@@ -183,9 +190,14 @@ public sealed partial class FirebaseAuthService
         PostJsonAsync<FirebaseAuthResponseDto>($"{IdentityToolkitBaseUrl}/accounts:signInWithPassword?key={Escape(_options.ApiKey)}",
             new { email, password, returnSecureToken = true }, ct);
 
-    private async Task SendEmailLinkAsync(string token, string newEmail, CancellationToken ct) =>
-        await PostJsonAsync<JsonElement>($"{IdentityToolkitBaseUrl}/accounts:sendOobCode?key={Escape(_options.ApiKey)}",
-            new { requestType = "VERIFY_AND_CHANGE_EMAIL", idToken = token, newEmail }, ct);
+    private async Task SendEmailLinkAsync(string token, string newEmail, CancellationToken ct)
+    {
+        using var request = CreateJsonRequest(HttpMethod.Post,
+            $"{IdentityToolkitBaseUrl}/accounts:sendOobCode?key={Escape(_options.ApiKey)}",
+            new { requestType = "VERIFY_AND_CHANGE_EMAIL", idToken = token, newEmail });
+        request.Headers.Add("X-Firebase-Locale", "pt-BR");
+        EnsureSuccess(await SendAsync(request, ct));
+    }
 
     private async Task<FirebaseAuthResponseDto> LookupAccountAsync(string token, string userId, CancellationToken ct)
     {

@@ -35,9 +35,25 @@ public sealed partial class FirebaseAuthServiceTests
         var before = await fixture.Service.LoginAsync("old@example.com", "password");
         fixture.Handle = _ => Task.FromResult(Json(
             JsonSerializer.Serialize(new { error = new { message = error } }), HttpStatusCode.BadRequest));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.ReauthenticateAsync("wrong-password"));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.ReauthenticateAsync("wrong-password"));
+        Assert.Equal("Senha inválida.", exception.Message);
         Assert.Same(before, fixture.Service.CurrentUser);
         Assert.Equal("token", await fixture.Service.GetValidIdTokenAsync());
+    }
+
+    [Theory]
+    [InlineData("INVALID_PASSWORD")]
+    [InlineData("INVALID_LOGIN_CREDENTIALS")]
+    public async Task Login_IncorrectCredentials_KeepsGlobalMessage(string error)
+    {
+        using var fixture = new AuthFixture();
+        fixture.Handle = _ => Task.FromResult(Json(
+            JsonSerializer.Serialize(new { error = new { message = error } }), HttpStatusCode.BadRequest));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Service.LoginAsync("old@example.com", "wrong-password"));
+
+        Assert.Equal("E-mail ou senha inválidos.", exception.Message);
     }
 
     [Fact]
