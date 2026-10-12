@@ -1,7 +1,9 @@
 "use strict";
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
+const { getFirestoreDb } = require("./firebaseAdmin");
 const {
   GooglePlacesError,
   autocompletePlaces,
@@ -9,6 +11,7 @@ const {
   getPlaceDetails,
 } = require("./googlePlaces");
 const { createComputeRouteHandler } = require("./googleRoutesCallable");
+const { synchronizeWeeklyRouteUserNames } = require("./userProfileSync");
 
 const googlePlacesApiKey = defineSecret("GOOGLE_PLACES_API_KEY");
 const googleRoutesApiKey = defineSecret("GOOGLE_ROUTES_API_KEY");
@@ -75,6 +78,15 @@ exports.computeRoute = onCall(
   routesCallableOptions,
   createComputeRouteHandler({
     getApiKey: () => googleRoutesApiKey.value(),
+  }));
+
+exports.syncWeeklyRouteUserNames = onDocumentUpdated(
+  { document: "users/{uid}", region: "southamerica-east1" },
+  async (event) => synchronizeWeeklyRouteUserNames({
+    db: getFirestoreDb(),
+    uid: event.params.uid,
+    beforeName: event.data.before.data().name,
+    afterName: event.data.after.data().name,
   }));
 
 function requireAuthenticatedUser(request) {
