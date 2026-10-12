@@ -2,51 +2,56 @@
 <ContentPage x:Class="UniRota.Views.Matching.RideRequestPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    Shell.NavBarIsVisible="True" Title="Confirmar carona">
-    <ScrollView>
-        <VerticalStackLayout Style="{StaticResource PageContent}">
-            <Border Style="{StaticResource InfoCard}">
-                <VerticalStackLayout Style="{StaticResource SectionContent}">
-                    <VerticalStackLayout Style="{StaticResource DetailContent}">
-                        <Label Text="{Binding DriverNameText}" Style="{StaticResource SectionTitle}" />
-                        <Label Text="Motorista" Style="{StaticResource Caption}" />
+    xmlns:controls="clr-namespace:UniRota.Views.Controls"
+    Shell.NavBarIsVisible="False" Title="Confirmar carona">
+    <Grid RowDefinitions="Auto,*">
+        <controls:AuthenticatedHeader />
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Style="{StaticResource PageContent}">
+                <Label Text="Confirmar carona" Style="{StaticResource PageTitle}" />
+                <Border Style="{StaticResource InfoCard}">
+                    <VerticalStackLayout Style="{StaticResource SectionContent}">
+                        <VerticalStackLayout Style="{StaticResource DetailContent}">
+                            <Label Text="{Binding DriverNameText}" Style="{StaticResource SectionTitle}" />
+                            <Label Text="Motorista" Style="{StaticResource Caption}" />
+                        </VerticalStackLayout>
+                        <Label Text="{Binding OriginDestinationText}" Style="{StaticResource CardTitle}" />
+                        <VerticalStackLayout Style="{StaticResource DetailContent}">
+                            <Label Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}" Style="{StaticResource PageSubtitle}" />
+                            <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" Style="{StaticResource CardTitle}" />
+                        </VerticalStackLayout>
+                        <Label Text="{Binding SuggestedPriceText}" IsVisible="{Binding HasSuggestedPrice}" Style="{StaticResource SuccessBadge}" />
                     </VerticalStackLayout>
-                    <Label Text="{Binding OriginDestinationText}" Style="{StaticResource CardTitle}" />
-                    <VerticalStackLayout Style="{StaticResource DetailContent}">
-                        <Label Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}" Style="{StaticResource PageSubtitle}" />
-                        <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" Style="{StaticResource CardTitle}" />
-                    </VerticalStackLayout>
-                    <Label Text="{Binding SuggestedPriceText}" IsVisible="{Binding HasSuggestedPrice}" Style="{StaticResource SuccessBadge}" />
-                </VerticalStackLayout>
-            </Border>
-            <VerticalStackLayout Style="{StaticResource DetailContent}">
-                <Label Text="Como deseja viajar?" Style="{StaticResource SectionTitle}" />
-                <Label Text="Selecione a frequência da sua carona." Style="{StaticResource PageSubtitle}" />
-            </VerticalStackLayout>
-            <VerticalStackLayout Style="{StaticResource DetailContent}" IsEnabled="{Binding CanSubmit}">
-                <RadioButton Content="Uma única vez" Value="{Binding RequestTypes[0]}" GroupName="RequestType"
-                    IsChecked="{Binding IsOnceSelected, Mode=OneWay}" CheckedChanged="OnRequestTypeCheckedChanged" Style="{StaticResource ChoiceRadio}" />
-                <RadioButton Content="Toda semana" Value="{Binding RequestTypes[1]}" GroupName="RequestType"
-                    IsChecked="{Binding IsWeeklySelected, Mode=OneWay}" CheckedChanged="OnRequestTypeCheckedChanged" Style="{StaticResource ChoiceRadio}" />
-            </VerticalStackLayout>
-            <VerticalStackLayout Style="{StaticResource DetailContent}" IsVisible="{Binding IsOnceSelected}">
-                <Label Text="Data da viagem" Style="{StaticResource SectionTitle}" />
-                <Border Style="{StaticResource InputContainer}">
-                    <DatePicker Date="{Binding RequestedDate}" MinimumDate="{Binding MinimumDate}" Format="dd/MM/yyyy" IsEnabled="{Binding CanSubmit}" />
                 </Border>
-                <Label Text="A data precisa corresponder a um dos dias compatíveis." Style="{StaticResource Caption}" />
-            </VerticalStackLayout>
-            <Border Style="{StaticResource InfoCard}" IsVisible="{Binding IsWeeklySelected}">
                 <VerticalStackLayout Style="{StaticResource DetailContent}">
-                    <Label Text="Compromisso semanal" Style="{StaticResource CardTitle}" />
-                    <Label Text="Todos os dias compatíveis serão incluídos:" Style="{StaticResource PageSubtitle}" />
-                    <Label Text="{Binding CompatibleDaysText}" Style="{StaticResource CardTitle}" />
+                    <Label Text="Como deseja viajar?" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Selecione a frequência da sua carona." Style="{StaticResource PageSubtitle}" />
                 </VerticalStackLayout>
-            </Border>
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
-            <Button Text="Confirmar solicitação" Clicked="OnConfirmRequestClicked" IsEnabled="{Binding CanSubmit}" Style="{StaticResource PrimaryButton}" />
-            <Label Text="Sua solicitação será enviada para o motorista." Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
-        </VerticalStackLayout>
-    </ScrollView>
+                <VerticalStackLayout Style="{StaticResource DetailContent}" IsEnabled="{Binding CanSubmit}">
+                    <RadioButton Content="Uma única vez" Value="{Binding RequestTypes[0]}" GroupName="RequestType"
+                        IsChecked="{Binding IsOnceSelected, Mode=OneWay}" CheckedChanged="OnRequestTypeCheckedChanged" Style="{StaticResource ChoiceRadio}" />
+                    <RadioButton Content="Toda semana" Value="{Binding RequestTypes[1]}" GroupName="RequestType"
+                        IsChecked="{Binding IsWeeklySelected, Mode=OneWay}" CheckedChanged="OnRequestTypeCheckedChanged" Style="{StaticResource ChoiceRadio}" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Style="{StaticResource DetailContent}" IsVisible="{Binding IsOnceSelected}">
+                    <Label Text="Data da viagem" Style="{StaticResource SectionTitle}" />
+                    <Border Style="{StaticResource InputContainer}">
+                        <DatePicker Date="{Binding RequestedDate}" MinimumDate="{Binding MinimumDate}" Format="dd/MM/yyyy" IsEnabled="{Binding CanSubmit}" />
+                    </Border>
+                    <Label Text="A data precisa corresponder a um dos dias compatíveis." Style="{StaticResource Caption}" />
+                </VerticalStackLayout>
+                <Border Style="{StaticResource InfoCard}" IsVisible="{Binding IsWeeklySelected}">
+                    <VerticalStackLayout Style="{StaticResource DetailContent}">
+                        <Label Text="Compromisso semanal" Style="{StaticResource CardTitle}" />
+                        <Label Text="Todos os dias compatíveis serão incluídos:" Style="{StaticResource PageSubtitle}" />
+                        <Label Text="{Binding CompatibleDaysText}" Style="{StaticResource CardTitle}" />
+                    </VerticalStackLayout>
+                </Border>
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
+                <Button Text="Confirmar solicitação" Clicked="OnConfirmRequestClicked" IsEnabled="{Binding CanSubmit}" Style="{StaticResource PrimaryButton}" />
+                <Label Text="Sua solicitação será enviada para o motorista." Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
 </ContentPage>
