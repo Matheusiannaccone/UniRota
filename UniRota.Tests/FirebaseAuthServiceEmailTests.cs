@@ -1,11 +1,50 @@
 using System.Net;
 using System.Text.Json;
 using UniRota.Models;
+using UniRota.ViewModels;
 
 namespace UniRota.Tests;
 
 public sealed partial class FirebaseAuthServiceTests
 {
+    [Fact]
+    public async Task AwaitingScreen_AutomaticCheckIgnoresManualCooldown()
+    {
+        using var f = await BeginEmailFlowAsync();
+        var vm = new AwaitingEmailConfirmationViewModel(f.Service);
+        vm.RefreshState();
+        Assert.False(vm.CanVerify);
+        Assert.False(vm.CanResend);
+        await vm.CheckAutomaticallyAsync();
+        Assert.Contains("ainda não", vm.StatusMessage);
+        Assert.Single(f.Requests.Where(r => r.Contains("accounts:lookup")));
+        Assert.False(vm.CanVerify);
+    }
+
+    [Fact]
+    public async Task AwaitingScreen_ForegroundWhileBusy_QueuesAnotherCheckWithoutConcurrency()
+    {
+        using var f = await BeginEmailFlowAsync();
+        var vm = new AwaitingEmailConfirmationViewModel(f.Service);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var normal = f.Handle;
+        var calls = 0;
+        f.Handle = async request =>
+        {
+            if (++calls == 1) { entered.SetResult(); await release.Task; }
+            return await normal(request);
+        };
+        var checking = vm.CheckAutomaticallyAsync();
+        await entered.Task;
+        await vm.CheckAutomaticallyAsync();
+        Assert.Equal(1, calls);
+        release.SetResult();
+        await checking;
+        Assert.Equal(2, calls);
+        Assert.False(vm.IsBusy);
+    }
+
     private static async Task<AuthFixture> BeginEmailFlowAsync()
     {
         var fixture = new AuthFixture();

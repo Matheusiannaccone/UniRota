@@ -12,13 +12,14 @@ public partial class AwaitingEmailConfirmationPage : ContentPage
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        _observedWindow = Window;
-        if (_observedWindow is not null) _observedWindow.Resumed += OnResumed;
+        ObserveWindow();
         _timer ??= Dispatcher.CreateTimer();
         _timer.Interval = TimeSpan.FromSeconds(1);
         _timer.Tick += OnTimerTick;
@@ -27,12 +28,44 @@ public partial class AwaitingEmailConfirmationPage : ContentPage
     }
 
     private void OnTimerTick(object? sender, EventArgs e) => _viewModel.RefreshState();
-    private async void OnResumed(object? sender, EventArgs e) => await _viewModel.CheckAutomaticallyAsync();
+    private void OnLoaded(object? sender, EventArgs e) => ObserveWindow();
+    private void OnUnloaded(object? sender, EventArgs e) => StopObservingWindow();
+
+    private void ObserveWindow()
+    {
+        // No Shell, OnAppearing pode ocorrer antes de a página estar ligada à Window.
+        if (ReferenceEquals(_observedWindow, Window)) return;
+        StopObservingWindow();
+        _observedWindow = Window;
+        if (_observedWindow is not null)
+        {
+            // Activated corresponde a OnResume no Android, inclusive retorno após OnPause.
+            _observedWindow.Activated += OnActivated;
+            _observedWindow.Deactivated += OnDeactivated;
+        }
+    }
+
+    private async void OnActivated(object? sender, EventArgs e)
+    {
+        if (Shell.Current?.CurrentPage == this)
+            await _viewModel.CheckAutomaticallyAsync();
+    }
+
+    private void OnDeactivated(object? sender, EventArgs e) => _viewModel.RecoveryPassword = string.Empty;
+
+    private void StopObservingWindow()
+    {
+        if (_observedWindow is not null)
+        {
+            _observedWindow.Activated -= OnActivated;
+            _observedWindow.Deactivated -= OnDeactivated;
+        }
+        _observedWindow = null;
+    }
 
     protected override void OnDisappearing()
     {
-        if (_observedWindow is not null) _observedWindow.Resumed -= OnResumed;
-        _observedWindow = null;
+        // A observação termina em Unloaded; ir para segundo plano não deve removê-la.
         if (_timer is not null) { _timer.Stop(); _timer.Tick -= OnTimerTick; }
         _viewModel.RecoveryPassword = string.Empty;
         base.OnDisappearing();

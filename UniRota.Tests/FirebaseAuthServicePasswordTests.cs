@@ -7,6 +7,28 @@ namespace UniRota.Tests;
 public sealed partial class FirebaseAuthServiceTests
 {
     [Fact]
+    public async Task LeavingProfileDuringReauthentication_DoesNotReopenSecurityStep()
+    {
+        using var f = new AuthFixture();
+        await f.Service.LoginAsync("old@example.com", "password");
+        var vm = new ProfileViewModel(f.Service);
+        vm.BeginPasswordChangeCommand.Execute(null);
+        vm.CurrentPassword = "password";
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var normal = f.Handle;
+        f.Handle = async request => { entered.SetResult(); await release.Task; return await normal(request); };
+        var confirming = vm.ConfirmCurrentPasswordCommand.ExecuteAsync(null);
+        await entered.Task;
+        vm.ClearSensitiveFields();
+        release.SetResult();
+        await confirming;
+        Assert.True(vm.IsSecurityIdle);
+        Assert.Empty(vm.CurrentPassword);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.ChangePasswordAsync("new-password"));
+    }
+
+    [Fact]
     public async Task PasswordScreen_RequiresCurrentPassword_AndClearsItAfterEachAttempt()
     {
         using var f = new AuthFixture();

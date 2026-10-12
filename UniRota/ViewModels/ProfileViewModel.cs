@@ -8,6 +8,7 @@ public partial class ProfileViewModel : ObservableObject
 {
     private readonly IAuthService _authService;
     private bool _changingPassword;
+    private int _securityFlowVersion;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSecurityIdle))]
@@ -67,6 +68,7 @@ public partial class ProfileViewModel : ObservableObject
 
     public void ClearSensitiveFields()
     {
+        _securityFlowVersion++;
         CurrentPassword = NewEmail = string.Empty;
         NewPassword = ConfirmNewPassword = string.Empty;
         _changingPassword = false;
@@ -104,10 +106,16 @@ public partial class ProfileViewModel : ObservableObject
     {
         if (IsBusy || !IsConfirmingPassword) return;
         IsBusy = true;
+        var flowVersion = _securityFlowVersion;
         ErrorMessage = SuccessMessage = string.Empty;
         try
         {
             await _authService.ReauthenticateAsync(CurrentPassword);
+            if (flowVersion != _securityFlowVersion)
+            {
+                _authService.ClearReauthentication();
+                return;
+            }
             SecurityStep = _changingPassword ? 3 : 2;
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }
