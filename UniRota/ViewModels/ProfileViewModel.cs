@@ -7,18 +7,23 @@ namespace UniRota.ViewModels;
 public partial class ProfileViewModel : ObservableObject
 {
     private readonly IAuthService _authService;
+    private bool _changingPassword;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSecurityIdle))]
     [NotifyPropertyChangedFor(nameof(IsConfirmingPassword))]
     [NotifyPropertyChangedFor(nameof(IsEnteringEmail))]
+    [NotifyPropertyChangedFor(nameof(IsEnteringPassword))]
     private int securityStep;
 
     [ObservableProperty] private string currentPassword = string.Empty;
     [ObservableProperty] private string newEmail = string.Empty;
+    [ObservableProperty] private string newPassword = string.Empty;
+    [ObservableProperty] private string confirmNewPassword = string.Empty;
     public bool IsSecurityIdle => SecurityStep == 0;
     public bool IsConfirmingPassword => SecurityStep == 1;
     public bool IsEnteringEmail => SecurityStep == 2;
+    public bool IsEnteringPassword => SecurityStep == 3;
 
     [ObservableProperty]
     private string name = string.Empty;
@@ -63,6 +68,8 @@ public partial class ProfileViewModel : ObservableObject
     public void ClearSensitiveFields()
     {
         CurrentPassword = NewEmail = string.Empty;
+        NewPassword = ConfirmNewPassword = string.Empty;
+        _changingPassword = false;
         SecurityStep = 0;
         _authService.ClearReauthentication();
     }
@@ -82,6 +89,16 @@ public partial class ProfileViewModel : ObservableObject
         if (!IsBusy) ClearSensitiveFields();
     }
 
+    [RelayCommand]
+    private void BeginPasswordChange()
+    {
+        if (IsBusy) return;
+        ClearSensitiveFields();
+        ErrorMessage = SuccessMessage = string.Empty;
+        _changingPassword = true;
+        SecurityStep = 1;
+    }
+
     [RelayCommand(AllowConcurrentExecutions = false)]
     private async Task ConfirmCurrentPasswordAsync()
     {
@@ -91,10 +108,49 @@ public partial class ProfileViewModel : ObservableObject
         try
         {
             await _authService.ReauthenticateAsync(CurrentPassword);
-            SecurityStep = 2;
+            SecurityStep = _changingPassword ? 3 : 2;
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }
         finally { CurrentPassword = string.Empty; IsBusy = false; }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task SubmitPasswordAsync()
+    {
+        if (IsBusy || !IsEnteringPassword) return;
+        ErrorMessage = SuccessMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(NewPassword) || NewPassword.Length < 6)
+        {
+            ErrorMessage = "A senha deve ter pelo menos 6 caracteres.";
+            return;
+        }
+        if (!string.Equals(NewPassword, ConfirmNewPassword, StringComparison.Ordinal))
+        {
+            ErrorMessage = "A confirmação de senha não corresponde à nova senha.";
+            return;
+        }
+        IsBusy = true;
+        try
+        {
+            await _authService.ChangePasswordAsync(NewPassword);
+            ClearSensitiveFields();
+            SuccessMessage = "Senha atualizada.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            SecurityStep = 1;
+            if (_authService.CurrentUser is null)
+            {
+                await Shell.Current.DisplayAlert("Sessão", ErrorMessage, "OK");
+                await Shell.Current.GoToAsync("//login");
+            }
+        }
+        finally
+        {
+            CurrentPassword = NewPassword = ConfirmNewPassword = string.Empty;
+            IsBusy = false;
+        }
     }
 
     [RelayCommand(AllowConcurrentExecutions = false)]

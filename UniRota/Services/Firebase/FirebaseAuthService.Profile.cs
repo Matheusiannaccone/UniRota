@@ -12,6 +12,43 @@ public sealed partial class FirebaseAuthService
 
     public void ClearReauthentication() => _reauthenticatedUntilUtc = default;
 
+    public async Task ChangePasswordAsync(string newPassword, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+            throw new ArgumentException("A senha deve ter pelo menos 6 caracteres.");
+        if (PendingEmailChange is not null)
+            throw new InvalidOperationException("Conclua ou cancele a alteração de e-mail antes de alterar sua senha.");
+        var user = CurrentUser ?? throw CreateFirebaseException("INVALID_ID_TOKEN");
+        var token = await GetValidIdTokenAsync(cancellationToken);
+        await _tokenRefreshLock.WaitAsync(cancellationToken);
+        var changed = false;
+        try
+        {
+            EnsureCurrentUser(user);
+            EnsureRecentAuthentication();
+            var response = await PostJsonAsync<FirebaseAuthResponseDto>(
+                $"{IdentityToolkitBaseUrl}/accounts:update?key={Escape(_options.ApiKey)}",
+                new { idToken = token, password = newPassword, returnSecureToken = true }, cancellationToken);
+            changed = true;
+            EnsureCurrentUser(user);
+            if (response.LocalId != user.Id) throw CreateFirebaseException("INVALID_ID_TOKEN");
+            await SetCurrentSessionAsync(user,
+                RequireResponseValue(response.IdToken, "ID token"),
+                RequireResponseValue(response.RefreshToken, "refresh token"),
+                GetIdTokenExpiration(response.ExpiresIn), cancellationToken);
+        }
+        catch (Exception ex) when (changed)
+        {
+            try { ClearLocalSession(); } catch { ClearSessionInMemory(); }
+            throw new InvalidOperationException("A senha foi alterada, mas não foi possível manter a sessão. Entre novamente com a nova senha.", ex);
+        }
+        finally
+        {
+            ClearReauthentication();
+            _tokenRefreshLock.Release();
+        }
+    }
+
     public async Task BeginEmailChangeAsync(string newEmail, CancellationToken cancellationToken = default)
     {
         newEmail = newEmail.Trim();

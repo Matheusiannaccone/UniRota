@@ -180,9 +180,15 @@ public sealed partial class FirebaseAuthServiceTests
 
     private sealed class MemoryStorage : ISecureStorage
     {
+        public bool FailWrites { get; set; }
         public Dictionary<string, string> Values { get; } = [];
         public Task<string?> GetAsync(string key) => Task.FromResult(Values.GetValueOrDefault(key));
-        public Task SetAsync(string key, string value) { Values[key] = value; return Task.CompletedTask; }
+        public Task SetAsync(string key, string value)
+        {
+            if (FailWrites) throw new InvalidOperationException("Storage unavailable");
+            Values[key] = value;
+            return Task.CompletedTask;
+        }
         public bool Remove(string key) => Values.Remove(key);
         public void RemoveAll() => Values.Clear();
     }

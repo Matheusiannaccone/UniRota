@@ -27,7 +27,7 @@
                         <Label Text="Segurança" Style="{StaticResource SectionTitle}" />
                         <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsSecurityIdle}">
                             <Button Text="Alterar e-mail" Command="{Binding BeginEmailChangeCommand}" Style="{StaticResource DangerButton}" IsEnabled="{Binding IsNotBusy}" />
-                            <Button Text="Alterar senha" Style="{StaticResource DangerButton}" IsEnabled="False" />
+                            <Button Text="Alterar senha" Command="{Binding BeginPasswordChangeCommand}" Style="{StaticResource DangerButton}" IsEnabled="{Binding IsNotBusy}" />
                         </VerticalStackLayout>
                         <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsConfirmingPassword}">
                             <Label Text="Confirme sua senha" Style="{StaticResource CardTitle}" />
@@ -42,6 +42,16 @@
                                 <Entry Text="{Binding NewEmail}" Keyboard="Email" Placeholder="Novo e-mail" IsEnabled="{Binding IsNotBusy}" />
                             </Border>
                             <Button Text="Confirmar alteração" Command="{Binding SubmitEmailCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DangerButton}" />
+                            <Button Text="Cancelar" Command="{Binding CancelSecurityChangeCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Style="{StaticResource SectionContent}" IsVisible="{Binding IsEnteringPassword}">
+                            <Border Style="{StaticResource InputContainer}">
+                                <Entry Text="{Binding NewPassword}" IsPassword="True" Placeholder="Nova senha (mínimo 6 caracteres)" IsEnabled="{Binding IsNotBusy}" />
+                            </Border>
+                            <Border Style="{StaticResource InputContainer}">
+                                <Entry Text="{Binding ConfirmNewPassword}" IsPassword="True" Placeholder="Confirme a nova senha" IsEnabled="{Binding IsNotBusy}" />
+                            </Border>
+                            <Button Text="Confirmar alteração" Command="{Binding SubmitPasswordCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource DangerButton}" />
                             <Button Text="Cancelar" Command="{Binding CancelSecurityChangeCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
                         </VerticalStackLayout>
                     </VerticalStackLayout>

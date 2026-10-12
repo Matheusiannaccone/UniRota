@@ -233,6 +233,8 @@ public sealed class FirebaseRouteServiceTests
         public Task<EmailConfirmationResult> CheckEmailConfirmationAsync(EmailConfirmationAction action, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task RecoverEmailChangeSessionAsync(string password, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+        public Task ChangePasswordAsync(string newPassword, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task LogoutAsync() => Task.CompletedTask;
     }
 }

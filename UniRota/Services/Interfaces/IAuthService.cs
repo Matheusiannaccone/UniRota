@@ -24,6 +24,7 @@ public interface IAuthService
     Task UpdateNameAsync(string name, CancellationToken cancellationToken = default);
 
     Task ReauthenticateAsync(string currentPassword, CancellationToken cancellationToken = default);
+    Task ChangePasswordAsync(string newPassword, CancellationToken cancellationToken = default);
 
     PendingEmailChange? PendingEmailChange { get; }
     void ClearReauthentication();
