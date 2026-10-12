@@ -2,44 +2,104 @@
 <ContentPage x:Class="UniRota.Views.Auth.LoginPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    Shell.NavBarIsVisible="False" Title="Entrar">
-    <ScrollView>
-        <VerticalStackLayout Style="{StaticResource AuthContent}">
-            <!-- Container substituível pela marca oficial. -->
-            <Grid Style="{StaticResource BrandSlot}" ColumnDefinitions="Auto,*">
+    Shell.NavBarIsVisible="False"
+    Title="Entrar">
+    <ContentPage.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Offset="0" Color="{AppThemeBinding Light=#F4FAFF, Dark=#0D1D29}" />
+            <GradientStop Offset="0.55" Color="{AppThemeBinding Light=#FFFFFF, Dark=#101E29}" />
+            <GradientStop Offset="1" Color="{AppThemeBinding Light=#F2FBFC, Dark=#102630}" />
+        </LinearGradientBrush>
+    </ContentPage.Background>
 
-                <Label Grid.Column="1" Text="UniRota" Style="{StaticResource BrandText}" />
-            </Grid>
-            <VerticalStackLayout Style="{StaticResource DetailContent}">
-                <Label Text="Bem-vindo" Style="{StaticResource PageTitle}" />
-                <Label Text="Acesse sua conta para continuar sua jornada na Facens." Style="{StaticResource PageSubtitle}" />
+    <Grid>
+        <Border WidthRequest="230" HeightRequest="230" TranslationX="105" TranslationY="-135"
+                HorizontalOptions="End" VerticalOptions="Start" StrokeThickness="0"
+                BackgroundColor="{AppThemeBinding Light=#DDF3FF, Dark=#12364E}" Opacity="0.48"
+                StrokeShape="RoundRectangle 115" InputTransparent="True" />
+
+        <ScrollView>
+            <VerticalStackLayout Style="{StaticResource AuthRedesignContent}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="13">
+                    <Border Style="{StaticResource AuthBrandMark}">
+                        <Image Source="auth_route.svg" SemanticProperties.Description="Símbolo de rota" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="-2" VerticalOptions="Center">
+                        <Label Text="UniRota" Style="{StaticResource AuthBrandName}" />
+                        <Label Text="Juntos, o caminho fica mais leve" Style="{StaticResource AuthTagline}" />
+                    </VerticalStackLayout>
+                </Grid>
+
+                <Border Style="{StaticResource AuthHeroSurface}">
+                    <Image Source="auth_hero.png" Aspect="AspectFit"
+                           Margin="-8,-5,-8,-2"
+                           SemanticProperties.Description="Estudantes compartilhando uma rota de carro até o campus" />
+                </Border>
+
+                <VerticalStackLayout Spacing="9" Margin="0,2">
+                    <Label Text="BEM-VINDO DE VOLTA" Style="{StaticResource AuthEyebrow}" />
+                    <Label Text="Seu caminho começa aqui." Style="{StaticResource AuthTitle}" />
+                    <Label Text="Entre para encontrar rotas, compartilhar trajetos e chegar junto com a comunidade." Style="{StaticResource AuthSubtitle}" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="16">
+                    <VerticalStackLayout Spacing="7">
+                        <Label Text="E-mail" Style="{StaticResource AuthFieldLabel}" />
+                        <Border Style="{StaticResource AuthInputContainer}">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                <Border Style="{StaticResource AuthFieldIconSurface}">
+                                    <Image Source="auth_mail.svg" SemanticProperties.Description="E-mail" />
+                                </Border>
+                                <Entry Grid.Column="1" Text="{Binding Email}" Placeholder="seu@email.com"
+                                       Keyboard="Email" ReturnType="Next" IsEnabled="{Binding IsNotBusy}"
+                                       Style="{StaticResource AuthEntry}" />
+                            </Grid>
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="7">
+                        <Label Text="Senha" Style="{StaticResource AuthFieldLabel}" />
+                        <Border Style="{StaticResource AuthInputContainer}">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                <Border Style="{StaticResource AuthFieldIconSurface}">
+                                    <Image Source="auth_lock.svg" SemanticProperties.Description="Senha" />
+                                </Border>
+                                <Entry Grid.Column="1" Text="{Binding Password}" Placeholder="Digite sua senha"
+                                       IsPassword="True" ReturnType="Go" IsEnabled="{Binding IsNotBusy}"
+                                       Style="{StaticResource AuthEntry}" />
+                            </Grid>
+                        </Border>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+
+                <VerticalStackLayout Spacing="12">
+                    <Button Text="Entrar  →" Command="{Binding LoginCommand}" IsEnabled="{Binding IsNotBusy}"
+                            Style="{StaticResource AuthPrimaryButton}" />
+                    <Button Text="Criar minha conta" Command="{Binding GoToRegisterCommand}" IsEnabled="{Binding IsNotBusy}"
+                            Style="{StaticResource AuthSecondaryButton}" />
+                </VerticalStackLayout>
+
+                <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="12">
+                    <BoxView HeightRequest="1" VerticalOptions="Center" BackgroundColor="{AppThemeBinding Light=#DCE7EF, Dark=#385267}" />
+                    <Label Grid.Column="1" Text="UMA COMUNIDADE EM MOVIMENTO" Style="{StaticResource AuthEyebrow}" FontSize="10" />
+                    <BoxView Grid.Column="2" HeightRequest="1" VerticalOptions="Center" BackgroundColor="{AppThemeBinding Light=#DCE7EF, Dark=#385267}" />
+                </Grid>
+
+                <Border Style="{StaticResource AuthInfoCard}">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="13">
+                        <Border Style="{StaticResource AuthFieldIconSurface}" WidthRequest="44" HeightRequest="44" Padding="9">
+                            <Image Source="auth_people.svg" SemanticProperties.Description="Comunidade" />
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                            <Label Text="Feito para a vida no campus" Style="{StaticResource AuthFieldLabel}" FontSize="14" />
+                            <Label Text="Conecte-se com pessoas que compartilham o mesmo caminho." Style="{StaticResource AuthSubtitle}" FontSize="13" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
             </VerticalStackLayout>
-            <VerticalStackLayout Style="{StaticResource SectionContent}">
-
-                <Border Style="{StaticResource InputContainer}">
-                <VerticalStackLayout Spacing="0">
-                    <Label Text="E-mail" Style="{StaticResource Caption}" />
-                    <Entry Text="{Binding Email}" Placeholder="seu@email.com" Keyboard="Email" ReturnType="Next" IsEnabled="{Binding IsNotBusy}" />
-                </VerticalStackLayout>
-            </Border>
-                <Border Style="{StaticResource InputContainer}">
-                <VerticalStackLayout Spacing="0">
-                    <Label Text="Senha" Style="{StaticResource Caption}" />
-                    <Entry Text="{Binding Password}" Placeholder="Digite sua senha" IsPassword="True" ReturnType="Go" IsEnabled="{Binding IsNotBusy}" />
-                </VerticalStackLayout>
-            </Border>
-
-            </VerticalStackLayout>
-            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorMessage}" />
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-            <Button Text="Entrar →" Command="{Binding LoginCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource PrimaryButton}" />
-            <Button Text="Ainda não tenho conta? Criar conta" Command="{Binding GoToRegisterCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource LinkButton}" />
-            <Border Style="{StaticResource InfoCard}">
-                <VerticalStackLayout Style="{StaticResource DetailContent}">
-                    <Label Text="Na mesma direção" Style="{StaticResource CardTitle}" />
-                    <Label Text="Conectando você a uma vida acadêmica mais prática e organizada." Style="{StaticResource PageSubtitle}" />
-                </VerticalStackLayout>
-            </Border>
-        </VerticalStackLayout>
-    </ScrollView>
+        </ScrollView>
+    </Grid>
 </ContentPage>
