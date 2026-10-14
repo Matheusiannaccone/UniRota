@@ -67,6 +67,30 @@ public sealed class GooglePlaceServiceTests
     }
 
     [Fact]
+    public async Task SearchAsync_UsesEmulatorFunctionUrl()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new StubHttpMessageHandler((request, cancellationToken) =>
+        {
+            capturedRequest = request;
+            return Task.FromResult(JsonResponse("""
+                {
+                  "result": {
+                    "suggestions": []
+                  }
+                }
+                """));
+        });
+        var service = CreateService(handler, useEmulators: true);
+
+        await service.SearchAsync("Facens", service.CreateSession());
+
+        Assert.Equal(
+            "http://10.0.2.2:5001/test-project/southamerica-east1/placesAutocomplete",
+            capturedRequest!.RequestUri!.AbsoluteUri);
+    }
+
+    [Fact]
     public async Task GetPlaceAsync_UsesSameSessionAndParsesSelectedAddress()
     {
         string? capturedBody = null;
@@ -250,7 +274,9 @@ public sealed class GooglePlaceServiceTests
         Assert.Contains("conexão", exception.Message);
     }
 
-    private static GooglePlaceService CreateService(HttpMessageHandler handler)
+    private static GooglePlaceService CreateService(
+        HttpMessageHandler handler,
+        bool useEmulators = false)
     {
         return new GooglePlaceService(
             new HttpClient(handler),
@@ -258,7 +284,8 @@ public sealed class GooglePlaceServiceTests
             {
                 ApiKey = "test-api-key",
                 ProjectId = "test-project",
-                FunctionsRegion = "southamerica-east1"
+                FunctionsRegion = "southamerica-east1",
+                UseEmulators = useEmulators
             },
             new FakeAuthService());
     }

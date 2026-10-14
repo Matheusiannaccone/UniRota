@@ -264,9 +264,7 @@ public sealed class GooglePlaceService : IPlaceService
 
     private string BuildFunctionUrl(string functionName)
     {
-        return $"https://{Uri.EscapeDataString(_options.FunctionsRegion)}-" +
-               $"{Uri.EscapeDataString(_options.ProjectId)}.cloudfunctions.net/" +
-               Uri.EscapeDataString(functionName);
+        return _options.BuildFunctionUrl(functionName);
     }
 
     private static InvalidOperationException CreateServiceException(
