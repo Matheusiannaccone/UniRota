@@ -368,7 +368,32 @@ public sealed partial class FirebaseRouteServiceTests
         WeeklyRoute input,
         bool update = false)
     {
-        var storedDocument = CreateSeatDocument();
+        var storedDocument = CreateSeatDocument(input.Role == RouteRole.Passenger);
+
+        if (update)
+        {
+            // A edição preserva a ocupação do documento relido, não a enviada pela tela.
+            var storedFields = storedDocument["fields"]!.AsObject();
+            storedFields["daysOfWeek"]!["arrayValue"]!["values"] = new JsonArray(
+                input.DaysOfWeek.Select(day => (JsonNode)new JsonObject { ["stringValue"] = day.ToString() }).ToArray());
+            storedFields["seatCapacity"] = input.SeatCapacity is { } capacity
+                ? new JsonObject { ["integerValue"] = capacity.ToString(CultureInfo.InvariantCulture) }
+                : new JsonObject { ["nullValue"] = null };
+            var weekly = new JsonObject();
+
+            foreach (var entry in input.WeeklyAvailableSeats)
+            {
+                weekly[entry.Key.ToString()] = new JsonObject { ["integerValue"] = entry.Value.ToString(CultureInfo.InvariantCulture) };
+            }
+
+            storedFields["weeklyAvailableSeats"]!["mapValue"]!["fields"] = weekly;
+            storedFields["oneTimeReservations"]!["arrayValue"]!["values"] = new JsonArray(
+                input.OneTimeReservations.Select(reservation => (JsonNode)SeatReservationValue(
+                    reservation.RequestId,
+                    reservation.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    reservation.DayOfWeek.ToString())).ToArray());
+        }
+
         JsonObject? writtenFields = null;
         string? writtenUrl = null;
         var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>

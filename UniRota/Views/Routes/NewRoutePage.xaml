@@ -16,7 +16,7 @@
                     <Label Text="Selecione seu papel nesta rota." Style="{StaticResource PageSubtitle}" />
                 </VerticalStackLayout>
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DetailSpacing}"
-                    IsEnabled="{Binding IsNotBusy}">
+                    IsEnabled="{Binding IsRoleEditable}">
                     <RadioButton Content="{Binding RoleOptions[0].DisplayName}" Value="{Binding RoleOptions[0]}" GroupName="RouteRole" IsChecked="{Binding IsDriver, Mode=OneWay}" CheckedChanged="OnRoleCheckedChanged" Style="{StaticResource ChoiceRadio}" />
                     <RadioButton Grid.Column="1" Content="{Binding RoleOptions[1].DisplayName}" Value="{Binding RoleOptions[1]}" GroupName="RouteRole" IsChecked="{Binding IsPassenger, Mode=OneWay}" CheckedChanged="OnRoleCheckedChanged" Style="{StaticResource ChoiceRadio}" />
                 </Grid>
@@ -98,8 +98,8 @@
                     <Label Text="4. Detalhes" Style="{StaticResource SectionTitle}" />
                     <Border Style="{StaticResource InputContainer}">
                         <VerticalStackLayout Style="{StaticResource DetailContent}">
-                            <Label Text="Vagas disponíveis" Style="{StaticResource Caption}" />
-                            <Entry Text="{Binding AvailableSeats, Mode=TwoWay}" Placeholder="Quantidade de vagas" Keyboard="Numeric" ReturnType="Done" IsEnabled="{Binding IsNotBusy}" />
+                            <Label Text="Vagas no veículo" Style="{StaticResource Caption}" />
+                            <Entry Text="{Binding SeatCapacity, Mode=TwoWay}" Placeholder="Quantidade de vagas" Keyboard="Numeric" ReturnType="Done" IsEnabled="{Binding IsNotBusy}" />
                         </VerticalStackLayout>
                     </Border>
                     <Label Text="A distância do trajeto é calculada automaticamente." Style="{StaticResource Caption}" />

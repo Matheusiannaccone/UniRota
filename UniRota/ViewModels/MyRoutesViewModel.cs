@@ -151,14 +151,19 @@ public partial class MyRoutesViewModel : ObservableObject
     }
 }
 
-public sealed class WeeklyRouteItemViewModel
+public sealed partial class WeeklyRouteItemViewModel : ObservableObject
 {
     private static readonly CultureInfo PtBrCulture =
         CultureInfo.GetCultureInfo("pt-BR");
 
-    public WeeklyRouteItemViewModel(WeeklyRoute route)
+    public WeeklyRouteItemViewModel(WeeklyRoute route, DateOnly? referenceDate = null)
     {
         Route = route ?? throw new ArgumentNullException(nameof(route));
+
+        // Referência local apenas para navegação visual; não define P3.
+        var visualDate = referenceDate ?? DateOnly.FromDateTime(DateTime.Today);
+        WeekStart = visualDate.AddDays(-(int)visualDate.DayOfWeek);
+        RebuildWeekDays();
     }
 
     public WeeklyRoute Route { get; }
@@ -173,11 +178,51 @@ public sealed class WeeklyRouteItemViewModel
     public string DepartureTimeText =>
         RoutePresentationText.GetDepartureTimeText(Route.DepartureTimeMinutes);
 
-    public bool HasAvailableSeats =>
-        Route.Role == RouteRole.Driver && Route.AvailableSeats is > 0;
+    public bool HasDriverWeek => Route.Role == RouteRole.Driver;
 
-    public string AvailableSeatsText =>
-        RoutePresentationText.GetAvailableSeatsText(Route.AvailableSeats);
+    public DateOnly WeekStart { get; private set; }
+
+    public string WeekRangeText => WeekStart.ToString("dd/MM/yyyy", PtBrCulture)
+        + " – " + WeekStart.AddDays(6).ToString("dd/MM/yyyy", PtBrCulture);
+
+    public IReadOnlyList<ScheduledRouteDayViewModel> WeekDays { get; private set; } = [];
+
+    public bool CanGoToPreviousWeek => HasDriverWeek && WeekStart.DayNumber >= 7;
+
+    public bool CanGoToNextWeek => HasDriverWeek && WeekStart.DayNumber <= DateOnly.MaxValue.DayNumber - 13;
+
+    [RelayCommand(CanExecute = nameof(CanGoToPreviousWeek))]
+    private void PreviousWeek() => MoveWeek(-7);
+
+    [RelayCommand(CanExecute = nameof(CanGoToNextWeek))]
+    private void NextWeek() => MoveWeek(7);
+
+    private void MoveWeek(int days)
+    {
+        if ((days < 0 && !CanGoToPreviousWeek) || (days > 0 && !CanGoToNextWeek))
+        {
+            return;
+        }
+
+        WeekStart = WeekStart.AddDays(days);
+        RebuildWeekDays();
+        OnPropertyChanged(nameof(WeekStart));
+        OnPropertyChanged(nameof(WeekRangeText));
+        OnPropertyChanged(nameof(CanGoToPreviousWeek));
+        OnPropertyChanged(nameof(CanGoToNextWeek));
+        PreviousWeekCommand.NotifyCanExecuteChanged();
+        NextWeekCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RebuildWeekDays()
+    {
+        WeekDays = HasDriverWeek
+            ? Enumerable.Range(0, 7)
+                .Select(offset => new ScheduledRouteDayViewModel(Route, WeekStart.AddDays(offset)))
+                .ToArray()
+            : [];
+        OnPropertyChanged(nameof(WeekDays));
+    }
 
     public bool HasEstimatedDistance => Route.Role == RouteRole.Driver;
 

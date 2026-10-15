@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using UniRota.Models;
+using UniRota.Services;
 using UniRota.Services.Interfaces;
 
 namespace UniRota.ViewModels;
@@ -57,7 +58,7 @@ public partial class NewRouteViewModel : ObservableObject
     private TimeSpan departureTime = DefaultDepartureTime;
 
     [ObservableProperty]
-    private int? availableSeats;
+    private int? seatCapacity;
 
     [ObservableProperty]
     private bool isBusy;
@@ -127,6 +128,8 @@ public partial class NewRouteViewModel : ObservableObject
 
     public bool IsNotBusy => !IsBusy;
 
+    public bool IsRoleEditable => !IsBusy && !IsEditing;
+
     public string PageTitle => IsEditing ? "Editar rota" : "Nova rota";
 
     public string ActionButtonText =>
@@ -166,24 +169,33 @@ public partial class NewRouteViewModel : ObservableObject
 
     partial void OnSelectedRoleChanged(RouteRoleOption? value)
     {
+        if (_routeBeingEdited is { } existingRoute && value?.Role != existingRoute.Role)
+        {
+            SelectedRole = RoleOptions.Single(option => option.Role == existingRoute.Role);
+            SetError("O papel da rota não pode ser alterado após a criação.");
+            return;
+        }
+
         OnPropertyChanged(nameof(IsPassenger));
         OnPropertyChanged(nameof(IsDriver));
 
         if (!IsDriver)
         {
-            AvailableSeats = null;
+            SeatCapacity = null;
         }
     }
 
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(IsNotBusy));
+        OnPropertyChanged(nameof(IsRoleEditable));
     }
 
     partial void OnIsEditingChanged(bool value)
     {
         OnPropertyChanged(nameof(PageTitle));
         OnPropertyChanged(nameof(ActionButtonText));
+        OnPropertyChanged(nameof(IsRoleEditable));
     }
 
     public void BeginCreate()
@@ -217,8 +229,8 @@ public partial class NewRouteViewModel : ObservableObject
         SetOriginSelection(route.Origin, route.OriginPlaceId);
         SetDestinationSelection(route.Destination, route.DestinationPlaceId);
         DepartureTime = TimeSpan.FromMinutes(route.DepartureTimeMinutes);
-        AvailableSeats = route.Role == RouteRole.Driver
-            ? route.AvailableSeats
+        SeatCapacity = route.Role == RouteRole.Driver
+            ? route.SeatCapacity
             : null;
 
         foreach (var day in Days)
@@ -467,15 +479,33 @@ public partial class NewRouteViewModel : ObservableObject
         }
 
         if (SelectedRole.Role == RouteRole.Driver
-            && AvailableSeats is null or <= 0)
+            && SeatCapacity is null or <= 0)
         {
             SetError("Informe ao menos uma vaga para a rota de motorista.");
+            return false;
+        }
+
+        IReadOnlyDictionary<DayOfWeek, int> weeklySeats;
+
+        try
+        {
+            weeklySeats = _routeBeingEdited is { } existingRoute
+                ? RouteSeatEditingRules.GetUpdatedWeeklySeats(existingRoute, SeatCapacity, selectedDays)
+                : SelectedRole.Role == RouteRole.Driver
+                    ? selectedDays.ToDictionary(day => day, _ => SeatCapacity!.Value)
+                    : new Dictionary<DayOfWeek, int>();
+        }
+        catch (ArgumentException exception)
+        {
+            SetError(exception.Message);
             return false;
         }
 
         route = new WeeklyRoute
         {
             Id = _routeBeingEdited?.Id ?? string.Empty,
+            UserId = _routeBeingEdited?.UserId ?? string.Empty,
+            UserName = _routeBeingEdited?.UserName ?? string.Empty,
             Role = SelectedRole.Role,
             Origin = normalizedOrigin,
             OriginPlaceId = OriginPlaceId.Trim(),
@@ -483,9 +513,13 @@ public partial class NewRouteViewModel : ObservableObject
             DestinationPlaceId = DestinationPlaceId.Trim(),
             DaysOfWeek = selectedDays,
             DepartureTimeMinutes = (int)DepartureTime.TotalMinutes,
-            AvailableSeats = SelectedRole.Role == RouteRole.Driver
-                ? AvailableSeats
+            SeatCapacity = SelectedRole.Role == RouteRole.Driver
+                ? SeatCapacity
                 : null,
+            WeeklyAvailableSeats = weeklySeats,
+            OneTimeReservations = _routeBeingEdited?.OneTimeReservations.ToArray() ?? [],
+            RequestRevision = _routeBeingEdited?.RequestRevision ?? 0,
+            CreatedAtUtc = _routeBeingEdited?.CreatedAtUtc ?? default,
             EstimatedDistanceKm = 0m
         };
 
@@ -501,7 +535,7 @@ public partial class NewRouteViewModel : ObservableObject
         SetOriginSelection(string.Empty, string.Empty);
         SetDestinationSelection(string.Empty, string.Empty);
         DepartureTime = DefaultDepartureTime;
-        AvailableSeats = null;
+        SeatCapacity = null;
 
         foreach (var day in Days)
         {
@@ -737,7 +771,9 @@ public partial class NewRouteViewModel : ObservableObject
             DestinationPlaceId = route.DestinationPlaceId,
             DaysOfWeek = route.DaysOfWeek,
             DepartureTimeMinutes = route.DepartureTimeMinutes,
-            AvailableSeats = route.AvailableSeats,
+            SeatCapacity = route.SeatCapacity,
+            WeeklyAvailableSeats = route.WeeklyAvailableSeats,
+            OneTimeReservations = route.OneTimeReservations,
             EstimatedDistanceKm = estimatedDistanceKm,
             RequestRevision = route.RequestRevision,
             CreatedAtUtc = route.CreatedAtUtc

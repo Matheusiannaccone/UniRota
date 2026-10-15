@@ -42,8 +42,27 @@
                                     <VerticalStackLayout Style="{StaticResource DetailContent}">
                                         <Label Text="{Binding DaysText}" Style="{StaticResource PageSubtitle}" />
                                         <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" />
-                                        <Label Text="{Binding AvailableSeatsText}" IsVisible="{Binding HasAvailableSeats}" Style="{StaticResource SuccessBadge}" />
                                         <Label Text="{Binding EstimatedDistanceText}" IsVisible="{Binding HasEstimatedDistance}" Style="{StaticResource Caption}" />
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout IsVisible="{Binding HasDriverWeek}" Style="{StaticResource DetailContent}">
+                                        <Label Text="Passageiros programados" Style="{StaticResource CardTitle}" />
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Button Text="‹" Command="{Binding PreviousWeekCommand}" SemanticProperties.Description="Semana anterior" Style="{StaticResource HeaderAction}" />
+                                            <Label Grid.Column="1" Text="{Binding WeekRangeText}" Style="{StaticResource Caption}" HorizontalTextAlignment="Center" VerticalOptions="Center" />
+                                            <Button Grid.Column="2" Text="›" Command="{Binding NextWeekCommand}" SemanticProperties.Description="Próxima semana" Style="{StaticResource HeaderAction}" />
+                                        </Grid>
+                                        <FlexLayout Direction="Row" BindableLayout.ItemsSource="{Binding WeekDays}">
+                                            <BindableLayout.ItemTemplate>
+                                                <DataTemplate x:DataType="viewModels:ScheduledRouteDayViewModel">
+                                                    <VerticalStackLayout FlexLayout.Basis="0" FlexLayout.Grow="1" FlexLayout.Shrink="1" Style="{StaticResource DetailContent}">
+                                                        <Label Text="{Binding DisplayDay}" Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
+                                                        <Label Text="{Binding DisplayDate}" Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
+                                                        <Label Text="{Binding DisplayValue}" SemanticProperties.Description="{Binding AccessibilityText}" Style="{StaticResource CardTitle}" HorizontalTextAlignment="Center" />
+                                                    </VerticalStackLayout>
+                                                </DataTemplate>
+                                            </BindableLayout.ItemTemplate>
+                                        </FlexLayout>
+                                        <Label Text="-: dia não oferecido · 0: sem passageiros" Style="{StaticResource Caption}" />
                                     </VerticalStackLayout>
                                     <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DetailSpacing}">
                                         <Button Text="Editar" Clicked="OnEditRouteClicked" CommandParameter="{Binding .}" Style="{StaticResource SecondaryButton}" />

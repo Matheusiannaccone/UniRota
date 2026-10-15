@@ -95,7 +95,8 @@ public sealed class FirebaseRouteService : IRouteService
             userId,
             existingRoute.UserName,
             existingRoute.Id,
-            existingRoute.CreatedAtUtc);
+            existingRoute.CreatedAtUtc,
+            existingRoute);
 
         EnsureCurrentUserHasNotChanged(userId);
 
@@ -247,11 +248,17 @@ public sealed class FirebaseRouteService : IRouteService
         string userId,
         string userName,
         string routeId,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        WeeklyRoute? existingRoute = null)
     {
         if (!Enum.IsDefined(typeof(RouteRole), route.Role))
         {
             throw new ArgumentException("Informe um papel válido para a rota.", nameof(route));
+        }
+
+        if (existingRoute is not null && route.Role != existingRoute.Role)
+        {
+            throw new ArgumentException("O papel da rota não pode ser alterado após a criação.", nameof(route));
         }
 
         var origin = route.Origin?.Trim() ?? string.Empty;
@@ -298,9 +305,7 @@ public sealed class FirebaseRouteService : IRouteService
                 "O horário de saída deve estar entre 0 e 1439 minutos.");
         }
 
-        var seatSchemaError = GetSeatSchemaValidationError(route);
-
-        if (seatSchemaError is not null)
+        if (existingRoute is null && GetSeatSchemaValidationError(route) is { } seatSchemaError)
         {
             throw new ArgumentException(seatSchemaError, nameof(route));
         }
@@ -318,7 +323,11 @@ public sealed class FirebaseRouteService : IRouteService
             .OrderBy(day => day)
             .ToArray();
 
-        return new WeeklyRoute
+        var weeklySeats = existingRoute is null
+            ? route.WeeklyAvailableSeats
+            : RouteSeatEditingRules.GetUpdatedWeeklySeats(existingRoute, route.SeatCapacity, daysOfWeek);
+        var reservations = existingRoute?.OneTimeReservations ?? route.OneTimeReservations;
+        var normalizedRoute = new WeeklyRoute
         {
             Id = routeId,
             UserId = userId,
@@ -331,16 +340,23 @@ public sealed class FirebaseRouteService : IRouteService
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = route.DepartureTimeMinutes,
             SeatCapacity = route.SeatCapacity,
-            WeeklyAvailableSeats = route.WeeklyAvailableSeats.ToDictionary(
+            WeeklyAvailableSeats = weeklySeats.ToDictionary(
                 entry => entry.Key,
                 entry => entry.Value),
-            OneTimeReservations = route.OneTimeReservations.ToArray(),
+            OneTimeReservations = reservations.ToArray(),
             EstimatedDistanceKm = route.Role == RouteRole.Driver
                 ? route.EstimatedDistanceKm
                 : 0m,
-            RequestRevision = 0,
+            RequestRevision = existingRoute?.RequestRevision ?? 0,
             CreatedAtUtc = createdAtUtc
         };
+
+        if (GetSeatSchemaValidationError(normalizedRoute) is { } normalizedSchemaError)
+        {
+            throw new ArgumentException(normalizedSchemaError, nameof(route));
+        }
+
+        return normalizedRoute;
     }
 
     private static string? GetSeatSchemaValidationError(WeeklyRoute route)

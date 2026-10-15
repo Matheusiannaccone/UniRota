@@ -4,7 +4,7 @@ using UniRota.ViewModels;
 
 namespace UniRota.Tests;
 
-public sealed class NewRouteViewModelTests
+public sealed partial class NewRouteViewModelTests
 {
     [Fact]
     public async Task Save_CalculatesAndCreatesDriverRouteInKilometers()
@@ -460,7 +460,7 @@ public sealed class NewRouteViewModelTests
             Origin = "Centro",
             Destination = "Facens",
             DepartureTime = new TimeSpan(7, 30, 0),
-            AvailableSeats = role == RouteRole.Driver ? 2 : null
+            SeatCapacity = role == RouteRole.Driver ? 2 : null
         };
 
         viewModel.OriginPlaceId = "origin-place-id";
@@ -545,7 +545,10 @@ public sealed class NewRouteViewModelTests
                 : string.Empty,
             DaysOfWeek = [DayOfWeek.Monday],
             DepartureTimeMinutes = 450,
-            AvailableSeats = role == RouteRole.Driver ? 2 : null,
+            SeatCapacity = role == RouteRole.Driver ? 2 : null,
+            WeeklyAvailableSeats = role == RouteRole.Driver
+                ? new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 2 }
+                : new Dictionary<DayOfWeek, int>(),
             EstimatedDistanceKm = estimatedDistanceKm,
             CreatedAtUtc = DateTimeOffset.UnixEpoch
         };
