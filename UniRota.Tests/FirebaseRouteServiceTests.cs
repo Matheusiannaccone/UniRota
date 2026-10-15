@@ -6,7 +6,7 @@ using UniRota.Services.Interfaces;
 
 namespace UniRota.Tests;
 
-public sealed class FirebaseRouteServiceTests
+public sealed partial class FirebaseRouteServiceTests
 {
     [Fact]
     public async Task CreateAsync_PersistsAndDeserializesPlaceIds()
@@ -84,7 +84,7 @@ public sealed class FirebaseRouteServiceTests
     }
 
     [Fact]
-    public async Task GetMyRoutesAsync_DeserializesLegacyDocumentWithoutPlaceIds()
+    public async Task GetMyRoutesAsync_DeserializesNewSeatSchemaWithoutPlaceIds()
     {
         var handler = new StubHttpMessageHandler((request, cancellationToken) =>
             Task.FromResult(JsonResponse(
@@ -125,7 +125,11 @@ public sealed class FirebaseRouteServiceTests
             DestinationPlaceId = destinationPlaceId,
             DaysOfWeek = [DayOfWeek.Monday],
             DepartureTimeMinutes = 450,
-            AvailableSeats = 2,
+            SeatCapacity = 2,
+            WeeklyAvailableSeats = new Dictionary<DayOfWeek, int>
+            {
+                [DayOfWeek.Monday] = 2
+            },
             EstimatedDistanceKm = 8.5m
         };
     }
@@ -155,7 +159,11 @@ public sealed class FirebaseRouteServiceTests
                   "arrayValue": { "values": [{ "stringValue": "Monday" }] }
                 },
                 "departureTimeMinutes": { "integerValue": "450" },
-                "availableSeats": { "integerValue": "2" },
+                "seatCapacity": { "integerValue": "2" },
+                "weeklyAvailableSeats": {
+                  "mapValue": { "fields": { "Monday": { "integerValue": "2" } } }
+                },
+                "oneTimeReservations": { "arrayValue": { "values": [] } },
                 "estimatedDistanceKm": { "doubleValue": 8.5 },
                 "requestRevision": { "integerValue": "0" },
                 "createdAtUtc": { "timestampValue": "2026-09-21T12:00:00Z" }

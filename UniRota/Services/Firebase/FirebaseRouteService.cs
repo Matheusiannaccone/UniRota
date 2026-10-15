@@ -298,12 +298,11 @@ public sealed class FirebaseRouteService : IRouteService
                 "O horário de saída deve estar entre 0 e 1439 minutos.");
         }
 
-        if (route.Role == RouteRole.Driver
-            && route.AvailableSeats is null or <= 0)
+        var seatSchemaError = GetSeatSchemaValidationError(route);
+
+        if (seatSchemaError is not null)
         {
-            throw new ArgumentException(
-                "Uma rota de motorista deve oferecer ao menos uma vaga.",
-                nameof(route));
+            throw new ArgumentException(seatSchemaError, nameof(route));
         }
 
         if (route.Role == RouteRole.Driver
@@ -331,15 +330,80 @@ public sealed class FirebaseRouteService : IRouteService
             DestinationPlaceId = destinationPlaceId,
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = route.DepartureTimeMinutes,
-            AvailableSeats = route.Role == RouteRole.Driver
-                ? route.AvailableSeats
-                : null,
+            SeatCapacity = route.SeatCapacity,
+            WeeklyAvailableSeats = route.WeeklyAvailableSeats.ToDictionary(
+                entry => entry.Key,
+                entry => entry.Value),
+            OneTimeReservations = route.OneTimeReservations.ToArray(),
             EstimatedDistanceKm = route.Role == RouteRole.Driver
                 ? route.EstimatedDistanceKm
                 : 0m,
             RequestRevision = 0,
             CreatedAtUtc = createdAtUtc
         };
+    }
+
+    private static string? GetSeatSchemaValidationError(WeeklyRoute route)
+    {
+        if (route.WeeklyAvailableSeats is null || route.OneTimeReservations is null)
+        {
+            return "Os campos 'weeklyAvailableSeats' e 'oneTimeReservations' são obrigatórios.";
+        }
+
+        if (route.Role == RouteRole.Passenger)
+        {
+            return route.SeatCapacity is not null
+                || route.WeeklyAvailableSeats.Count != 0
+                || route.OneTimeReservations.Count != 0
+                ? "Passageiro deve possuir 'seatCapacity' null, mapa de vagas e reservas vazios."
+                : null;
+        }
+
+        if (route.SeatCapacity is null or <= 0)
+        {
+            return "O campo 'seatCapacity' deve ser maior que zero para motorista.";
+        }
+
+        var selectedDays = route.DaysOfWeek.ToHashSet();
+
+        if (route.WeeklyAvailableSeats.Count != selectedDays.Count
+            || route.WeeklyAvailableSeats.Keys.Any(day => !selectedDays.Contains(day)))
+        {
+            return "As chaves de 'weeklyAvailableSeats' devem corresponder aos dias da rota.";
+        }
+
+        if (route.WeeklyAvailableSeats.Values.Any(
+                seats => seats < 0 || seats > route.SeatCapacity.Value))
+        {
+            return "Os saldos de 'weeklyAvailableSeats' devem estar entre zero e 'seatCapacity'.";
+        }
+
+        var requestIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var reservation in route.OneTimeReservations)
+        {
+            if (reservation is null || string.IsNullOrWhiteSpace(reservation.RequestId))
+            {
+                return "Toda reserva deve possuir um 'requestId' não vazio.";
+            }
+
+            if (!requestIds.Add(reservation.RequestId))
+            {
+                return "O campo 'oneTimeReservations' contém 'requestId' duplicado.";
+            }
+
+            if (reservation.DayOfWeek != reservation.Date.DayOfWeek)
+            {
+                return "O campo 'dayOfWeek' da reserva deve corresponder a 'date'.";
+            }
+
+            if (!selectedDays.Contains(reservation.DayOfWeek))
+            {
+                return "A reserva deve pertencer a um dia existente da rota.";
+            }
+        }
+
+        return null;
     }
 
     private static Dictionary<string, object> CreateFirestoreFields(WeeklyRoute route)
@@ -382,13 +446,52 @@ public sealed class FirebaseRouteService : IRouteService
                 integerValue = route.DepartureTimeMinutes.ToString(
                     CultureInfo.InvariantCulture)
             },
-            ["availableSeats"] = route.AvailableSeats is not null
+            ["seatCapacity"] = route.SeatCapacity is not null
                 ? new
                 {
-                    integerValue = route.AvailableSeats.Value.ToString(
+                    integerValue = route.SeatCapacity.Value.ToString(
                         CultureInfo.InvariantCulture)
                 }
                 : new { nullValue = (object?)null },
+            ["weeklyAvailableSeats"] = new
+            {
+                mapValue = new
+                {
+                    fields = route.WeeklyAvailableSeats.ToDictionary(
+                        entry => entry.Key.ToString(),
+                        entry => new
+                        {
+                            integerValue = entry.Value.ToString(
+                                CultureInfo.InvariantCulture)
+                        })
+                }
+            },
+            ["oneTimeReservations"] = new
+            {
+                arrayValue = new
+                {
+                    values = route.OneTimeReservations.Select(reservation => new
+                    {
+                        mapValue = new
+                        {
+                            fields = new Dictionary<string, object>
+                            {
+                                ["requestId"] = new { stringValue = reservation.RequestId },
+                                ["date"] = new
+                                {
+                                    stringValue = reservation.Date.ToString(
+                                        "yyyy-MM-dd",
+                                        CultureInfo.InvariantCulture)
+                                },
+                                ["dayOfWeek"] = new
+                                {
+                                    stringValue = reservation.DayOfWeek.ToString()
+                                }
+                            }
+                        }
+                    }).ToArray()
+                }
+            },
             ["estimatedDistanceKm"] = new
             {
                 doubleValue = (double)route.EstimatedDistanceKm
@@ -420,7 +523,7 @@ public sealed class FirebaseRouteService : IRouteService
         var id = GetDocumentId(document.Name);
         var fields = document.Fields;
         var role = ParseRole(GetRequiredStringField(fields, "role"));
-        var daysOfWeek = GetRequiredDaysOfWeekField(fields, "daysOfWeek");
+        var daysOfWeek = GetRequiredDaysOfWeekField(fields, "daysOfWeek", id);
         var departureTimeMinutes = GetRequiredInt32Field(
             fields,
             "departureTimeMinutes");
@@ -432,27 +535,31 @@ public sealed class FirebaseRouteService : IRouteService
                 "o campo 'departureTimeMinutes' está fora do intervalo permitido");
         }
 
-        int? availableSeats = null;
+        int? seatCapacity;
         var estimatedDistanceKm = 0m;
 
         if (role == RouteRole.Driver)
         {
-            availableSeats = GetRequiredInt32Field(fields, "availableSeats");
-
-            if (availableSeats < 0)
-            {
-                throw CreateInvalidDocumentException(
-                    id,
-                    "o campo 'availableSeats' não pode ser negativo para motorista");
-            }
-
+            seatCapacity = GetRequiredInt32Field(fields, "seatCapacity");
             estimatedDistanceKm = GetRequiredPositiveDecimalField(
                 fields,
                 "estimatedDistanceKm",
                 id);
         }
+        else
+        {
+            if (!fields.TryGetValue("seatCapacity", out var capacityField)
+                || capacityField?.NullValue.ValueKind != JsonValueKind.Null)
+            {
+                throw CreateInvalidDocumentException(
+                    id,
+                    "o campo 'seatCapacity' deve ser explicitamente null para passageiro");
+            }
 
-        return new WeeklyRoute
+            seatCapacity = null;
+        }
+
+        var route = new WeeklyRoute
         {
             Id = id,
             UserId = GetRequiredStringField(fields, "userId"),
@@ -466,7 +573,9 @@ public sealed class FirebaseRouteService : IRouteService
                 "destinationPlaceId"),
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = departureTimeMinutes,
-            AvailableSeats = availableSeats,
+            SeatCapacity = seatCapacity,
+            WeeklyAvailableSeats = GetRequiredWeeklyAvailableSeats(fields, id),
+            OneTimeReservations = GetRequiredOneTimeReservations(fields, id),
             EstimatedDistanceKm = estimatedDistanceKm,
             RequestRevision = GetOptionalNonNegativeInt64Field(
                 fields,
@@ -474,6 +583,106 @@ public sealed class FirebaseRouteService : IRouteService
                 id),
             CreatedAtUtc = GetRequiredTimestampField(fields, "createdAtUtc")
         };
+
+        var seatSchemaError = GetSeatSchemaValidationError(route);
+
+        if (seatSchemaError is not null)
+        {
+            throw CreateInvalidDocumentException(id, seatSchemaError);
+        }
+
+        return route;
+    }
+
+    private static IReadOnlyDictionary<DayOfWeek, int> GetRequiredWeeklyAvailableSeats(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string documentId)
+    {
+        if (!fields.TryGetValue("weeklyAvailableSeats", out var field)
+            || field?.MapValue?.Fields is not { } mapFields)
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                "o campo 'weeklyAvailableSeats' deve conter um mapValue");
+        }
+
+        var seats = new Dictionary<DayOfWeek, int>();
+
+        foreach (var entry in mapFields)
+        {
+            var day = ParseCanonicalDay(entry.Key, "weeklyAvailableSeats", documentId);
+            seats.Add(day, GetRequiredInt32Field(mapFields, entry.Key));
+        }
+
+        return seats;
+    }
+
+    private static IReadOnlyList<OneTimeReservation> GetRequiredOneTimeReservations(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields,
+        string documentId)
+    {
+        if (!fields.TryGetValue("oneTimeReservations", out var field)
+            || field?.ArrayValue?.Values is not { } values)
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                "o campo 'oneTimeReservations' deve conter um arrayValue");
+        }
+
+        var reservations = new List<OneTimeReservation>();
+
+        foreach (var value in values)
+        {
+            if (value?.MapValue?.Fields is not { } reservationFields)
+            {
+                throw CreateInvalidDocumentException(
+                    documentId,
+                    "cada entrada de 'oneTimeReservations' deve conter um mapValue");
+            }
+
+            var dateText = GetRequiredStringField(reservationFields, "date");
+
+            if (!DateOnly.TryParseExact(
+                    dateText,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var date))
+            {
+                throw CreateInvalidDocumentException(
+                    documentId,
+                    "o campo 'date' da reserva deve conter uma data válida em yyyy-MM-dd");
+            }
+
+            reservations.Add(new OneTimeReservation
+            {
+                RequestId = GetRequiredStringField(reservationFields, "requestId"),
+                Date = date,
+                DayOfWeek = ParseCanonicalDay(
+                    GetRequiredStringField(reservationFields, "dayOfWeek"),
+                    "oneTimeReservations.dayOfWeek",
+                    documentId)
+            });
+        }
+
+        return reservations;
+    }
+
+    private static DayOfWeek ParseCanonicalDay(
+        string? value,
+        string fieldName,
+        string documentId)
+    {
+        if (!Enum.TryParse<DayOfWeek>(value, out var day)
+            || !Enum.IsDefined(typeof(DayOfWeek), day)
+            || !string.Equals(value, day.ToString(), StringComparison.Ordinal))
+        {
+            throw CreateInvalidDocumentException(
+                documentId,
+                $"o campo '{fieldName}' deve usar nomes canônicos de DayOfWeek");
+        }
+
+        return day;
     }
 
     private async Task<IReadOnlyList<WeeklyRoute>> RunRouteQueryAsync(
@@ -604,7 +813,8 @@ public sealed class FirebaseRouteService : IRouteService
 
     private static IReadOnlyList<DayOfWeek> GetRequiredDaysOfWeekField(
         IReadOnlyDictionary<string, FirestoreValueDto> fields,
-        string fieldName)
+        string fieldName,
+        string documentId)
     {
         if (!fields.TryGetValue(fieldName, out var field)
             || field.ArrayValue is null
@@ -618,18 +828,7 @@ public sealed class FirebaseRouteService : IRouteService
 
         foreach (var value in field.ArrayValue.Values)
         {
-            if (string.IsNullOrWhiteSpace(value.StringValue)
-                || !Enum.TryParse<DayOfWeek>(
-                    value.StringValue,
-                    ignoreCase: true,
-                    out var day)
-                || !Enum.IsDefined(typeof(DayOfWeek), day))
-            {
-                throw new InvalidOperationException(
-                    $"O documento de rota contém um valor inválido em '{fieldName}'.");
-            }
-
-            days.Add(day);
+            days.Add(ParseCanonicalDay(value?.StringValue, fieldName, documentId));
         }
 
         return days
@@ -643,7 +842,7 @@ public sealed class FirebaseRouteService : IRouteService
         string fieldName)
     {
         if (fields.TryGetValue(fieldName, out var field)
-            && !string.IsNullOrWhiteSpace(field.StringValue))
+            && !string.IsNullOrWhiteSpace(field?.StringValue))
         {
             return field.StringValue;
         }
@@ -665,7 +864,7 @@ public sealed class FirebaseRouteService : IRouteService
         IReadOnlyDictionary<string, FirestoreValueDto> fields,
         string fieldName)
     {
-        if (!fields.TryGetValue(fieldName, out var field))
+        if (!fields.TryGetValue(fieldName, out var field) || field is null)
         {
             throw new InvalidOperationException(
                 $"O documento de rota não contém o campo obrigatório '{fieldName}'.");
@@ -940,7 +1139,9 @@ public sealed class FirebaseRouteService : IRouteService
             "destinationPlaceId",
             "daysOfWeek",
             "departureTimeMinutes",
-            "availableSeats",
+            "seatCapacity",
+            "weeklyAvailableSeats",
+            "oneTimeReservations",
             "estimatedDistanceKm"
         };
         var updateMask = string.Join(
@@ -1003,6 +1204,9 @@ public sealed class FirebaseRouteService : IRouteService
         [JsonPropertyName("integerValue")]
         public JsonElement IntegerValue { get; init; }
 
+        [JsonPropertyName("nullValue")]
+        public JsonElement NullValue { get; init; }
+
         [JsonPropertyName("doubleValue")]
         public JsonElement DoubleValue { get; init; }
 
@@ -1011,6 +1215,15 @@ public sealed class FirebaseRouteService : IRouteService
 
         [JsonPropertyName("arrayValue")]
         public FirestoreArrayValueDto? ArrayValue { get; init; }
+
+        [JsonPropertyName("mapValue")]
+        public FirestoreMapValueDto? MapValue { get; init; }
+    }
+
+    private sealed class FirestoreMapValueDto
+    {
+        [JsonPropertyName("fields")]
+        public Dictionary<string, FirestoreValueDto> Fields { get; init; } = [];
     }
 
     private sealed class FirestoreArrayValueDto
