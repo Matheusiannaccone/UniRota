@@ -27,7 +27,7 @@ Nenhum desses comportamentos é alterado no Bloco 0.
 Definir o contrato dos campos, suas representações, cálculos e invariantes; preservar o inventário histórico; consolidar as decisões finais P1–P6 e organizar os blocos de implementação restantes. Decisão resolvida não significa implementação concluída.
 
 Preservar .NET MAUI/.NET 8, MVVM, DI, Firebase, integração de mapas, matching geográfico, preço e snapshot de `SuggestedPrice`, autenticação e estados Pending/Accepted/Rejected.
-
+    
 No Bloco 0, somente este documento foi alterado. O Bloco 1 implementou modelos e serialização. O Bloco 2 tratou de criação/edição e sua apresentação ao motorista. O planejamento restante consolida disponibilidade e referência temporal, aceite parcial, concorrência, Rules, integração, seed e visão do passageiro. Não planejar mudança funcional do matching neste ciclo.
 
 ## 3. Schema aprovado
@@ -174,22 +174,51 @@ Tuesday semanal = 2
 
 Uma data anterior à referência de hoje não é elegível para nova carona e suas reservas não entram na oferta vigente. Usar a referência confiável de hoje no calendário `America/Sao_Paulo`, conforme P3 na seção 11.1. Não aplicar comparações entre instantes UTC a strings de data civil.
 
-## 8. Solicitações Weekly — aceite parcial
+## 8. Solicitações Weekly — criação e aceite parcial
 
-- `CompatibleDays` preserva os dias originalmente compatíveis/solicitados, sem duplicação; `RequestedDate` permanece nulo.
-- A criação revalida o saldo semanal dos dias solicitados, mantém Pending com `AcceptedDays = []` e não reserva vagas. A concessão parcial é decidida no aceite.
-- No aceite, reler a solicitação Pending e a rota. Para cada `CompatibleDay`, conferir saldo semanal atual e conflitos com Once futuras já confirmadas; reservas da data de hoje também continuam válidas.
-- Incluir em `AcceptedDays` somente os dias que comportarem o passageiro. Se o saldo do dia for zero, o dia não existir na oferta atual ou seu decremento provocar sobreocupação em alguma data vigente afetada, ignorar esse dia.
-- Para cada dia candidato `d`, exigir saldo semanal positivo e, para cada data `D >= hoje` com reserva Once daquele dia, `weeklyAvailableSeats[d] - 1 - reservasOnce(D) >= 0`. Contar cada data separadamente e ignorar reservas passadas nesta decisão de disponibilidade.
-- Se `AcceptedDays` ficar vazio, não aceitar nem consumir vagas; Aceitar fica desabilitado e a única ação disponível é Recusar. Não rejeitar automaticamente.
-- Se restar pelo menos um dia, decrementar uma vaga somente em cada dia de `AcceptedDays`, persistir esse campo e mudar o status para Accepted, tudo no mesmo commit atômico.
-- Não sobrescrever `CompatibleDays`, não alterar `seatCapacity` nem `oneTimeReservations`, e não consumir dias não concedidos.
-- Informar ao passageiro exatamente os dias concedidos e os dias solicitados que não foram concedidos; a revisão de apresentação está no Bloco 9.
-- A mesma solicitação não pode ser aceita duas vezes. Concorrência deve impedir overbooking entre Weekly e Once.
+- `CompatibleDays` preserva todos os dias originalmente compatíveis/solicitados.
+- `RequestedDate` permanece nulo.
+- `AcceptedDays` começa vazio e só é definido no aceite.
+- A criação da solicitação não consome vagas.
+- A solicitação Weekly pode ser criada se pelo menos um `CompatibleDay` ainda tiver disponibilidade.
+- Mesmo que alguns dias estejam sem vaga na criação, todos os `CompatibleDays` originais são preservados.
 
-Exemplo: solicitação Monday/Tuesday/Wednesday; Monday sem vaga, Tuesday e Wednesday com vaga e sem conflito com Once vigente. Resultado: Accepted com `AcceptedDays = [Tuesday, Wednesday]`; apenas esses dois dias consomem vaga.
+No aceite, o sistema relê a rota e verifica individualmente cada `CompatibleDay`.
 
-P2 define que a Weekly começa a valer no momento do aceite, não possui data final automática neste MVP e permanece válida enquanto a relação existir. Não provocar overbooking em Once futuras já confirmadas. Reservas passadas não bloqueiam disponibilidade atual/futura. Cancelamento, vigência por semestre, data final e histórico temporal completo permanecem fora do MVP.
+Somente os dias que ainda possuírem vaga e não causarem conflito com reservas `Once` atuais ou futuras entram em `AcceptedDays` e consomem uma vaga.
+
+Se pelo menos um dia permanecer disponível, a solicitação é aceita parcialmente.
+
+Exemplo:
+
+```text
+CompatibleDays:
+Monday
+Tuesday
+Wednesday
+
+Disponibilidade no aceite:
+Monday = 0
+Tuesday = 2
+Wednesday = 1
+
+Resultado:
+AcceptedDays = [Tuesday, Wednesday]
+```
+
+Se nenhum dia estiver disponível:
+
+- a solicitação não é aceita;
+- nenhuma vaga é alterada;
+- `AcceptedDays` permanece vazio;
+- o botão Aceitar fica desabilitado;
+- somente Recusar permanece disponível.
+
+No aceite bem-sucedido, `status = Accepted`, `AcceptedDays` e `WeeklyAvailableSeats` devem ser atualizados atomicamente.
+
+`CompatibleDays` nunca deve ser sobrescrito.
+
+A Weekly começa a valer no momento do aceite e não possui data final automática neste MVP.
 
 ## 9. Solicitações Once
 
