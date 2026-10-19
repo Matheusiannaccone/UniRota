@@ -72,6 +72,8 @@ public sealed class MatchingService : IMatchingService
 
             var compatibleDays = driverRoute.DaysOfWeek
                 .Where(passengerDays.Contains)
+                .Where(day => driverRoute.WeeklyAvailableSeats.TryGetValue(day, out var seats)
+                    && seats > 0)
                 .Distinct()
                 .OrderBy(day => day)
                 .ToArray();
@@ -347,8 +349,7 @@ public sealed class MatchingService : IMatchingService
             && route.DaysOfWeek.All(
                 day => Enum.IsDefined(typeof(DayOfWeek), day))
             && route.DepartureTimeMinutes is >= 0 and <= 1439
-            // Transição até os Blocos 3–4: validar o schema e a oferta semanal
-            // da rota inteira, sem filtrar dias nem consultar reservas Once.
+            // Valida o schema e o saldo semanal persistido, sem previsão por data.
             && route.SeatCapacity is > 0
             && route.WeeklyAvailableSeats is not null
             && route.WeeklyAvailableSeats.Count == route.DaysOfWeek.Distinct().Count()

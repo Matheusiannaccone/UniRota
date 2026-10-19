@@ -35,6 +35,7 @@ public sealed partial class MatchingServiceTests
 
         Assert.Equal(matches ? 1 : 0, result.Count);
         Assert.Equal(matches ? 2 : 0, map.Requests.Count);
+        if (matches) Assert.Equal(new[] { DayOfWeek.Monday }, Assert.Single(result).CompatibleDays);
     }
 
     [Theory]
@@ -68,15 +69,55 @@ public sealed partial class MatchingServiceTests
         // Mesmo lotando datas específicas, a busca não recebe tipo/data de solicitação.
         var match = Assert.Single(await service.FindMatchesAsync(passenger, [driver]));
 
-        Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Tuesday }, match.CompatibleDays);
+        Assert.Equal(new[] { DayOfWeek.Monday }, match.CompatibleDays);
         Assert.Equal(baseline.CompatibleDays, match.CompatibleDays);
         Assert.Equal(baseline.TimeDifferenceMinutes, match.TimeDifferenceMinutes);
         Assert.Equal(baseline.SharedEncodedPolyline, match.SharedEncodedPolyline);
     }
 
+    [Theory]
+    [InlineData(0, 2, false)]
+    [InlineData(0, 0, false)]
+    [InlineData(1, 0, true)]
+    public async Task FindMatchesAsync_RequiresPositiveBalanceInsideDayIntersection(
+        int mondaySeats, int tuesdaySeats, bool matches)
+    {
+        var map = new FakeMapRouteService();
+        var driver = NewSchemaCandidate(new Dictionary<DayOfWeek, int>
+        {
+            [DayOfWeek.Monday] = mondaySeats,
+            [DayOfWeek.Tuesday] = tuesdaySeats
+        });
+
+        var result = await CreateService(map).FindMatchesAsync(
+            CreatePassenger(days: [DayOfWeek.Monday]), [driver]);
+
+        Assert.Equal(matches ? 1 : 0, result.Count);
+        Assert.Equal(matches ? 2 : 0, map.Requests.Count);
+        if (matches) Assert.Equal(new[] { DayOfWeek.Monday }, Assert.Single(result).CompatibleDays);
+    }
+
+    [Fact]
+    public async Task FindMatchesAsync_ExcludesFullDaysAndKeepsOnlyPositiveCommonDaysInOrder()
+    {
+        var driver = NewSchemaCandidate(new Dictionary<DayOfWeek, int>
+        {
+            [DayOfWeek.Monday] = 0,
+            [DayOfWeek.Tuesday] = 2,
+            [DayOfWeek.Wednesday] = 1,
+            [DayOfWeek.Thursday] = 3
+        }, days: [DayOfWeek.Thursday, DayOfWeek.Wednesday, DayOfWeek.Monday, DayOfWeek.Tuesday]);
+
+        var match = Assert.Single(await CreateService(new FakeMapRouteService()).FindMatchesAsync(
+            CreatePassenger(days: [DayOfWeek.Wednesday, DayOfWeek.Monday, DayOfWeek.Tuesday]), [driver]));
+
+        Assert.Equal(new[] { DayOfWeek.Tuesday, DayOfWeek.Wednesday }, match.CompatibleDays);
+    }
+
     private static WeeklyRoute NewSchemaCandidate(
         IReadOnlyDictionary<DayOfWeek, int> weekly,
-        IReadOnlyList<OneTimeReservation>? reservations = null) => new()
+        IReadOnlyList<OneTimeReservation>? reservations = null,
+        IReadOnlyList<DayOfWeek>? days = null) => new()
     {
         Id = "new-schema",
         UserId = "driver-user",
@@ -85,7 +126,7 @@ public sealed partial class MatchingServiceTests
         OriginPlaceId = "driver-origin",
         Destination = "Destino do motorista",
         DestinationPlaceId = "driver-destination",
-        DaysOfWeek = [DayOfWeek.Monday, DayOfWeek.Tuesday],
+        DaysOfWeek = days ?? [DayOfWeek.Monday, DayOfWeek.Tuesday],
         DepartureTimeMinutes = DefaultDepartureTimeMinutes,
         SeatCapacity = 3,
         WeeklyAvailableSeats = weekly,

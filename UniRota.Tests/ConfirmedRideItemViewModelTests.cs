@@ -101,10 +101,11 @@ public sealed class ConfirmedRideItemViewModelTests
     }
 
     [Fact]
-    public void WeeklyRequest_ShowsStoredCompatibleDaysWithoutDate()
+    public void WeeklyRequest_ShowsAcceptedDaysWithoutDate()
     {
         var request = CreateRequest(
-            compatibleDays: [DayOfWeek.Monday, DayOfWeek.Friday]);
+            compatibleDays: [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday],
+            acceptedDays: [DayOfWeek.Monday, DayOfWeek.Friday]);
 
         var item = new ConfirmedRideItemViewModel(
             request,
@@ -119,13 +120,41 @@ public sealed class ConfirmedRideItemViewModelTests
         Assert.Equal("Confirmada", item.StatusText);
     }
 
+    [Theory]
+    [InlineData("passenger-1")]
+    [InlineData("driver-1")]
+    public void WeeklyPartialAcceptance_ShowsOnlyGrantedDaysInConsistentOrder(string currentUserId)
+    {
+        var compatible = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday };
+        var accepted = new[] { DayOfWeek.Wednesday, DayOfWeek.Tuesday };
+        var request = CreateRequest(compatibleDays: compatible, acceptedDays: accepted);
+
+        var item = new ConfirmedRideItemViewModel(request, currentUserId);
+
+        Assert.Equal("Terça-feira, Quarta-feira", item.CompatibleDaysText);
+        Assert.DoesNotContain("Segunda-feira", item.CompatibleDaysText);
+        Assert.Equal(compatible, request.CompatibleDays);
+        Assert.Equal(accepted, request.AcceptedDays);
+        Assert.False(item.HasRequestedDate);
+    }
+
+    [Fact]
+    public void WeeklyWithoutAcceptedDays_DoesNotFallBackToRequestedDays()
+    {
+        var request = CreateRequest(acceptedDays: []);
+        var item = new ConfirmedRideItemViewModel(request, request.PassengerUserId);
+
+        Assert.Empty(item.CompatibleDaysText);
+    }
+
     private static RideRequest CreateRequest(
         string passengerUserName = "Ana",
         string driverUserName = "Bruno",
         IReadOnlyList<DayOfWeek>? compatibleDays = null,
         RideRequestType type = RideRequestType.Weekly,
         DateOnly? requestedDate = null,
-        decimal suggestedPrice = 3.45m)
+        decimal suggestedPrice = 3.45m,
+        IReadOnlyList<DayOfWeek>? acceptedDays = null)
     {
         return new RideRequest
         {
@@ -137,6 +166,9 @@ public sealed class ConfirmedRideItemViewModelTests
             PassengerRouteId = "passenger-route-1",
             DriverRouteId = "driver-route-1",
             CompatibleDays = compatibleDays ?? [DayOfWeek.Friday],
+            AcceptedDays = type == RideRequestType.Weekly
+                ? acceptedDays ?? compatibleDays ?? [DayOfWeek.Friday]
+                : [],
             Type = type,
             Status = RideRequestStatus.Accepted,
             RequestedDate = requestedDate,

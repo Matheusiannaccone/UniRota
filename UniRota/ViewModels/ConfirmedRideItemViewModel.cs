@@ -69,7 +69,10 @@ public sealed class ConfirmedRideItemViewModel
     };
 
     public string CompatibleDaysText =>
-        RoutePresentationText.GetDaysText(Request.CompatibleDays);
+        RoutePresentationText.GetDaysText(
+            Request.Type == RideRequestType.Weekly && Request.Status == RideRequestStatus.Accepted
+                ? Request.AcceptedDays.OrderBy(day => day)
+                : Request.CompatibleDays);
 
     public bool HasRequestedDate => Request.RequestedDate is not null;
 
