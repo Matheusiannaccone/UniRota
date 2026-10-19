@@ -16,13 +16,16 @@ public sealed class MatchingService : IMatchingService
 
     private readonly IMapRouteService _mapRouteService;
     private readonly MatchingOptions _options;
+    private readonly IAppClock _clock;
 
     public MatchingService(
         IMapRouteService mapRouteService,
-        MatchingOptions options)
+        MatchingOptions options,
+        IAppClock clock)
     {
         _mapRouteService = mapRouteService;
         _options = options;
+        _clock = clock;
         ValidateOptions(options);
     }
 
@@ -54,7 +57,7 @@ public sealed class MatchingService : IMatchingService
             return [];
         }
 
-        var passengerDays = passengerRoute.DaysOfWeek.Except(passengerRoute.WeeklyAcceptedDays).ToHashSet();
+        var passengerDays = RideRequestRules.GetPassengerAvailableWeeklyDays(passengerRoute, passengerRoute.DaysOfWeek, _clock.Today).ToHashSet();
         var candidates = new List<CandidateContext>();
 
         foreach (var driverRoute in candidateRoutes)

@@ -380,7 +380,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
 
         public void EditRoute(Action<JsonObject> edit) => Edit("weeklyRoutes/driver-route", edit);
         public void EditRequest(string id, Action<JsonObject> edit) => Edit("rideRequests/" + id, edit);
-        private void Edit(string key, Action<JsonObject> edit)
+        public void Edit(string key, Action<JsonObject> edit)
         {
             edit(_documents[key]["fields"]!.AsObject());
             _documents[key]["updateTime"] = NextVersion();
@@ -405,7 +405,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             Assert.EndsWith(":commit", request.RequestUri!.AbsoluteUri);
             var writes = JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!["writes"]!.AsArray();
             var weekly = writes[1]!["update"]!["fields"]!.AsObject().ContainsKey("weeklyAvailableSeats");
-            Assert.Equal(weekly ? 3 : 2, writes.Count);
+            Assert.Equal(3, writes.Count);
             var requestId = writes[0]!["update"]!["name"]!.GetValue<string>().Split('/').Last();
             var attempt = new CommitAttempt(requestId, writes);
             Attempts.Add(attempt);
@@ -477,7 +477,9 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                 else
                 {
                     Assert.Empty(AcceptedDays(id));
-                    Assert.Single(reservations.Where(value => value["requestId"]!["stringValue"]!.GetValue<string>() == id));
+                    var driverId = fields["driverRouteId"]!["stringValue"]!.GetValue<string>();
+                    var driverReservations = Fields("weeklyRoutes/" + driverId)["oneTimeReservations"]!["arrayValue"]!["values"]!.AsArray();
+                    Assert.Single(driverReservations.Where(value => value!["mapValue"]!["fields"]!["requestId"]!["stringValue"]!.GetValue<string>() == id));
                 }
             }
         }

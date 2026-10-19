@@ -91,7 +91,8 @@ public sealed class RideRequestViewModelTests
         var driverRoute = CreateDriverRouteWithPlaceIds();
         var match = Assert.Single(await new MatchingService(
                 mapRouteService,
-                new MatchingOptions())
+                new MatchingOptions(),
+                new AppClock(TimeProvider.System))
             .FindMatchesAsync(passengerRoute, [driverRoute]));
         Assert.Equal(2, mapRouteService.CalculateCount);
 

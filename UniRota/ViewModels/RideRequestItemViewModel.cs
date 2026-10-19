@@ -13,12 +13,12 @@ public sealed class RideRequestItemViewModel
         string counterpartyFallback,
         bool canAccept = false,
         IReadOnlyList<DayOfWeek>? acceptableDays = null,
-        bool passengerDaysUnavailable = false)
+        string? passengerConflictMessage = null)
     {
         Request = request ?? throw new ArgumentNullException(nameof(request));
         CanAccept = canAccept && request.Status == RideRequestStatus.Pending;
         AcceptableDays = acceptableDays ?? [];
-        PassengerDaysUnavailable = passengerDaysUnavailable;
+        PassengerConflictMessage = passengerConflictMessage;
         CounterpartyNameText = string.IsNullOrWhiteSpace(counterpartyName)
             ? counterpartyFallback
             : counterpartyName;
@@ -30,7 +30,7 @@ public sealed class RideRequestItemViewModel
 
     public IReadOnlyList<DayOfWeek> AcceptableDays { get; }
 
-    public bool PassengerDaysUnavailable { get; }
+    public string? PassengerConflictMessage { get; }
 
     public string AcceptanceConfirmationMessage => Request.Type == RideRequestType.Weekly
         && !AcceptableDays.OrderBy(day => day).SequenceEqual(Request.CompatibleDays.OrderBy(day => day))

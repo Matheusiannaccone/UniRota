@@ -84,9 +84,13 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         EnsureCurrentUserHasNotChanged(userId);
         if (type == RideRequestType.Weekly)
         {
-            compatibleDays = RideRequestRules.GetPassengerAvailableWeeklyDays(passengerRoute, compatibleDays);
+            compatibleDays = RideRequestRules.GetPassengerAvailableWeeklyDays(passengerRoute, compatibleDays, _clock.Today);
             if (compatibleDays.Count == 0) throw new InvalidOperationException(RideRequestRules.PassengerDaysUnavailableMessage);
         }
+
+        if (type == RideRequestType.Once
+            && RideRequestRules.GetPassengerOnceConflict(passengerRoute, requestedDate!.Value, _clock.Today) is { } conflict)
+            throw new InvalidOperationException(conflict);
 
         var idToken = await _authService.GetValidIdTokenAsync(cancellationToken);
         EnsureCurrentUserHasNotChanged(userId);
@@ -380,7 +384,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         var userId = GetAuthenticatedUser().Id;
         var token = await _authService.GetValidIdTokenAsync(cancellationToken);
         var routes = new Dictionary<string, WeeklyRoute>();
-        foreach (var request in requests.Where(request => request.Type == RideRequestType.Weekly))
+        foreach (var request in requests)
         {
             EnsureDriverCanProcessRequest(request, userId);
             if (!routes.ContainsKey(request.PassengerRouteId))
@@ -401,6 +405,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         var fields = document.Fields;
         var days = GetRequiredDaysOfWeekField(fields, "daysOfWeek", id);
         var accepted = GetRequiredAcceptedDays(fields, id, "weeklyAcceptedDays");
+        var dates = GetRequiredOneTimeAcceptedDates(fields, id);
         if (id != request.PassengerRouteId || GetRequiredStringField(fields, "userId", id) != request.PassengerUserId
             || ParseRouteRole(GetRequiredStringField(fields, "role", id), id) != RouteRole.Passenger
             || accepted.Distinct().Count() != accepted.Count || accepted.Any(day => !days.Contains(day))
@@ -409,7 +414,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             || !fields.TryGetValue("oneTimeReservations", out var reservations) || reservations?.ArrayValue?.Values is not { Count: 0 })
             throw CreateInvalidDocumentException(id, "o schema ou proprietário da rota do passageiro é inválido");
         return new WeeklyRoute { Id = id, UserId = request.PassengerUserId, Role = RouteRole.Passenger,
-            DaysOfWeek = days, WeeklyAcceptedDays = accepted };
+            DaysOfWeek = days, WeeklyAcceptedDays = accepted, OneTimeAcceptedDates = dates };
     }
 
     private static object CreatePassengerAcceptedDaysWrite(FirestoreDocumentDto document, IReadOnlyList<DayOfWeek> days) => new
@@ -417,6 +422,15 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         update = new { name = GetRequiredDocumentName(document), fields = new Dictionary<string, object>
         { ["weeklyAcceptedDays"] = new { arrayValue = new { values = days.Select(day => new { stringValue = day.ToString() }).ToArray() } } } },
         updateMask = new { fieldPaths = new[] { "weeklyAcceptedDays" } },
+        currentDocument = new { updateTime = GetRequiredUpdateTime(document) }
+    };
+
+    private static object CreatePassengerAcceptedDatesWrite(FirestoreDocumentDto document, IReadOnlyList<DateOnly> dates) => new
+    {
+        update = new { name = GetRequiredDocumentName(document), fields = new Dictionary<string, object>
+        { ["oneTimeAcceptedDates"] = new { arrayValue = new { values = dates.Select(date => new
+        { stringValue = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }).ToArray() } } } },
+        updateMask = new { fieldPaths = new[] { "oneTimeAcceptedDates" } },
         currentDocument = new { updateTime = GetRequiredUpdateTime(document) }
     };
 
@@ -452,17 +466,15 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 rideRequest,
                 userId);
 
+            var passengerDocument = await GetDocumentAsync(
+                BuildWeeklyRouteDocumentUrl(rideRequest.PassengerRouteId), idToken, cancellationToken);
+            var passenger = ConvertPassengerRouteSnapshot(passengerDocument, rideRequest);
             var today = _clock.Today;
-            FirestoreDocumentDto? passengerDocument = null;
-            WeeklyRoute? passenger = null;
             IReadOnlyList<DayOfWeek> acceptedDays = [];
             object availabilityWrite;
             if (rideRequest.Type == RideRequestType.Weekly)
             {
-                passengerDocument = await GetDocumentAsync(
-                    BuildWeeklyRouteDocumentUrl(rideRequest.PassengerRouteId), idToken, cancellationToken);
-                passenger = ConvertPassengerRouteSnapshot(passengerDocument, rideRequest);
-                var freeDays = RideRequestRules.GetPassengerAvailableWeeklyDays(passenger, rideRequest.CompatibleDays);
+                var freeDays = RideRequestRules.GetPassengerAvailableWeeklyDays(passenger, rideRequest.CompatibleDays, today);
                 if (freeDays.Count == 0) throw new InvalidOperationException(RideRequestRules.PassengerDaysUnavailableMessage);
                 var acceptance = RideRequestRules.ApplyWeeklyAcceptance(
                     routeSnapshot.WeeklyAvailableSeats, routeSnapshot.OneTimeReservations, freeDays, today);
@@ -474,6 +486,8 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             }
             else
             {
+                if (RideRequestRules.GetPassengerOnceConflict(passenger, rideRequest.RequestedDate!.Value, today) is { } conflict)
+                    throw new InvalidOperationException(conflict);
                 availabilityWrite = CreateOneTimeReservationsWrite(routeSnapshot,
                     RideRequestRules.ApplyOnceAcceptance(routeSnapshot.WeeklyAvailableSeats,
                         routeSnapshot.OneTimeReservations, rideRequest.Id,
@@ -487,9 +501,11 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 availabilityWrite
             };
 
-            if (passengerDocument is not null && passenger is not null)
-                writes.Add(CreatePassengerAcceptedDaysWrite(passengerDocument,
-                    passenger.WeeklyAcceptedDays.Union(acceptedDays).OrderBy(day => day).ToArray()));
+            writes.Add(rideRequest.Type == RideRequestType.Weekly
+                ? CreatePassengerAcceptedDaysWrite(passengerDocument,
+                    passenger.WeeklyAcceptedDays.Union(acceptedDays).OrderBy(day => day).ToArray())
+                : CreatePassengerAcceptedDatesWrite(passengerDocument,
+                    [.. passenger.OneTimeAcceptedDates, rideRequest.RequestedDate!.Value]));
 
             var response = await CommitAsync(
                 writes,
@@ -1166,6 +1182,8 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         var fields = document.Fields;
         var capacity = GetRequiredInt32Field(fields, "seatCapacity", id);
         var offeredDays = GetRequiredDaysOfWeekField(fields, "daysOfWeek", id);
+        if (GetRequiredOneTimeAcceptedDates(fields, id).Count != 0)
+            throw CreateInvalidDocumentException(id, "oneTimeAcceptedDates deve ser vazio para motorista");
         if (GetRequiredAcceptedDays(fields, id, "weeklyAcceptedDays").Count != 0)
             throw CreateInvalidDocumentException(id, "weeklyAcceptedDays deve ser vazio para motorista");
 
@@ -1262,6 +1280,24 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 documentId,
                 "uma solicitação semanal não deve possuir 'requestedDate'");
         }
+    }
+
+    private static IReadOnlyList<DateOnly> GetRequiredOneTimeAcceptedDates(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields, string documentId)
+    {
+        if (!fields.TryGetValue("oneTimeAcceptedDates", out var field) || field?.ArrayValue?.Values is not { } values)
+            throw CreateInvalidDocumentException(documentId, "oneTimeAcceptedDates deve conter um arrayValue");
+        var dates = new List<DateOnly>();
+        foreach (var value in values)
+        {
+            if (!DateOnly.TryParseExact(value?.StringValue, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var date)
+                || value?.StringValue != date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                || dates.Contains(date))
+                throw CreateInvalidDocumentException(documentId, "oneTimeAcceptedDates contém data inválida ou duplicada");
+            dates.Add(date);
+        }
+        return dates;
     }
 
     private static IReadOnlyList<DayOfWeek> GetRequiredAcceptedDays(

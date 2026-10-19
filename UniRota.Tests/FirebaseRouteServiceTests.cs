@@ -165,6 +165,7 @@ public sealed partial class FirebaseRouteServiceTests
                   "mapValue": { "fields": { "Monday": { "integerValue": "2" } } }
                 },
                 "weeklyAcceptedDays": { "arrayValue": { "values": [] } },
+                "oneTimeAcceptedDates": { "arrayValue": { "values": [] } },
                 "oneTimeReservations": { "arrayValue": { "values": [] } },
                 "estimatedDistanceKm": { "doubleValue": 8.5 },
                 "requestRevision": { "integerValue": "0" },

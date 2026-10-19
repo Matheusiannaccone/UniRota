@@ -31,9 +31,9 @@ public partial class ReceivedRequestsPage : ContentPage
 
         try
         {
-            if (item!.PassengerDaysUnavailable)
+            if (item!.PassengerConflictMessage is not null)
             {
-                await DisplayAlert("Aceitar solicitação", UniRota.Services.RideRequestRules.PassengerDaysUnavailableMessage, "OK");
+                await DisplayAlert("Aceitar solicitação", item.PassengerConflictMessage, "OK");
                 return;
             }
             await _viewModel.ConfirmAndAcceptAsync(item, message => DisplayAlert(

@@ -226,7 +226,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         IReadOnlyList<DayOfWeek>? acceptedDays = null)
     {
         var writes = JsonNode.Parse(body)!["writes"]!.AsArray();
-        Assert.Equal(field == "weeklyAvailableSeats" ? 3 : 2, writes.Count);
+        Assert.Equal(3, writes.Count);
         Assert.Equal("accepted", writes[0]!["update"]!["fields"]!["status"]!["stringValue"]!.GetValue<string>());
         Assert.Equal(2, writes[0]!["update"]!["fields"]!.AsObject().Count);
         var expectedDays = acceptedDays ?? (field == "weeklyAvailableSeats" ? new[] { DayOfWeek.Monday } : []);
@@ -248,6 +248,12 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             Assert.Equal("2026-09-03T14:00:00Z", writes[2]!["currentDocument"]!["updateTime"]!.GetValue<string>());
             Assert.Equal("weeklyAcceptedDays", Assert.Single(writes[2]!["updateMask"]!["fieldPaths"]!.AsArray())!.GetValue<string>());
             Assert.Equal(expectedDays.Select(day => day.ToString()), writes[2]!["update"]!["fields"]!["weeklyAcceptedDays"]!["arrayValue"]!["values"]!.AsArray().Select(value => value!["stringValue"]!.GetValue<string>()));
+        }
+        else
+        {
+            Assert.Equal("2026-09-03T14:00:00Z", writes[2]!["currentDocument"]!["updateTime"]!.GetValue<string>());
+            Assert.Equal("oneTimeAcceptedDates", Assert.Single(writes[2]!["updateMask"]!["fieldPaths"]!.AsArray())!.GetValue<string>());
+            Assert.Equal("2026-10-19", Assert.Single(writes[2]!["update"]!["fields"]!["oneTimeAcceptedDates"]!["arrayValue"]!["values"]!.AsArray())!["stringValue"]!.GetValue<string>());
         }
         var fields = writes[1]!["update"]!["fields"]!.AsObject();
         Assert.Equal(field, Assert.Single(fields).Key);

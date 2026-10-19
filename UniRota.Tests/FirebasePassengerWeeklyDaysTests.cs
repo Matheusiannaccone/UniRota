@@ -32,8 +32,10 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         store.AssertConsistent();
     }
 
-    [Fact]
-    public async Task PendingForDifferentDriver_DoesNotBlockOverlappingDaysOrReservePassengerLedger()
+    [Theory]
+    [InlineData(RideRequestType.Weekly)]
+    [InlineData(RideRequestType.Once)]
+    public async Task PendingForDifferentDriver_DoesNotBlockOverlappingDaysOrReservePassengerLedger(RideRequestType type)
     {
         var existing = JsonNode.Parse(CreateRideRequestDocumentJson("existing", "passenger-user", 3.45m))!;
         existing["fields"]!["driverRouteId"]!["stringValue"] = "another-driver-route";
@@ -50,7 +52,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         });
 
         var pending = await CreateService(handler, [passenger]).CreateAsync(
-            passenger.Id, CreateMatch(), RideRequestType.Weekly, null, 3.45m);
+            passenger.Id, CreateMatch(), type, type == RideRequestType.Once ? TestToday : null, 3.45m);
 
         Assert.Equal(new[] { DayOfWeek.Monday }, pending.CompatibleDays);
         Assert.Empty(passenger.WeeklyAcceptedDays);
@@ -174,19 +176,22 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     }
 
     [Fact]
-    public async Task Once_RemainsIndependentOfPassengerRecurringLedger()
+    public async Task Once_IsBlockedByPassengerRecurringLedger()
     {
         var store = ConcurrencyStore(RideRequestType.Once, RideRequestType.Once);
         store.Fields("weeklyRoutes/passenger-route-request-B")["weeklyAcceptedDays"] = DaysField(["Monday"]);
-        await CreateService(store, [], "driver-user").AcceptAsync("request-B");
-        Assert.Equal("accepted", store.Status("request-B"));
-        Assert.Single(store.Reservations);
-        Assert.False(store.DocumentReads.ContainsKey("weeklyRoutes/passenger-route-request-B"));
+        var before = store.Snapshot();
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => CreateService(store, [], "driver-user").AcceptAsync("request-B"));
+        Assert.Equal(RideRequestRules.PassengerWeeklyConflictMessage, error.Message);
+        Assert.Equal(before, store.Snapshot());
+        Assert.Empty(store.Attempts);
+        Assert.True(store.DocumentReads.ContainsKey("weeklyRoutes/passenger-route-request-B"));
     }
 
-    private static StatefulAcceptanceHandler SharedPassengerStore(IReadOnlyList<DayOfWeek> firstDays, IReadOnlyList<DayOfWeek> secondDays)
+    private static StatefulAcceptanceHandler SharedPassengerStore(IReadOnlyList<DayOfWeek> firstDays, IReadOnlyList<DayOfWeek> secondDays,
+        RideRequestType firstType = RideRequestType.Weekly, RideRequestType secondType = RideRequestType.Weekly, DateOnly? secondDate = null)
     {
-        var store = ConcurrencyStore(RideRequestType.Weekly, RideRequestType.Weekly, secondDays);
+        var store = ConcurrencyStore(firstType, secondType, secondDays, secondDate);
         store.EditRoute(fields => fields["userId"]!["stringValue"] = "driver-A");
         var otherDriver = JsonNode.Parse(CreateCreationDriverRouteDocumentJson(
             new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 1, [DayOfWeek.Tuesday] = 1 }))!.AsObject();
@@ -217,6 +222,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             ["role"] = new JsonObject { ["stringValue"] = "passenger" },
             ["daysOfWeek"] = DaysField((days ?? Enum.GetValues<DayOfWeek>()).Select(day => day.ToString())),
             ["weeklyAcceptedDays"] = DaysField((accepted ?? []).Select(day => day.ToString())),
+            ["oneTimeAcceptedDates"] = DaysField([]),
             ["seatCapacity"] = new JsonObject { ["nullValue"] = null },
             ["weeklyAvailableSeats"] = new JsonObject { ["mapValue"] = new JsonObject { ["fields"] = new JsonObject() } },
             ["oneTimeReservations"] = new JsonObject { ["arrayValue"] = new JsonObject { ["values"] = new JsonArray() } }

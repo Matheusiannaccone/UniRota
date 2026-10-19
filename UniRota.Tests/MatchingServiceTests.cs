@@ -673,12 +673,16 @@ public sealed partial class MatchingServiceTests
 
     private static MatchingService CreateService(
         IMapRouteService mapRouteService,
-        MatchingOptions? options = null)
+        MatchingOptions? options = null,
+        IAppClock? clock = null)
     {
         return new MatchingService(
             mapRouteService,
-            options ?? new MatchingOptions());
+            options ?? new MatchingOptions(),
+            clock ?? new MatchingClock(new DateOnly(2026, 10, 19)));
     }
+
+    private sealed class MatchingClock(DateOnly today) : IAppClock { public DateOnly Today => today; }
 
     private static FakeMapRouteService CreateMapService(
         long baseDistanceMeters,
@@ -739,7 +743,8 @@ public sealed partial class MatchingServiceTests
         string destinationPlaceId = "passenger-destination",
         IReadOnlyList<DayOfWeek>? days = null,
         int departureTimeMinutes = DefaultDepartureTimeMinutes,
-        IReadOnlyList<DayOfWeek>? weeklyAcceptedDays = null)
+        IReadOnlyList<DayOfWeek>? weeklyAcceptedDays = null,
+        IReadOnlyList<DateOnly>? oneTimeAcceptedDates = null)
     {
         return new WeeklyRoute
         {
@@ -753,6 +758,7 @@ public sealed partial class MatchingServiceTests
             DestinationPlaceId = destinationPlaceId,
             DaysOfWeek = days ?? [DayOfWeek.Monday],
             WeeklyAcceptedDays = weeklyAcceptedDays ?? [],
+            OneTimeAcceptedDates = oneTimeAcceptedDates ?? [],
             DepartureTimeMinutes = departureTimeMinutes,
             CreatedAtUtc = DateTimeOffset.UnixEpoch
         };

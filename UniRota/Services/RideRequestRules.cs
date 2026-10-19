@@ -5,15 +5,33 @@ namespace UniRota.Services;
 public static class RideRequestRules
 {
     public const string PassengerDaysUnavailableMessage =
-        "Todos os dias dessa solicitação já foram aceitos por outro motorista.";
+        "Os dias dessa solicitação possuem conflito com caronas já confirmadas do passageiro.";
 
     public const string ConfirmedDaysChangedMessage =
         "Os dias disponíveis para aceite foram alterados. Atualize a lista e confirme novamente.";
 
     public static IReadOnlyList<DayOfWeek> GetPassengerAvailableWeeklyDays(
-        WeeklyRoute passengerRoute, IReadOnlyList<DayOfWeek> compatibleDays) =>
+        WeeklyRoute passengerRoute, IReadOnlyList<DayOfWeek> compatibleDays, DateOnly today) =>
         compatibleDays.Intersect(passengerRoute.DaysOfWeek)
-            .Except(passengerRoute.WeeklyAcceptedDays).OrderBy(day => day).ToArray();
+            .Except(passengerRoute.WeeklyAcceptedDays)
+            .Except(passengerRoute.OneTimeAcceptedDates.Where(date => date >= today).Select(date => date.DayOfWeek))
+            .OrderBy(day => day).ToArray();
+
+    public const string PassengerOnceConflictMessage =
+        "O passageiro já possui uma carona confirmada para esta data.";
+
+    public const string PassengerWeeklyConflictMessage =
+        "O passageiro já possui uma carona semanal confirmada para este dia.";
+
+    public static string? GetPassengerOnceConflict(WeeklyRoute passengerRoute, DateOnly requestedDate, DateOnly today)
+    {
+        if (requestedDate < today) return "A data da carona não pode estar no passado.";
+        if (passengerRoute.WeeklyAcceptedDays.Contains(requestedDate.DayOfWeek)) return PassengerWeeklyConflictMessage;
+        return passengerRoute.OneTimeAcceptedDates.Contains(requestedDate) ? PassengerOnceConflictMessage : null;
+    }
+
+    public static bool CanPassengerAcceptOnce(WeeklyRoute passengerRoute, DateOnly requestedDate, DateOnly today) =>
+        GetPassengerOnceConflict(passengerRoute, requestedDate, today) is null;
 
     public static void EnsurePending(RideRequestStatus status)
     {

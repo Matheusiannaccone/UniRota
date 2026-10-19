@@ -4,7 +4,7 @@ using UniRota.ViewModels;
 
 namespace UniRota.Tests;
 
-public sealed class ReceivedRequestsViewModelTests
+public sealed partial class ReceivedRequestsViewModelTests
 {
     private static readonly DateOnly Today = new(2026, 10, 19);
 
@@ -40,7 +40,7 @@ public sealed class ReceivedRequestsViewModelTests
         var item = Assert.Single(vm.Requests);
         Assert.True(item.CanAccept);
         await vm.ConfirmAndAcceptAsync(item, _ => throw new InvalidOperationException("Não deve confirmar subconjunto vazio."));
-        Assert.Equal("Todos os dias dessa solicitação já foram aceitos por outro motorista.", vm.ErrorMessage);
+        Assert.Equal("Os dias dessa solicitação possuem conflito com caronas já confirmadas do passageiro.", vm.ErrorMessage);
         Assert.Equal(0, service.Accepts);
         Assert.Equal(0, service.Rejects);
         Assert.Single(vm.Requests);
@@ -214,11 +214,12 @@ public sealed class ReceivedRequestsViewModelTests
         public Task AcceptAsync(string requestId, CancellationToken cancellationToken = default, IReadOnlyList<DayOfWeek>? confirmedDays = null)
         { Accepts++; LastConfirmedDays = confirmedDays; BeforeAccept?.Invoke(); Requests = Requests.Where(request => request.Id != requestId).ToArray(); return Task.CompletedTask; }
         public IReadOnlyList<DayOfWeek> PassengerAcceptedDays { get; set; } = [];
+        public IReadOnlyList<DateOnly> PassengerAcceptedDates { get; set; } = [];
         public IReadOnlyList<DayOfWeek>? LastConfirmedDays { get; private set; }
         public Task<IReadOnlyDictionary<string, WeeklyRoute>> GetPassengerRoutesAsync(IReadOnlyList<RideRequest> requests, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyDictionary<string, WeeklyRoute>>(requests.GroupBy(request => request.PassengerRouteId).ToDictionary(group => group.Key,
                 group => new WeeklyRoute { Id = group.Key, UserId = group.First().PassengerUserId, Role = RouteRole.Passenger,
-                    DaysOfWeek = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday], WeeklyAcceptedDays = PassengerAcceptedDays }));
+                    DaysOfWeek = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday], WeeklyAcceptedDays = PassengerAcceptedDays, OneTimeAcceptedDates = PassengerAcceptedDates }));
 
         public Task RejectAsync(string requestId, CancellationToken cancellationToken = default)
         { Rejects++; Requests = Requests.Where(request => request.Id != requestId).ToArray(); return Task.CompletedTask; }

@@ -22,6 +22,8 @@ public sealed class WeeklyRoute
 
     public IReadOnlyList<DayOfWeek> WeeklyAcceptedDays { get; init; } = [];
 
+    public IReadOnlyList<DateOnly> OneTimeAcceptedDates { get; init; } = [];
+
     public int DepartureTimeMinutes { get; init; }
 
     public int? SeatCapacity { get; init; }

@@ -333,6 +333,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                 "seatCapacity": { "integerValue": "3" },
                 "weeklyAvailableSeats": { "mapValue": { "fields": { "Monday": { "integerValue": "{{weeklySeats}}" } } } },
                 "weeklyAcceptedDays": { "arrayValue": { "values": [] } },
+                "oneTimeAcceptedDates": { "arrayValue": { "values": [] } },
                 "oneTimeReservations": { "arrayValue": { "values": [] } },
                 "requestRevision": { "integerValue": "0" }
               },
