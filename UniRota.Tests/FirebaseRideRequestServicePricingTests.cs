@@ -117,7 +117,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     }
 
     [Fact]
-    public async Task AcceptAsync_ConsumesLastSeatAndRejectsCompetingRequestsWithoutChangingPrice()
+    public async Task AcceptAsync_ConsumesLastWeeklySeatWithoutRejectingOtherPendingOrChangingPrice()
     {
         string? commitBody = null;
         var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
@@ -160,10 +160,11 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         Assert.NotNull(commitBody);
         using var document = JsonDocument.Parse(commitBody);
         var writes = document.RootElement.GetProperty("writes");
-        Assert.Equal(3, writes.GetArrayLength());
+        Assert.Equal(2, writes.GetArrayLength());
         Assert.Equal("accepted", GetWrittenStringField(writes[0], "status"));
-        Assert.Equal("0", GetWrittenIntegerField(writes[1], "availableSeats"));
-        Assert.Equal("rejected", GetWrittenStringField(writes[2], "status"));
+        Assert.Equal("0", writes[1].GetProperty("update").GetProperty("fields")
+            .GetProperty("weeklyAvailableSeats").GetProperty("mapValue").GetProperty("fields")
+            .GetProperty("Monday").GetProperty("integerValue").GetString());
         Assert.All(
             writes.EnumerateArray(),
             write => Assert.False(
@@ -299,14 +300,15 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             Destination = "Facens",
             DaysOfWeek = [DayOfWeek.Monday],
             DepartureTimeMinutes = 480,
-            AvailableSeats = 2,
+            SeatCapacity = 2,
+            WeeklyAvailableSeats = new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 2 },
             EstimatedDistanceKm = 12.75m
         };
 
         return new MatchResult(driverRoute, [DayOfWeek.Monday], 0);
     }
 
-    private static string CreateDriverRouteDocumentJson(int availableSeats = 2)
+    private static string CreateDriverRouteDocumentJson(int weeklySeats = 2)
     {
         return $$"""
             {
@@ -314,7 +316,9 @@ public sealed partial class FirebaseRideRequestServicePricingTests
               "fields": {
                 "userId": { "stringValue": "driver-user" },
                 "role": { "stringValue": "driver" },
-                "availableSeats": { "integerValue": "{{availableSeats}}" },
+                "seatCapacity": { "integerValue": "3" },
+                "weeklyAvailableSeats": { "mapValue": { "fields": { "Monday": { "integerValue": "{{weeklySeats}}" } } } },
+                "oneTimeReservations": { "arrayValue": { "values": [] } },
                 "requestRevision": { "integerValue": "0" }
               },
               "updateTime": "2026-09-03T12:00:00Z"
@@ -398,17 +402,6 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             .GetProperty("fields")
             .GetProperty(fieldName)
             .GetProperty("stringValue")
-            .GetString();
-    }
-
-    private static string? GetWrittenIntegerField(
-        JsonElement write,
-        string fieldName)
-    {
-        return write.GetProperty("update")
-            .GetProperty("fields")
-            .GetProperty(fieldName)
-            .GetProperty("integerValue")
             .GetString();
     }
 

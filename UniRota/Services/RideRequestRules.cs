@@ -13,15 +13,67 @@ public static class RideRequestRules
         }
     }
 
-    public static int GetRemainingSeatsAfterAcceptance(int? availableSeats)
+    public static bool HasWeeklySeats(
+        IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
+        IReadOnlyList<DayOfWeek> days) =>
+        days.Count > 0 && days.All(day => weeklySeats.TryGetValue(day, out var seats) && seats > 0);
+
+    public static bool HasSeatsOnDate(
+        IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
+        IReadOnlyList<OneTimeReservation> reservations,
+        DateOnly date) =>
+        weeklySeats.TryGetValue(date.DayOfWeek, out var seats)
+        && seats - reservations.Count(reservation => reservation.Date == date) > 0;
+
+    public static IReadOnlyDictionary<DayOfWeek, int> ApplyWeeklyAcceptance(
+        IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
+        IReadOnlyList<OneTimeReservation> reservations,
+        IReadOnlyList<DayOfWeek> days)
     {
-        if (availableSeats is null or <= 0)
+        if (!HasWeeklySeats(weeklySeats, days))
         {
-            throw new InvalidOperationException(
-                "Não há vagas disponíveis para aceitar esta solicitação.");
+            throw new InvalidOperationException("Não há vagas disponíveis em todos os dias solicitados.");
         }
 
-        return availableSeats.Value - 1;
+        var updated = weeklySeats.ToDictionary(entry => entry.Key, entry => entry.Value);
+        foreach (var day in days.Distinct())
+        {
+            updated[day]--;
+        }
+
+        // Proteção conservadora inclui todas as datas armazenadas; vigência Weekly (P2) pendente.
+        if (reservations.Where(reservation => days.Contains(reservation.DayOfWeek))
+            .GroupBy(reservation => reservation.Date)
+            .Any(group => updated[group.Key.DayOfWeek] - group.Count() < 0))
+        {
+            throw new InvalidOperationException("Não há vagas sem comprometer reservas pontuais confirmadas.");
+        }
+
+        return updated;
+    }
+
+    public static IReadOnlyList<OneTimeReservation> ApplyOnceAcceptance(
+        IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
+        IReadOnlyList<OneTimeReservation> reservations,
+        string requestId,
+        DateOnly date)
+    {
+        if (reservations.Any(reservation => reservation.RequestId == requestId))
+        {
+            throw new InvalidOperationException("Esta solicitação já possui reserva pontual.");
+        }
+
+        if (!HasSeatsOnDate(weeklySeats, reservations, date))
+        {
+            throw new InvalidOperationException("Não há vagas disponíveis para a data solicitada.");
+        }
+
+        return [.. reservations, new OneTimeReservation
+        {
+            RequestId = requestId,
+            Date = date,
+            DayOfWeek = date.DayOfWeek
+        }];
     }
 
     public static IReadOnlyList<DayOfWeek> ValidateForCreation(

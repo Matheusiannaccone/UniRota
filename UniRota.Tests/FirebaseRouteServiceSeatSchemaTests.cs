@@ -20,8 +20,7 @@ public sealed partial class FirebaseRouteServiceTests
             SeatReservation("once-C", new DateOnly(2026, 10, 26))
         ];
         var input = CreateSeatSchemaRoute(
-            reservations: reservations.Take(reservationCount).ToArray(),
-            legacySeats: 99);
+            reservations: reservations.Take(reservationCount).ToArray());
 
         var (output, fields, _) = await RoundTripSeatRouteAsync(input);
 
@@ -59,7 +58,6 @@ public sealed partial class FirebaseRouteServiceTests
         }
 
         Assert.False(fields.ContainsKey("availableSeats"));
-        Assert.Null(output.AvailableSeats);
     }
 
     [Theory]
@@ -81,7 +79,6 @@ public sealed partial class FirebaseRouteServiceTests
         Assert.Empty(fields["weeklyAvailableSeats"]!["mapValue"]!["fields"]!.AsObject());
         Assert.Empty(fields["oneTimeReservations"]!["arrayValue"]!["values"]!.AsArray());
         Assert.False(fields.ContainsKey("availableSeats"));
-        Assert.Null(output.AvailableSeats);
     }
 
     [Fact]
@@ -270,23 +267,22 @@ public sealed partial class FirebaseRouteServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_DoesNotInferNewSchemaFromTemporaryLegacyProperty()
+    public async Task CreateAsync_RejectsDriverWithoutSeatSchema()
     {
-        var legacyOnly = new WeeklyRoute
+        var withoutSchema = new WeeklyRoute
         {
             Role = RouteRole.Driver,
             Origin = "Centro",
             Destination = "Facens",
             DaysOfWeek = [DayOfWeek.Monday],
             DepartureTimeMinutes = 450,
-            AvailableSeats = 2,
             EstimatedDistanceKm = 8.5m
         };
         var handler = new StubHttpMessageHandler((_, _) =>
             throw new InvalidOperationException("Não deve inferir o novo schema."));
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => CreateService(handler).CreateAsync(legacyOnly));
+            () => CreateService(handler).CreateAsync(withoutSchema));
     }
 
     [Fact]
@@ -315,9 +311,9 @@ public sealed partial class FirebaseRouteServiceTests
     }
 
     [Fact]
-    public void WeeklyRoute_TemporaryLegacyPropertyIsExcludedFromJsonSerialization()
+    public void WeeklyRoute_JsonHasNoLegacySeatProperty()
     {
-        var route = CreateSeatSchemaRoute(legacySeats: 99);
+        var route = CreateSeatSchemaRoute();
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(route));
 
         Assert.False(json.RootElement.TryGetProperty("AvailableSeats", out _));
@@ -327,8 +323,7 @@ public sealed partial class FirebaseRouteServiceTests
         RouteRole role = RouteRole.Driver,
         int? capacity = 3,
         IReadOnlyDictionary<DayOfWeek, int>? seats = null,
-        IReadOnlyList<OneTimeReservation>? reservations = null,
-        int? legacySeats = null)
+        IReadOnlyList<OneTimeReservation>? reservations = null)
     {
         return new WeeklyRoute
         {
@@ -345,7 +340,6 @@ public sealed partial class FirebaseRouteServiceTests
                 ? new Dictionary<DayOfWeek, int>()
                 : DefaultWeeklySeatMap()),
             OneTimeReservations = reservations ?? [],
-            AvailableSeats = legacySeats,
             EstimatedDistanceKm = role == RouteRole.Driver ? 8.5m : 0m
         };
     }

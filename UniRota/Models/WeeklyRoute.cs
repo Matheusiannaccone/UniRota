@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace UniRota.Models;
 
 public sealed class WeeklyRoute
@@ -30,11 +28,6 @@ public sealed class WeeklyRoute
         = new Dictionary<DayOfWeek, int>();
 
     public IReadOnlyList<OneTimeReservation> OneTimeReservations { get; init; } = [];
-
-    // TEMPORÁRIO (Blocos 2–6): mantém os consumidores antigos compiláveis.
-    // Não participa da persistência nem é derivado do novo schema.
-    [JsonIgnore]
-    public int? AvailableSeats { get; init; }
 
     public decimal EstimatedDistanceKm { get; init; }
 

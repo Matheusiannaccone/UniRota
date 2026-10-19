@@ -115,13 +115,4 @@ internal static class RoutePresentationText
         return $"{(int)departureTime.TotalHours:00}:{departureTime.Minutes:00}";
     }
 
-    public static string GetAvailableSeatsText(int? availableSeats)
-    {
-        return availableSeats switch
-        {
-            1 => "1 vaga",
-            > 1 => $"{availableSeats} vagas",
-            _ => string.Empty
-        };
-    }
 }

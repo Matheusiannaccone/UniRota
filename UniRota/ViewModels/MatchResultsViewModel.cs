@@ -213,10 +213,6 @@ public sealed class MatchResultItemViewModel
         RoutePresentationText.GetDepartureTimeText(
             Match.DriverRoute.DepartureTimeMinutes);
 
-    public string AvailableSeatsText =>
-        RoutePresentationText.GetAvailableSeatsText(
-            Match.DriverRoute.AvailableSeats);
-
     public string DetourText =>
         $"Desvio: +{Match.DetourDistanceKm.ToString("0.#", PtBrCulture)} km"
         + $" · +{Math.Ceiling(Match.DetourDurationMinutes).ToString(

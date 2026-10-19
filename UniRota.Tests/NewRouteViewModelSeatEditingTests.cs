@@ -19,7 +19,6 @@ public sealed partial class NewRouteViewModelTests
         await viewModel.SaveCommand.ExecuteAsync(null);
 
         var route = Assert.Single(service.CreatedRoutes);
-        Assert.Null(route.AvailableSeats);
         Assert.Empty(route.OneTimeReservations);
         Assert.Equal(role == RouteRole.Driver ? 3 : (int?)null, route.SeatCapacity);
 
@@ -62,7 +61,6 @@ public sealed partial class NewRouteViewModelTests
         Assert.Equal(original.UserName, saved.UserName);
         Assert.Equal(original.RequestRevision, saved.RequestRevision);
         Assert.Equal(original.CreatedAtUtc, saved.CreatedAtUtc);
-        Assert.Null(saved.AvailableSeats);
     }
 
     [Fact]

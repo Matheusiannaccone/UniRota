@@ -188,7 +188,8 @@ public sealed class RideRequestViewModelTests
             Destination = "Facens",
             DaysOfWeek = [currentDay],
             DepartureTimeMinutes = 480,
-            AvailableSeats = 1,
+            SeatCapacity = 1,
+            WeeklyAvailableSeats = new Dictionary<DayOfWeek, int> { [currentDay] = 1 },
             EstimatedDistanceKm = driverEstimatedDistanceKm
         };
 

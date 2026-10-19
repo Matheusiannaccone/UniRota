@@ -53,7 +53,6 @@ public sealed partial class NewRouteViewModelTests
         Assert.Equal(selectedDays, sent.DaysOfWeek);
         Assert.Equal(role == RouteRole.Driver ? capacity : (int?)null, sent.SeatCapacity);
         Assert.Empty(sent.OneTimeReservations);
-        Assert.Null(sent.AvailableSeats);
 
         if (role == RouteRole.Driver)
         {

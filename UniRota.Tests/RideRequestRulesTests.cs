@@ -98,27 +98,19 @@ public sealed class RideRequestRulesTests
         Assert.Equal("Esta solicitação já foi processada.", exception.Message);
     }
 
-    [Theory]
-    [InlineData(1, 0)]
-    [InlineData(2, 1)]
-    [InlineData(3, 2)]
-    public void GetRemainingSeatsAfterAcceptance_DecrementsExactlyOneSeat(
-        int availableSeats,
-        int expectedRemainingSeats)
+    [Fact]
+    public void ApplyWeeklyAcceptance_DoesNotMutateInputOnReservationConflict()
     {
-        Assert.Equal(
-            expectedRemainingSeats,
-            RideRequestRules.GetRemainingSeatsAfterAcceptance(availableSeats));
-    }
+        var weekly = new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 1 };
+        var reservations = new[] { new OneTimeReservation
+        {
+            RequestId = "once", Date = new DateOnly(2020, 1, 6), DayOfWeek = DayOfWeek.Monday
+        } };
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void GetRemainingSeatsAfterAcceptance_RejectsUnavailableSeats(
-        int? availableSeats)
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            RideRequestRules.GetRemainingSeatsAfterAcceptance(availableSeats));
+        Assert.Throws<InvalidOperationException>(() => RideRequestRules.ApplyWeeklyAcceptance(
+            weekly, reservations, [DayOfWeek.Monday]));
+
+        Assert.Equal(1, weekly[DayOfWeek.Monday]);
+        Assert.Single(reservations);
     }
 }

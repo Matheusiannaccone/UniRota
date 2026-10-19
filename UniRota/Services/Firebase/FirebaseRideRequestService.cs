@@ -389,52 +389,26 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 BuildWeeklyRouteDocumentUrl(rideRequest.DriverRouteId),
                 idToken,
                 cancellationToken);
-            var routeSnapshot = ConvertLegacyDriverRouteSnapshot(routeDocument);
+            var routeSnapshot = ConvertDriverRouteSnapshot(routeDocument);
             ValidateDriverRouteForAcceptance(
                 routeSnapshot,
                 rideRequest,
                 userId);
 
-            var remainingSeats = RideRequestRules
-                .GetRemainingSeatsAfterAcceptance(routeSnapshot.AvailableSeats);
-            var pendingRouteRequests = await GetPendingRequestsForRouteAsync(
-                rideRequest.DriverRouteId,
-                userId,
-                idToken,
-                cancellationToken);
+            var availabilityWrite = rideRequest.Type == RideRequestType.Weekly
+                ? CreateWeeklySeatsWrite(routeSnapshot, RideRequestRules.ApplyWeeklyAcceptance(
+                    routeSnapshot.WeeklyAvailableSeats, routeSnapshot.OneTimeReservations,
+                    rideRequest.CompatibleDays))
+                : CreateOneTimeReservationsWrite(routeSnapshot, RideRequestRules.ApplyOnceAcceptance(
+                    routeSnapshot.WeeklyAvailableSeats, routeSnapshot.OneTimeReservations,
+                    rideRequest.Id, rideRequest.RequestedDate!.Value));
 
-            var selectedDocument = pendingRouteRequests.FirstOrDefault(
-                item => string.Equals(
-                    GetDocumentId(item.Name),
-                    normalizedRequestId,
-                    StringComparison.Ordinal));
-
-            if (selectedDocument is null)
-            {
-                throw new InvalidOperationException(
-                    "Esta solicitação já foi processada.");
-            }
-
+            // P5 pendente: outras Pending serão revalidadas ao processar cada solicitação.
             var writes = new List<object>
             {
-                CreateStatusWrite(
-                    selectedDocument,
-                    RideRequestStatus.Accepted),
-                CreateAvailableSeatsWrite(routeSnapshot, remainingSeats)
+                CreateStatusWrite(requestDocument, RideRequestStatus.Accepted),
+                availabilityWrite
             };
-
-            if (remainingSeats == 0)
-            {
-                writes.AddRange(
-                    pendingRouteRequests
-                        .Where(document => !string.Equals(
-                            GetDocumentId(document.Name),
-                            normalizedRequestId,
-                            StringComparison.Ordinal))
-                        .Select(document => CreateStatusWrite(
-                            document,
-                            RideRequestStatus.Rejected)));
-            }
 
             var response = await CommitAsync(
                 writes,
@@ -547,41 +521,6 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         }
 
         return requests;
-    }
-
-    private async Task<IReadOnlyList<FirestoreDocumentDto>>
-        GetPendingRequestsForRouteAsync(
-            string driverRouteId,
-            string driverUserId,
-            string idToken,
-            CancellationToken cancellationToken)
-    {
-        var documents = await RunRideRequestDocumentQueryAsync(
-            CreatePendingRequestsQuery("driverRouteId", driverRouteId),
-            idToken,
-            driverUserId,
-            cancellationToken);
-
-        foreach (var document in documents)
-        {
-            var request = ConvertDocument(document);
-
-            if (!string.Equals(
-                    request.DriverRouteId,
-                    driverRouteId,
-                    StringComparison.Ordinal)
-                || !string.Equals(
-                    request.DriverUserId,
-                    driverUserId,
-                    StringComparison.Ordinal)
-                || request.Status != RideRequestStatus.Pending)
-            {
-                throw new InvalidOperationException(
-                    "O Firebase retornou uma solicitação incompatível com a rota do motorista.");
-            }
-        }
-
-        return documents;
     }
 
     private async Task<IReadOnlyList<RideRequest>> RunRideRequestQueryAsync(
@@ -819,9 +758,9 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         DateOnly? requestedDate)
     {
         var hasSeats = type == RideRequestType.Weekly
-            ? compatibleDays.All(day => snapshot.WeeklyAvailableSeats.TryGetValue(day, out var weeklySeats) && weeklySeats > 0)
-            : snapshot.WeeklyAvailableSeats.TryGetValue(requestedDate!.Value.DayOfWeek, out var dateSeats)
-                && dateSeats - snapshot.OneTimeReservations.Count(reservation => reservation.Date == requestedDate.Value) > 0;
+            ? RideRequestRules.HasWeeklySeats(snapshot.WeeklyAvailableSeats, compatibleDays)
+            : RideRequestRules.HasSeatsOnDate(snapshot.WeeklyAvailableSeats,
+                snapshot.OneTimeReservations, requestedDate!.Value);
 
         if (!hasSeats)
         {
@@ -831,7 +770,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
     }
 
     private static void ValidateDriverRouteForAcceptance(
-        LegacyDriverRouteSnapshot snapshot,
+        DriverRouteSnapshot snapshot,
         RideRequest request,
         string driverUserId)
     {
@@ -919,9 +858,9 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         };
     }
 
-    private static object CreateAvailableSeatsWrite(
-        LegacyDriverRouteSnapshot route,
-        int availableSeats)
+    private static object CreateWeeklySeatsWrite(
+        DriverRouteSnapshot route,
+        IReadOnlyDictionary<DayOfWeek, int> weeklySeats)
     {
         return new
         {
@@ -930,17 +869,53 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 name = route.DocumentName,
                 fields = new Dictionary<string, object>
                 {
-                    ["availableSeats"] = new
+                    ["weeklyAvailableSeats"] = new
                     {
-                        integerValue = availableSeats.ToString(
-                            CultureInfo.InvariantCulture)
+                        mapValue = new
+                        {
+                            fields = weeklySeats.ToDictionary(entry => entry.Key.ToString(),
+                                entry => new { integerValue = entry.Value.ToString(CultureInfo.InvariantCulture) })
+                        }
                     }
                 }
             },
-            updateMask = new
+            updateMask = new { fieldPaths = new[] { "weeklyAvailableSeats" } },
+            currentDocument = new { updateTime = route.UpdateTime }
+        };
+    }
+
+    private static object CreateOneTimeReservationsWrite(
+        DriverRouteSnapshot route,
+        IReadOnlyList<OneTimeReservation> reservations)
+    {
+        return new
+        {
+            update = new
             {
-                fieldPaths = new[] { "availableSeats" }
+                name = route.DocumentName,
+                fields = new Dictionary<string, object>
+                {
+                    ["oneTimeReservations"] = new
+                    {
+                        arrayValue = new
+                        {
+                            values = reservations.Select(reservation => new
+                            {
+                                mapValue = new
+                                {
+                                    fields = new Dictionary<string, object>
+                                    {
+                                        ["requestId"] = new { stringValue = reservation.RequestId },
+                                        ["date"] = new { stringValue = reservation.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+                                        ["dayOfWeek"] = new { stringValue = reservation.DayOfWeek.ToString() }
+                                    }
+                                }
+                            }).ToArray()
+                        }
+                    }
+                }
             },
+            updateMask = new { fieldPaths = new[] { "oneTimeReservations" } },
             currentDocument = new { updateTime = route.UpdateTime }
         };
     }
@@ -1151,33 +1126,6 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         }
 
         return day;
-    }
-
-    // Aceite legado: leitura separada, sem fallback na criação pelo novo schema.
-    private static LegacyDriverRouteSnapshot ConvertLegacyDriverRouteSnapshot(
-        FirestoreDocumentDto document)
-    {
-        var id = GetDocumentId(document.Name);
-        var fields = document.Fields;
-        var role = ParseRouteRole(
-            GetRequiredStringField(fields, "role", id),
-            id);
-        var availableSeats = GetRequiredInt32Field(
-            fields,
-            "availableSeats",
-            id);
-
-        return new LegacyDriverRouteSnapshot(
-            id,
-            GetRequiredStringField(fields, "userId", id),
-            role,
-            availableSeats,
-            GetOptionalNonNegativeInt64Field(
-                fields,
-                "requestRevision",
-                id),
-            GetRequiredDocumentName(document),
-            GetRequiredUpdateTime(document));
     }
 
     private static void ValidatePersistedTypeAndDate(
@@ -1853,12 +1801,4 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         string DocumentName,
         string UpdateTime);
 
-    private sealed record LegacyDriverRouteSnapshot(
-        string Id,
-        string UserId,
-        RouteRole Role,
-        int AvailableSeats,
-        long RequestRevision,
-        string DocumentName,
-        string UpdateTime);
 }

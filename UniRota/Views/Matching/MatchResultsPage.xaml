@@ -34,7 +34,6 @@
                                     <VerticalStackLayout Style="{StaticResource DetailContent}">
                                         <Label Text="{Binding CompatibleDaysText, StringFormat='Dias compatíveis: {0}'}" Style="{StaticResource PageSubtitle}" />
                                         <Label Text="{Binding DepartureTimeText, StringFormat='Saída às {0}'}" />
-                                        <Label Text="{Binding AvailableSeatsText}" Style="{StaticResource SuccessBadge}" />
                                         <Label Text="{Binding DetourText}" Style="{StaticResource Caption}" />
                                     </VerticalStackLayout>
                                     <Button Text="Solicitar" Clicked="OnRequestRideClicked" CommandParameter="{Binding .}" Style="{StaticResource PrimaryButton}" />

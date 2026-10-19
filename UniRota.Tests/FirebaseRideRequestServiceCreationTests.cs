@@ -164,7 +164,6 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         reservations ??= [];
         var document = JsonNode.Parse(CreateDriverRouteDocumentJson())!;
         var fields = document["fields"]!.AsObject();
-        fields.Remove("availableSeats");
         fields["seatCapacity"] = new JsonObject { ["integerValue"] = "3" };
         fields["requestRevision"] = new JsonObject { ["integerValue"] = revision.ToString(CultureInfo.InvariantCulture) };
         var days = new JsonObject();

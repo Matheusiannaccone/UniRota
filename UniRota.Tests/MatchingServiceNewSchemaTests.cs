@@ -33,7 +33,6 @@ public sealed partial class MatchingServiceTests
         var result = await CreateService(map).FindMatchesAsync(
             CreatePassenger(days: [DayOfWeek.Monday, DayOfWeek.Tuesday]), [driver]);
 
-        Assert.Null(driver.AvailableSeats);
         Assert.Equal(matches ? 1 : 0, result.Count);
         Assert.Equal(matches ? 2 : 0, map.Requests.Count);
     }

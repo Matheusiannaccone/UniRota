@@ -752,7 +752,6 @@ public sealed partial class MatchingServiceTests
             DestinationPlaceId = destinationPlaceId,
             DaysOfWeek = days ?? [DayOfWeek.Monday],
             DepartureTimeMinutes = departureTimeMinutes,
-            AvailableSeats = null,
             CreatedAtUtc = DateTimeOffset.UnixEpoch
         };
     }
