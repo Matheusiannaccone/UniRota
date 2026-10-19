@@ -98,14 +98,15 @@ public sealed partial class FirebaseRouteServiceTests
         Assert.Equal(string.Empty, route.DestinationPlaceId);
     }
 
-    private static FirebaseRouteService CreateService(HttpMessageHandler handler)
+    private static FirebaseRouteService CreateService(HttpMessageHandler handler, bool useEmulators = false)
     {
         return new FirebaseRouteService(
             new HttpClient(handler),
             new FirebaseOptions
             {
                 ApiKey = "test-api-key",
-                ProjectId = "test-project"
+                ProjectId = "test-project",
+                UseEmulators = useEmulators
             },
             new FakeAuthService());
     }

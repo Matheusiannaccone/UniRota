@@ -1166,7 +1166,31 @@ public sealed class FirebaseRouteService : IRouteService
                 field => $"updateMask.fieldPaths={Escape(field)}"));
 
         return $"{BuildDocumentUrl(routeId)}?{updateMask}" +
-               $"&currentDocument.updateTime={Escape(updateTime)}";
+               "&" + BuildUpdateVersionPrecondition(updateTime);
+    }
+
+    private string BuildUpdateVersionPrecondition(string updateTime)
+    {
+        if (!_options.UseEmulators)
+        {
+            return $"currentDocument.updateTime={Escape(updateTime)}";
+        }
+
+        // O emulador interpreta o Timestamp RFC3339 na query do PATCH como
+        // versão zero. Seus campos protobuf preservam a mesma precondição.
+        if (!DateTimeOffset.TryParse(
+                updateTime,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var timestamp))
+        {
+            throw new InvalidOperationException("O Firebase retornou uma versão de rota inválida.");
+        }
+
+        var seconds = timestamp.ToUnixTimeSeconds();
+        var nanos = (timestamp.Ticks % TimeSpan.TicksPerSecond) * 100;
+        return "currentDocument.updateTime.seconds=" + seconds.ToString(CultureInfo.InvariantCulture)
+            + "&currentDocument.updateTime.nanos=" + nanos.ToString(CultureInfo.InvariantCulture);
     }
 
     private string BuildDeleteDocumentUrl(string routeId, string updateTime)

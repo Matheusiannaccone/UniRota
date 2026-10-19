@@ -347,7 +347,14 @@ public sealed class MatchingService : IMatchingService
             && route.DaysOfWeek.All(
                 day => Enum.IsDefined(typeof(DayOfWeek), day))
             && route.DepartureTimeMinutes is >= 0 and <= 1439
-            && route.AvailableSeats is > 0;
+            // Transição até os Blocos 3–4: validar o schema e a oferta semanal
+            // da rota inteira, sem filtrar dias nem consultar reservas Once.
+            && route.SeatCapacity is > 0
+            && route.WeeklyAvailableSeats is not null
+            && route.WeeklyAvailableSeats.Count == route.DaysOfWeek.Distinct().Count()
+            && route.WeeklyAvailableSeats.Keys.All(day => route.DaysOfWeek.Contains(day))
+            && route.WeeklyAvailableSeats.Values.All(seats => seats >= 0 && seats <= route.SeatCapacity.Value)
+            && route.WeeklyAvailableSeats.Values.Any(seats => seats > 0);
     }
 
     private static bool HasValidPlaceIds(WeeklyRoute route)

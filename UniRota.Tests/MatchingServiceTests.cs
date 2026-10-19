@@ -5,7 +5,7 @@ using UniRota.ViewModels;
 
 namespace UniRota.Tests;
 
-public sealed class MatchingServiceTests
+public sealed partial class MatchingServiceTests
 {
     private const int DefaultDepartureTimeMinutes = 480;
 
@@ -62,10 +62,10 @@ public sealed class MatchingServiceTests
     [InlineData(null)]
     [InlineData(0)]
     [InlineData(-1)]
-    public async Task FindMatchesAsync_NoSeatsDoesNotCallMapService(int? seats)
+    public async Task FindMatchesAsync_InvalidCapacityDoesNotCallMapService(int? seats)
     {
         var mapService = new FakeMapRouteService();
-        var driver = CreateDriver(availableSeats: seats);
+        var driver = CreateDriver(seatCapacity: seats);
 
         var matches = await CreateService(mapService)
             .FindMatchesAsync(CreatePassenger(), [driver]);
@@ -596,7 +596,7 @@ public sealed class MatchingServiceTests
             CreateDriver(id: "no-days", days: []),
             CreateDriver(id: "invalid-day", days: [(DayOfWeek)99]),
             CreateDriver(id: "invalid-time", departureTimeMinutes: 1440),
-            CreateDriver(id: "no-seats", availableSeats: 0),
+            CreateDriver(id: "no-seats", seatCapacity: 0),
             CreateDriver(id: "valid")
         };
 
@@ -767,7 +767,7 @@ public sealed class MatchingServiceTests
         string? destinationPlaceId = null,
         IReadOnlyList<DayOfWeek>? days = null,
         int departureTimeMinutes = DefaultDepartureTimeMinutes,
-        int? availableSeats = 1,
+        int? seatCapacity = 1,
         decimal estimatedDistanceKm = 10m)
     {
         return new WeeklyRoute
@@ -782,7 +782,9 @@ public sealed class MatchingServiceTests
             DestinationPlaceId = destinationPlaceId ?? $"driver-destination-{id}",
             DaysOfWeek = days ?? [DayOfWeek.Monday],
             DepartureTimeMinutes = departureTimeMinutes,
-            AvailableSeats = availableSeats,
+            SeatCapacity = seatCapacity,
+            WeeklyAvailableSeats = (days ?? [DayOfWeek.Monday]).Distinct()
+                .ToDictionary(day => day, _ => seatCapacity ?? 0),
             EstimatedDistanceKm = estimatedDistanceKm,
             CreatedAtUtc = DateTimeOffset.UnixEpoch
         };

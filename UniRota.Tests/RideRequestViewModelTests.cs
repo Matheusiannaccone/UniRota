@@ -232,7 +232,11 @@ public sealed class RideRequestViewModelTests
             DestinationPlaceId = "driver-destination",
             DaysOfWeek = [DayOfWeek.Monday],
             DepartureTimeMinutes = 480,
-            AvailableSeats = 1,
+            SeatCapacity = 1,
+            WeeklyAvailableSeats = new Dictionary<DayOfWeek, int>
+            {
+                [DayOfWeek.Monday] = 1
+            },
             EstimatedDistanceKm = 10m
         };
     }
