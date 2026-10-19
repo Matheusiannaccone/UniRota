@@ -37,24 +37,41 @@ public sealed partial class MatchingServiceTests
         Assert.Equal(matches ? 2 : 0, map.Requests.Count);
     }
 
-    [Fact]
-    public async Task FindMatchesAsync_TransitionDoesNotFilterDaysOrCountOnceReservations()
+    [Theory]
+    [InlineData(2020, 1, 6)]
+    [InlineData(2099, 1, 5)]
+    public async Task FindMatchesAsync_PastOrFutureOnceReservationsDoNotChangeCompatibility(
+        int year, int month, int day)
     {
-        var driver = NewSchemaCandidate(new Dictionary<DayOfWeek, int>
+        var date = new DateOnly(year, month, day);
+        var weekly = new Dictionary<DayOfWeek, int>
         {
             [DayOfWeek.Monday] = 1,
             [DayOfWeek.Tuesday] = 0
-        }, [new OneTimeReservation
+        };
+        var passenger = CreatePassenger(days: [DayOfWeek.Monday, DayOfWeek.Tuesday]);
+        var service = CreateService(new FakeMapRouteService());
+        var baseline = Assert.Single(await service.FindMatchesAsync(
+            passenger, [NewSchemaCandidate(weekly)]));
+        var driver = NewSchemaCandidate(weekly, [new OneTimeReservation
         {
             RequestId = "once-A",
-            Date = new DateOnly(2026, 10, 19),
-            DayOfWeek = DayOfWeek.Monday
+            Date = date,
+            DayOfWeek = date.DayOfWeek
+        }, new OneTimeReservation
+        {
+            RequestId = "once-B",
+            Date = date.AddDays(7),
+            DayOfWeek = date.AddDays(7).DayOfWeek
         }]);
 
-        var result = await CreateService(new FakeMapRouteService()).FindMatchesAsync(
-            CreatePassenger(days: [DayOfWeek.Monday, DayOfWeek.Tuesday]), [driver]);
+        // Mesmo lotando datas específicas, a busca não recebe tipo/data de solicitação.
+        var match = Assert.Single(await service.FindMatchesAsync(passenger, [driver]));
 
-        Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Tuesday }, Assert.Single(result).CompatibleDays);
+        Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Tuesday }, match.CompatibleDays);
+        Assert.Equal(baseline.CompatibleDays, match.CompatibleDays);
+        Assert.Equal(baseline.TimeDifferenceMinutes, match.TimeDifferenceMinutes);
+        Assert.Equal(baseline.SharedEncodedPolyline, match.SharedEncodedPolyline);
     }
 
     private static WeeklyRoute NewSchemaCandidate(
