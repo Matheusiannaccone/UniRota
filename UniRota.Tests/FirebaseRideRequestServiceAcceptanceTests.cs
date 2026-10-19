@@ -30,7 +30,8 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         var commits = await RunAcceptanceAsync(RideRequestType.Weekly, weekly, reservations,
             [DayOfWeek.Monday, DayOfWeek.Tuesday]);
 
-        var fields = AssertAcceptanceCommit(Assert.Single(commits), "weeklyAvailableSeats");
+        var fields = AssertAcceptanceCommit(Assert.Single(commits), "weeklyAvailableSeats",
+            acceptedDays: [DayOfWeek.Monday, DayOfWeek.Tuesday]);
         var days = fields["weeklyAvailableSeats"]!["mapValue"]!["fields"]!;
         Assert.Equal("1", days["Monday"]!["integerValue"]!.GetValue<string>());
         Assert.Equal("0", days["Tuesday"]!["integerValue"]!.GetValue<string>());
@@ -42,15 +43,52 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task AcceptAsync_WeeklyRejectsFullOrMissingDayWithoutCommit(bool missing)
+    public async Task AcceptAsync_WeeklySkipsFullOrRemovedDay(bool missing)
     {
         var weekly = AcceptanceWeeklySeats();
         if (missing) weekly.Remove(DayOfWeek.Tuesday);
         else weekly[DayOfWeek.Tuesday] = 0;
 
-        await RunAcceptanceAsync(RideRequestType.Weekly, weekly, [],
-            [DayOfWeek.Monday, DayOfWeek.Tuesday], allowed: false);
+        var commits = await RunAcceptanceAsync(RideRequestType.Weekly, weekly, [],
+            [DayOfWeek.Monday, DayOfWeek.Tuesday], allowed: true);
+        var fields = AssertAcceptanceCommit(Assert.Single(commits), "weeklyAvailableSeats");
+        Assert.Equal("1", fields["weeklyAvailableSeats"]!["mapValue"]!["fields"]!["Monday"]!["integerValue"]!.GetValue<string>());
         Assert.Equal(2, weekly[DayOfWeek.Monday]);
+    }
+
+    [Theory]
+    [InlineData(-7, false)]
+    [InlineData(0, true)]
+    [InlineData(7, true)]
+    public async Task AcceptAsync_WeeklySkipsOnlyWeekdayBlockedByCurrentOrFutureOnce(int offset, bool partial)
+    {
+        var date = TestToday.AddDays(offset);
+        var commits = await RunAcceptanceAsync(RideRequestType.Weekly, AcceptanceWeeklySeats(),
+            [AcceptanceReservation("a", date), AcceptanceReservation("b", date)],
+            [DayOfWeek.Monday, DayOfWeek.Tuesday]);
+
+        var fields = AssertAcceptanceCommit(Assert.Single(commits), "weeklyAvailableSeats",
+            acceptedDays: partial ? [DayOfWeek.Tuesday] : [DayOfWeek.Monday, DayOfWeek.Tuesday]);
+        var days = fields["weeklyAvailableSeats"]!["mapValue"]!["fields"]!;
+        Assert.Equal(partial ? "2" : "1", days["Monday"]!["integerValue"]!.GetValue<string>());
+        Assert.Equal("0", days["Tuesday"]!["integerValue"]!.GetValue<string>());
+        Assert.Equal("3", days["Wednesday"]!["integerValue"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task AcceptAsync_WeeklyRebuildsAcceptedDaysAfterConflict()
+    {
+        var weekly = AcceptanceWeeklySeats();
+        weekly[DayOfWeek.Monday] = 1;
+        var commits = await RunAcceptanceAsync(RideRequestType.Weekly, weekly, [],
+            [DayOfWeek.Monday, DayOfWeek.Tuesday], conflict: true);
+
+        Assert.Equal(2, commits.Count);
+        AssertAcceptanceCommit(commits[0], "weeklyAvailableSeats",
+            acceptedDays: [DayOfWeek.Monday, DayOfWeek.Tuesday]);
+        var fields = AssertAcceptanceCommit(commits[1], "weeklyAvailableSeats", retry: true,
+            acceptedDays: [DayOfWeek.Tuesday]);
+        Assert.Equal("0", fields["weeklyAvailableSeats"]!["mapValue"]!["fields"]!["Monday"]!["integerValue"]!.GetValue<string>());
     }
 
     [Theory]
@@ -184,17 +222,22 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         RequestId = id, Date = date, DayOfWeek = date.DayOfWeek
     };
 
-    private static JsonObject AssertAcceptanceCommit(string body, string field, bool retry = false)
+    private static JsonObject AssertAcceptanceCommit(string body, string field, bool retry = false,
+        IReadOnlyList<DayOfWeek>? acceptedDays = null)
     {
         var writes = JsonNode.Parse(body)!["writes"]!.AsArray();
         Assert.Equal(2, writes.Count);
         Assert.Equal("accepted", writes[0]!["update"]!["fields"]!["status"]!["stringValue"]!.GetValue<string>());
-        Assert.Single(writes[0]!["update"]!["fields"]!.AsObject());
+        Assert.Equal(2, writes[0]!["update"]!["fields"]!.AsObject().Count);
+        var expectedDays = acceptedDays ?? (field == "weeklyAvailableSeats" ? new[] { DayOfWeek.Monday } : []);
+        Assert.Equal(expectedDays.Select(day => day.ToString()), writes[0]!["update"]!["fields"]!
+            ["acceptedDays"]!["arrayValue"]!["values"]!.AsArray().Select(value => value!["stringValue"]!.GetValue<string>()));
         Assert.Equal("projects/test-project/databases/(default)/documents/rideRequests/request-1",
             writes[0]!["update"]!["name"]!.GetValue<string>());
         Assert.Equal("projects/test-project/databases/(default)/documents/weeklyRoutes/driver-route",
             writes[1]!["update"]!["name"]!.GetValue<string>());
-        Assert.Equal("status", Assert.Single(writes[0]!["updateMask"]!["fieldPaths"]!.AsArray())!.GetValue<string>());
+        Assert.Equal(new[] { "status", "acceptedDays" }, writes[0]!["updateMask"]!["fieldPaths"]!.AsArray()
+            .Select(value => value!.GetValue<string>()));
         Assert.Equal(field, Assert.Single(writes[1]!["updateMask"]!["fieldPaths"]!.AsArray())!.GetValue<string>());
         Assert.Equal(retry ? "2026-09-03T13:00:01Z" : "2026-09-03T13:00:00Z",
             writes[0]!["currentDocument"]!["updateTime"]!.GetValue<string>());
@@ -230,7 +273,14 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                 } };
                 if (type == RideRequestType.Once)
                     fields["requestedDate"] = new JsonObject { ["stringValue"] = "2026-10-19" };
-                if (invalidField == "status") fields["status"]!["stringValue"] = "accepted";
+                if (invalidField == "status")
+                {
+                    fields["status"]!["stringValue"] = "accepted";
+                    fields["acceptedDays"] = new JsonObject { ["arrayValue"] = new JsonObject
+                    {
+                        ["values"] = new JsonArray(new JsonObject { ["stringValue"] = days[0].ToString() })
+                    } };
+                }
                 if (invalidField == "driverUserId") fields["driverUserId"]!["stringValue"] = "other-driver";
                 if (retry) document["updateTime"] = "2026-09-03T13:00:01Z";
                 return JsonResponse(document.ToJsonString());

@@ -37,7 +37,13 @@
                                     </VerticalStackLayout>
                                     <Label Text="{Binding SuggestedPriceText}" Style="{StaticResource SuccessBadge}" />
                                     <Label Text="{Binding SentAtText}" IsVisible="{Binding HasCreatedAt}" Style="{StaticResource Caption}" />
-                                    <Button Text="Aceitar" Clicked="OnAcceptClicked" CommandParameter="{Binding .}" IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}" Style="{StaticResource PrimaryButton}" />
+                                    <Button Text="Aceitar" Clicked="OnAcceptClicked" CommandParameter="{Binding .}" IsEnabled="{Binding CanAccept}" Style="{StaticResource PrimaryButton}">
+                                        <Button.Triggers>
+                                            <DataTrigger TargetType="Button" Binding="{Binding BindingContext.IsBusy, Source={x:Reference Page}}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Button.Triggers>
+                                    </Button>
                                     <Button Text="Recusar" Clicked="OnRejectClicked" CommandParameter="{Binding .}" IsEnabled="{Binding BindingContext.IsNotBusy, Source={x:Reference Page}}" Style="{StaticResource DangerButton}" />
                                 </VerticalStackLayout>
                             </Border>

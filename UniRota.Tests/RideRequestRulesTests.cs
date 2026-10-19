@@ -132,7 +132,7 @@ public sealed class RideRequestRulesTests
         {
             var updated = RideRequestRules.ApplyWeeklyAcceptance(
                 weekly, reservations, [DayOfWeek.Monday], today);
-            Assert.Equal(0, updated[DayOfWeek.Monday]);
+            Assert.Equal(0, updated.WeeklySeats[DayOfWeek.Monday]);
         }
         else
         {
@@ -158,7 +158,7 @@ public sealed class RideRequestRulesTests
         var updated = RideRequestRules.ApplyWeeklyAcceptance(
             weekly, reservations, [DayOfWeek.Monday], today);
 
-        Assert.Equal(1, updated[DayOfWeek.Monday]);
+        Assert.Equal(1, updated.WeeklySeats[DayOfWeek.Monday]);
         Assert.Equal(3, reservations.Length);
     }
 
@@ -175,5 +175,23 @@ public sealed class RideRequestRulesTests
 
         Assert.True(RideRequestRules.HasSeatsOnDate(weekly, reservations, date));
         Assert.False(RideRequestRules.HasSeatsOnDate(weekly, reservations, date.AddDays(7)));
+    }
+
+    [Fact]
+    public void ApplyWeeklyAcceptance_ReturnsDistinctSubsetAndConsumesOnlyGrantedDays()
+    {
+        var today = new DateOnly(2026, 10, 19);
+        var weekly = new Dictionary<DayOfWeek, int>
+        {
+            [DayOfWeek.Monday] = 0, [DayOfWeek.Tuesday] = 2, [DayOfWeek.Wednesday] = 3
+        };
+        var result = RideRequestRules.ApplyWeeklyAcceptance(weekly, [],
+            [DayOfWeek.Tuesday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Friday], today);
+
+        Assert.Equal(new[] { DayOfWeek.Tuesday }, result.AcceptedDays);
+        Assert.Equal(0, result.WeeklySeats[DayOfWeek.Monday]);
+        Assert.Equal(1, result.WeeklySeats[DayOfWeek.Tuesday]);
+        Assert.Equal(3, result.WeeklySeats[DayOfWeek.Wednesday]);
+        Assert.Equal(2, weekly[DayOfWeek.Tuesday]);
     }
 }

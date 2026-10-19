@@ -16,7 +16,7 @@ public static class RideRequestRules
     public static bool HasWeeklySeats(
         IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
         IReadOnlyList<DayOfWeek> days) =>
-        days.Count > 0 && days.All(day => weeklySeats.TryGetValue(day, out var seats) && seats > 0);
+        days.Any(day => weeklySeats.TryGetValue(day, out var seats) && seats > 0);
 
     public static bool HasSeatsOnDate(
         IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
@@ -25,32 +25,61 @@ public static class RideRequestRules
         weeklySeats.TryGetValue(date.DayOfWeek, out var seats)
         && seats - reservations.Count(reservation => reservation.Date == date) > 0;
 
-    public static IReadOnlyDictionary<DayOfWeek, int> ApplyWeeklyAcceptance(
+    public static IReadOnlyList<DayOfWeek> GetAcceptableWeeklyDays(
+        IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
+        IReadOnlyList<OneTimeReservation> reservations,
+        IReadOnlyList<DayOfWeek> compatibleDays,
+        DateOnly today) =>
+        compatibleDays.Distinct()
+            .Where(day => weeklySeats.TryGetValue(day, out var seats) && seats > 0
+                && reservations.Where(reservation => reservation.Date >= today
+                        && reservation.Date.DayOfWeek == day)
+                    .GroupBy(reservation => reservation.Date)
+                    .All(group => group.Count() < seats))
+            .OrderBy(day => day)
+            .ToArray();
+
+    public static bool CanAccept(RideRequest request, WeeklyRoute route, DateOnly today)
+    {
+        if (request.Status != RideRequestStatus.Pending || route.Role != RouteRole.Driver
+            || request.DriverRouteId != route.Id || request.DriverUserId != route.UserId)
+        {
+            return false;
+        }
+
+        return request.Type switch
+        {
+            RideRequestType.Weekly => GetAcceptableWeeklyDays(route.WeeklyAvailableSeats,
+                route.OneTimeReservations,
+                request.CompatibleDays.Where(route.DaysOfWeek.Contains).ToArray(), today).Count > 0,
+            RideRequestType.Once => request.RequestedDate is { } date && date >= today
+                && route.DaysOfWeek.Contains(date.DayOfWeek)
+                && !route.OneTimeReservations.Any(reservation => reservation.RequestId == request.Id)
+                && HasSeatsOnDate(route.WeeklyAvailableSeats, route.OneTimeReservations, date),
+            _ => false
+        };
+    }
+
+    public static (IReadOnlyDictionary<DayOfWeek, int> WeeklySeats,
+        IReadOnlyList<DayOfWeek> AcceptedDays) ApplyWeeklyAcceptance(
         IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
         IReadOnlyList<OneTimeReservation> reservations,
         IReadOnlyList<DayOfWeek> days,
         DateOnly today)
     {
-        if (!HasWeeklySeats(weeklySeats, days))
+        var acceptedDays = GetAcceptableWeeklyDays(weeklySeats, reservations, days, today);
+        if (acceptedDays.Count == 0)
         {
-            throw new InvalidOperationException("Não há vagas disponíveis em todos os dias solicitados.");
+            throw new InvalidOperationException("Não há vagas disponíveis nos dias solicitados.");
         }
 
         var updated = weeklySeats.ToDictionary(entry => entry.Key, entry => entry.Value);
-        foreach (var day in days.Distinct())
+        foreach (var day in acceptedDays)
         {
             updated[day]--;
         }
 
-        if (reservations.Where(reservation => reservation.Date >= today
-                && days.Contains(reservation.DayOfWeek))
-            .GroupBy(reservation => reservation.Date)
-            .Any(group => updated[group.Key.DayOfWeek] - group.Count() < 0))
-        {
-            throw new InvalidOperationException("Não há vagas sem comprometer reservas pontuais confirmadas.");
-        }
-
-        return updated;
+        return (updated, acceptedDays);
     }
 
     public static IReadOnlyList<OneTimeReservation> ApplyOnceAcceptance(

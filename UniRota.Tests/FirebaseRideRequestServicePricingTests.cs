@@ -179,7 +179,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     }
 
     [Fact]
-    public async Task RejectAsync_ChangesOnlyStatusAndPreservesSuggestedPriceSnapshot()
+    public async Task RejectAsync_ChangesStatusAndEmptyAcceptedDaysPreservingSuggestedPrice()
     {
         string? commitBody = null;
         var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
@@ -212,6 +212,8 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         var write = Assert.Single(
             document.RootElement.GetProperty("writes").EnumerateArray());
         Assert.Equal("rejected", GetWrittenStringField(write, "status"));
+        Assert.Empty(write.GetProperty("update").GetProperty("fields").GetProperty("acceptedDays")
+            .GetProperty("arrayValue").GetProperty("values").EnumerateArray());
         Assert.False(
             write.GetProperty("update")
                 .GetProperty("fields")
@@ -318,6 +320,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
               "fields": {
                 "userId": { "stringValue": "driver-user" },
                 "role": { "stringValue": "driver" },
+                "daysOfWeek": { "arrayValue": { "values": [ { "stringValue": "Monday" } ] } },
                 "seatCapacity": { "integerValue": "3" },
                 "weeklyAvailableSeats": { "mapValue": { "fields": { "Monday": { "integerValue": "{{weeklySeats}}" } } } },
                 "oneTimeReservations": { "arrayValue": { "values": [] } },
@@ -347,7 +350,8 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                         "values": [ { "stringValue": "Monday" } ]
                       }
                     },
-                    "type": { "stringValue": "weekly" },
+                    "acceptedDays": { "arrayValue": { "values": [] } },
+                "type": { "stringValue": "weekly" },
                     "status": { "stringValue": "pending" },
                     "requestedDate": { "nullValue": null },
                     "suggestedPrice": { "doubleValue": 3.45 },
@@ -379,6 +383,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                     "values": [ { "stringValue": "Monday" } ]
                   }
                 },
+                "acceptedDays": { "arrayValue": { "values": [] } },
                 "type": { "stringValue": "weekly" },
                 "status": { "stringValue": "pending" },
                 "requestedDate": { "nullValue": null },

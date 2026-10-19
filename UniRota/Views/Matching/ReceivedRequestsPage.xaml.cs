@@ -22,7 +22,7 @@ public partial class ReceivedRequestsPage : ContentPage
 
     private async void OnAcceptClicked(object sender, EventArgs e)
     {
-        if (!TryGetRequest(sender, out var item))
+        if (!TryGetRequest(sender, out var item) || !_viewModel.AcceptCommand.CanExecute(item))
         {
             return;
         }
@@ -33,7 +33,7 @@ public partial class ReceivedRequestsPage : ContentPage
         {
             var confirmed = await DisplayAlert(
                 "Aceitar solicitação?",
-                "Uma vaga da rota será consumida.",
+                "Serão confirmados apenas os dias ou a data com vaga disponível.",
                 "Aceitar",
                 "Voltar");
 

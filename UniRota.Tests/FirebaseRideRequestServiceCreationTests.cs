@@ -71,7 +71,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     [Theory]
     [InlineData(DayOfWeek.Monday)]
     [InlineData(DayOfWeek.Tuesday)]
-    public async Task CreateAsync_WeeklyRejectsIfAnyRequestedDayIsFull(DayOfWeek fullDay)
+    public async Task CreateAsync_WeeklyAllowsOneRemainingDayAndPreservesRequestedDays(DayOfWeek fullDay)
     {
         var weekly = new Dictionary<DayOfWeek, int>
         {
@@ -80,7 +80,15 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         };
         weekly[fullDay] = 0;
 
-        await AssertCreationAsync(RideRequestType.Weekly, weekly, [], null, allowed: false);
+        await AssertCreationAsync(RideRequestType.Weekly, weekly, [], null, allowed: true);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WeeklyWithoutAnyAvailableDayDoesNotCommit()
+    {
+        await AssertCreationAsync(RideRequestType.Weekly,
+            new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 0, [DayOfWeek.Tuesday] = 0 },
+            [], null, allowed: false);
     }
 
     [Theory]
@@ -187,12 +195,19 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         Assert.Equal(1, commits);
         Assert.Equal(RideRequestStatus.Pending, created.Status);
         Assert.Equal(type, created.Type);
+        Assert.Empty(created.AcceptedDays);
+        Assert.Equal(weekly.Keys.OrderBy(day => day), created.CompatibleDays);
         Assert.Equal(date, created.RequestedDate);
         Assert.Equal(3.45m, created.SuggestedPrice);
         using var json = JsonDocument.Parse(commitBody!);
         var writes = json.RootElement.GetProperty("writes");
         Assert.Equal(2, writes.GetArrayLength());
         Assert.Equal("pending", GetWrittenStringField(writes[0], "status"));
+        var requestFields = writes[0].GetProperty("update").GetProperty("fields");
+        Assert.Empty(requestFields.GetProperty("acceptedDays").GetProperty("arrayValue").GetProperty("values").EnumerateArray());
+        Assert.Equal(weekly.Keys.OrderBy(day => day).Select(day => day.ToString()),
+            requestFields.GetProperty("compatibleDays").GetProperty("arrayValue").GetProperty("values")
+                .EnumerateArray().Select(value => value.GetProperty("stringValue").GetString()));
         Assert.Equal(3.45m, writes[0].GetProperty("update").GetProperty("fields")
             .GetProperty("suggestedPrice").GetProperty("doubleValue").GetDecimal());
         var routeFields = writes[1].GetProperty("update").GetProperty("fields");
@@ -221,6 +236,10 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             days[entry.Key.ToString()] = new JsonObject { ["integerValue"] = entry.Value.ToString(CultureInfo.InvariantCulture) };
         }
 
+        fields["daysOfWeek"] = new JsonObject { ["arrayValue"] = new JsonObject
+        {
+            ["values"] = new JsonArray(weekly.Keys.Select(day => (JsonNode)new JsonObject { ["stringValue"] = day.ToString() }).ToArray())
+        } };
         fields["weeklyAvailableSeats"] = new JsonObject { ["mapValue"] = new JsonObject { ["fields"] = days } };
         var values = new JsonArray();
         foreach (var reservation in reservations)

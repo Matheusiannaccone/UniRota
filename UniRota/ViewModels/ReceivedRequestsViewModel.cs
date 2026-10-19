@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using UniRota.Models;
+using UniRota.Services;
 using UniRota.Services.Interfaces;
 
 namespace UniRota.ViewModels;
@@ -8,6 +10,8 @@ namespace UniRota.ViewModels;
 public partial class ReceivedRequestsViewModel : ObservableObject
 {
     private readonly IRideRequestService _rideRequestService;
+    private readonly IRouteService _routeService;
+    private readonly IAppClock _clock;
 
     [ObservableProperty]
     private bool isBusy;
@@ -27,9 +31,14 @@ public partial class ReceivedRequestsViewModel : ObservableObject
     [ObservableProperty]
     private bool isEmpty = true;
 
-    public ReceivedRequestsViewModel(IRideRequestService rideRequestService)
+    public ReceivedRequestsViewModel(
+        IRideRequestService rideRequestService,
+        IRouteService routeService,
+        IAppClock clock)
     {
         _rideRequestService = rideRequestService;
+        _routeService = routeService;
+        _clock = clock;
     }
 
     public ObservableCollection<RideRequestItemViewModel> Requests { get; } = [];
@@ -41,6 +50,7 @@ public partial class ReceivedRequestsViewModel : ObservableObject
 
     partial void OnIsBusyChanged(bool value)
     {
+        AcceptCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsNotBusy));
         OnPropertyChanged(nameof(ShowEmptyState));
     }
@@ -87,7 +97,10 @@ public partial class ReceivedRequestsViewModel : ObservableObject
         }
     }
 
-    [RelayCommand(AllowConcurrentExecutions = false)]
+    private bool CanAcceptRequest(RideRequestItemViewModel? item) =>
+        !IsBusy && item?.CanAccept == true;
+
+    [RelayCommand(AllowConcurrentExecutions = false, CanExecute = nameof(CanAcceptRequest))]
     private Task AcceptAsync(
         RideRequestItemViewModel? item,
         CancellationToken cancellationToken)
@@ -114,7 +127,8 @@ public partial class ReceivedRequestsViewModel : ObservableObject
         bool accept,
         CancellationToken cancellationToken)
     {
-        if (item is null || IsBusy)
+        if (item is null || IsBusy || item.Request.Status != RideRequestStatus.Pending
+            || (accept && !item.CanAccept))
         {
             return;
         }
@@ -161,6 +175,19 @@ public partial class ReceivedRequestsViewModel : ObservableObject
         }
         catch (Exception exception)
         {
+            if (accept)
+            {
+                try
+                {
+                    await RefreshRequestsAsync(cancellationToken);
+                }
+                catch (Exception)
+                {
+                    Requests.Clear();
+                    IsEmpty = true;
+                }
+            }
+
             SetError(
                 exception.Message,
                 accept
@@ -177,6 +204,11 @@ public partial class ReceivedRequestsViewModel : ObservableObject
     {
         var requests = await _rideRequestService
             .GetReceivedPendingRequestsAsync(cancellationToken);
+        var routes = requests.Count == 0
+            ? new Dictionary<string, WeeklyRoute>()
+            : (await _routeService.GetMyRoutesAsync(cancellationToken))
+                .ToDictionary(route => route.Id);
+        var today = _clock.Today;
 
         Requests.Clear();
 
@@ -185,7 +217,9 @@ public partial class ReceivedRequestsViewModel : ObservableObject
             Requests.Add(new RideRequestItemViewModel(
                 request,
                 request.PassengerUserName,
-                "Passageiro"));
+                "Passageiro",
+                routes.TryGetValue(request.DriverRouteId, out var route)
+                    && RideRequestRules.CanAccept(request, route, today)));
         }
 
         IsEmpty = Requests.Count == 0;

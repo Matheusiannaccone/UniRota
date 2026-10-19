@@ -18,6 +18,8 @@ public sealed class RideRequest
 
     public IReadOnlyList<DayOfWeek> CompatibleDays { get; init; } = [];
 
+    public IReadOnlyList<DayOfWeek> AcceptedDays { get; init; } = [];
+
     public RideRequestType Type { get; init; }
 
     public RideRequestStatus Status { get; init; }

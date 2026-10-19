@@ -10,15 +10,19 @@ public sealed class RideRequestItemViewModel
     public RideRequestItemViewModel(
         RideRequest request,
         string counterpartyName,
-        string counterpartyFallback)
+        string counterpartyFallback,
+        bool canAccept = false)
     {
         Request = request ?? throw new ArgumentNullException(nameof(request));
+        CanAccept = canAccept && request.Status == RideRequestStatus.Pending;
         CounterpartyNameText = string.IsNullOrWhiteSpace(counterpartyName)
             ? counterpartyFallback
             : counterpartyName;
     }
 
     public RideRequest Request { get; }
+
+    public bool CanAccept { get; }
 
     public string CounterpartyNameText { get; }
 
