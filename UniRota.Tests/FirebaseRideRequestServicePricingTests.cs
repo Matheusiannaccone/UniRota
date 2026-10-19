@@ -7,7 +7,7 @@ using UniRota.Services.Interfaces;
 
 namespace UniRota.Tests;
 
-public sealed class FirebaseRideRequestServicePricingTests
+public sealed partial class FirebaseRideRequestServicePricingTests
 {
     [Fact]
     public async Task CreateAsync_PersistsAndReturnsSuggestedPrice()
@@ -20,7 +20,7 @@ public sealed class FirebaseRideRequestServicePricingTests
             if (request.Method == HttpMethod.Get
                 && url.Contains("/weeklyRoutes/driver-route", StringComparison.Ordinal))
             {
-                return JsonResponse(CreateDriverRouteDocumentJson());
+                return JsonResponse(CreateCreationDriverRouteDocumentJson());
             }
 
             if (url.EndsWith(":runQuery", StringComparison.Ordinal))

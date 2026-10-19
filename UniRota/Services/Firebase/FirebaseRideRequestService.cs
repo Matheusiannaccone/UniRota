@@ -113,6 +113,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 routeSnapshot,
                 driverRoute,
                 userId);
+            EnsureAvailabilityForCreation(routeSnapshot, type, compatibleDays, requestedDate);
 
             var pendingRequests = await GetMyPendingRequestsCoreAsync(
                 userId,
@@ -388,7 +389,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 BuildWeeklyRouteDocumentUrl(rideRequest.DriverRouteId),
                 idToken,
                 cancellationToken);
-            var routeSnapshot = ConvertDriverRouteSnapshot(routeDocument);
+            var routeSnapshot = ConvertLegacyDriverRouteSnapshot(routeDocument);
             ValidateDriverRouteForAcceptance(
                 routeSnapshot,
                 rideRequest,
@@ -809,15 +810,28 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 "Não é possível solicitar carona para uma rota do próprio usuário.");
         }
 
-        if (snapshot.AvailableSeats <= 0)
+    }
+
+    private static void EnsureAvailabilityForCreation(
+        DriverRouteSnapshot snapshot,
+        RideRequestType type,
+        IReadOnlyList<DayOfWeek> compatibleDays,
+        DateOnly? requestedDate)
+    {
+        var hasSeats = type == RideRequestType.Weekly
+            ? compatibleDays.All(day => snapshot.WeeklyAvailableSeats.TryGetValue(day, out var weeklySeats) && weeklySeats > 0)
+            : snapshot.WeeklyAvailableSeats.TryGetValue(requestedDate!.Value.DayOfWeek, out var dateSeats)
+                && dateSeats - snapshot.OneTimeReservations.Count(reservation => reservation.Date == requestedDate.Value) > 0;
+
+        if (!hasSeats)
         {
             throw new InvalidOperationException(
-                "A rota selecionada não possui mais vagas disponíveis.");
+                "A rota selecionada não possui vagas disponíveis para os dias ou a data solicitada.");
         }
     }
 
     private static void ValidateDriverRouteForAcceptance(
-        DriverRouteSnapshot snapshot,
+        LegacyDriverRouteSnapshot snapshot,
         RideRequest request,
         string driverUserId)
     {
@@ -906,7 +920,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
     }
 
     private static object CreateAvailableSeatsWrite(
-        DriverRouteSnapshot route,
+        LegacyDriverRouteSnapshot route,
         int availableSeats)
     {
         return new
@@ -1070,6 +1084,81 @@ public sealed class FirebaseRideRequestService : IRideRequestService
     {
         var id = GetDocumentId(document.Name);
         var fields = document.Fields;
+        var capacity = GetRequiredInt32Field(fields, "seatCapacity", id);
+
+        if (capacity <= 0
+            || !fields.TryGetValue("weeklyAvailableSeats", out var weeklyField)
+            || weeklyField?.MapValue?.Fields is not { Count: > 0 } weeklyFields
+            || !fields.TryGetValue("oneTimeReservations", out var reservationsField)
+            || reservationsField?.ArrayValue?.Values is not { } values)
+        {
+            throw CreateInvalidDocumentException(id, "o schema de vagas da rota é inválido");
+        }
+
+        var weeklySeats = new Dictionary<DayOfWeek, int>();
+        foreach (var entry in weeklyFields)
+        {
+            var day = ParseSeatDay(entry.Key, id);
+            var seats = GetRequiredInt32Field(weeklyFields, entry.Key, id);
+            if (seats < 0 || seats > capacity)
+            {
+                throw CreateInvalidDocumentException(id, "o saldo semanal está fora da capacidade da rota");
+            }
+
+            weeklySeats.Add(day, seats);
+        }
+
+        var reservations = new List<OneTimeReservation>();
+        var requestIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in values)
+        {
+            if (value?.MapValue?.Fields is not { } reservationFields)
+            {
+                throw CreateInvalidDocumentException(id, "a reserva pontual deve conter um mapValue");
+            }
+
+            var requestId = GetRequiredStringField(reservationFields, "requestId", id);
+            var date = GetOptionalDateField(reservationFields, "date", id)
+                ?? throw CreateInvalidDocumentException(id, "a reserva pontual deve possuir uma data");
+            var day = ParseSeatDay(GetRequiredStringField(reservationFields, "dayOfWeek", id), id);
+            if (!requestIds.Add(requestId) || day != date.DayOfWeek || !weeklySeats.ContainsKey(day))
+            {
+                throw CreateInvalidDocumentException(id, "a reserva pontual contém dados inconsistentes");
+            }
+
+            reservations.Add(new OneTimeReservation { RequestId = requestId, Date = date, DayOfWeek = day });
+        }
+
+        return new DriverRouteSnapshot(
+            id,
+            GetRequiredStringField(fields, "userId", id),
+            ParseRouteRole(GetRequiredStringField(fields, "role", id), id),
+            capacity,
+            weeklySeats,
+            reservations,
+            GetOptionalNonNegativeInt64Field(fields, "requestRevision", id),
+            GetRequiredDocumentName(document),
+            GetRequiredUpdateTime(document));
+    }
+
+    private static DayOfWeek ParseSeatDay(string value, string documentId)
+    {
+        if (!Enum.TryParse<DayOfWeek>(value, out var day)
+            || !Enum.IsDefined(typeof(DayOfWeek), day)
+            || value != day.ToString())
+        {
+            throw CreateInvalidDocumentException(documentId, "o schema de vagas contém um dia inválido");
+        }
+
+        return day;
+    }
+
+    // Aceite legado: leitura separada, sem fallback na criação pelo novo schema.
+    private static LegacyDriverRouteSnapshot ConvertLegacyDriverRouteSnapshot(
+        FirestoreDocumentDto document)
+    {
+        var id = GetDocumentId(document.Name);
+        var fields = document.Fields;
         var role = ParseRouteRole(
             GetRequiredStringField(fields, "role", id),
             id);
@@ -1078,7 +1167,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             "availableSeats",
             id);
 
-        return new DriverRouteSnapshot(
+        return new LegacyDriverRouteSnapshot(
             id,
             GetRequiredStringField(fields, "userId", id),
             role,
@@ -1736,6 +1825,15 @@ public sealed class FirebaseRideRequestService : IRideRequestService
 
         [JsonPropertyName("arrayValue")]
         public FirestoreArrayValueDto? ArrayValue { get; init; }
+
+        [JsonPropertyName("mapValue")]
+        public FirestoreMapValueDto? MapValue { get; init; }
+    }
+
+    private sealed class FirestoreMapValueDto
+    {
+        [JsonPropertyName("fields")]
+        public Dictionary<string, FirestoreValueDto> Fields { get; init; } = [];
     }
 
     private sealed class FirestoreArrayValueDto
@@ -1745,6 +1843,17 @@ public sealed class FirebaseRideRequestService : IRideRequestService
     }
 
     private sealed record DriverRouteSnapshot(
+        string Id,
+        string UserId,
+        RouteRole Role,
+        int SeatCapacity,
+        IReadOnlyDictionary<DayOfWeek, int> WeeklyAvailableSeats,
+        IReadOnlyList<OneTimeReservation> OneTimeReservations,
+        long RequestRevision,
+        string DocumentName,
+        string UpdateTime);
+
+    private sealed record LegacyDriverRouteSnapshot(
         string Id,
         string UserId,
         RouteRole Role,
