@@ -4,6 +4,17 @@ namespace UniRota.Services;
 
 public static class RideRequestRules
 {
+    public const string PassengerDaysUnavailableMessage =
+        "Todos os dias dessa solicitação já foram aceitos por outro motorista.";
+
+    public const string ConfirmedDaysChangedMessage =
+        "Os dias disponíveis para aceite foram alterados. Atualize a lista e confirme novamente.";
+
+    public static IReadOnlyList<DayOfWeek> GetPassengerAvailableWeeklyDays(
+        WeeklyRoute passengerRoute, IReadOnlyList<DayOfWeek> compatibleDays) =>
+        compatibleDays.Intersect(passengerRoute.DaysOfWeek)
+            .Except(passengerRoute.WeeklyAcceptedDays).OrderBy(day => day).ToArray();
+
     public static void EnsurePending(RideRequestStatus status)
     {
         if (status != RideRequestStatus.Pending)

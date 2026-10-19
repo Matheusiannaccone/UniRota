@@ -339,8 +339,12 @@ public sealed class RideRequestViewModelTests
 
         public Task AcceptAsync(
             string requestId,
-            CancellationToken cancellationToken = default) =>
+            CancellationToken cancellationToken = default,
+            IReadOnlyList<DayOfWeek>? confirmedDays = null) =>
             Task.CompletedTask;
+
+        public Task<IReadOnlyDictionary<string, WeeklyRoute>> GetPassengerRoutesAsync(IReadOnlyList<RideRequest> requests, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<string, WeeklyRoute>>(new Dictionary<string, WeeklyRoute>());
 
         public Task RejectAsync(
             string requestId,

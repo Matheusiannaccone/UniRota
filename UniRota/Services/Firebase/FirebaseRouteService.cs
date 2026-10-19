@@ -327,6 +327,9 @@ public sealed class FirebaseRouteService : IRouteService
             ? route.WeeklyAvailableSeats
             : RouteSeatEditingRules.GetUpdatedWeeklySeats(existingRoute, route.SeatCapacity, daysOfWeek);
         var reservations = existingRoute?.OneTimeReservations ?? route.OneTimeReservations;
+        if (existingRoute is null && route.WeeklyAcceptedDays.Count != 0)
+            throw new ArgumentException("Uma nova rota deve possuir weeklyAcceptedDays vazio.", nameof(route));
+
         var normalizedRoute = new WeeklyRoute
         {
             Id = routeId,
@@ -338,6 +341,7 @@ public sealed class FirebaseRouteService : IRouteService
             Destination = destination,
             DestinationPlaceId = destinationPlaceId,
             DaysOfWeek = daysOfWeek,
+            WeeklyAcceptedDays = (existingRoute?.WeeklyAcceptedDays ?? route.WeeklyAcceptedDays).ToArray(),
             DepartureTimeMinutes = route.DepartureTimeMinutes,
             SeatCapacity = route.SeatCapacity,
             WeeklyAvailableSeats = weeklySeats.ToDictionary(
@@ -361,10 +365,15 @@ public sealed class FirebaseRouteService : IRouteService
 
     private static string? GetSeatSchemaValidationError(WeeklyRoute route)
     {
-        if (route.WeeklyAvailableSeats is null || route.OneTimeReservations is null)
+        if (route.WeeklyAcceptedDays is null || route.WeeklyAvailableSeats is null || route.OneTimeReservations is null)
         {
-            return "Os campos 'weeklyAvailableSeats' e 'oneTimeReservations' são obrigatórios.";
+            return "Os campos 'weeklyAcceptedDays', 'weeklyAvailableSeats' e 'oneTimeReservations' são obrigatórios.";
         }
+
+        if (route.WeeklyAcceptedDays.Distinct().Count() != route.WeeklyAcceptedDays.Count
+            || route.WeeklyAcceptedDays.Any(day => !route.DaysOfWeek.Contains(day))
+            || (route.Role == RouteRole.Driver && route.WeeklyAcceptedDays.Count != 0))
+            return "weeklyAcceptedDays deve conter dias únicos da rota e permanecer vazio para motorista.";
 
         if (route.Role == RouteRole.Passenger)
         {
@@ -456,6 +465,10 @@ public sealed class FirebaseRouteService : IRouteService
                         .Select(day => new { stringValue = day.ToString() })
                         .ToArray()
                 }
+            },
+            ["weeklyAcceptedDays"] = new
+            {
+                arrayValue = new { values = route.WeeklyAcceptedDays.Select(day => new { stringValue = day.ToString() }).ToArray() }
             },
             ["departureTimeMinutes"] = new
             {
@@ -590,6 +603,7 @@ public sealed class FirebaseRouteService : IRouteService
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = departureTimeMinutes,
             SeatCapacity = seatCapacity,
+            WeeklyAcceptedDays = GetRequiredDaysOfWeekField(fields, "weeklyAcceptedDays", id, allowEmpty: true),
             WeeklyAvailableSeats = GetRequiredWeeklyAvailableSeats(fields, id),
             OneTimeReservations = GetRequiredOneTimeReservations(fields, id),
             EstimatedDistanceKm = estimatedDistanceKm,
@@ -830,11 +844,12 @@ public sealed class FirebaseRouteService : IRouteService
     private static IReadOnlyList<DayOfWeek> GetRequiredDaysOfWeekField(
         IReadOnlyDictionary<string, FirestoreValueDto> fields,
         string fieldName,
-        string documentId)
+        string documentId,
+        bool allowEmpty = false)
     {
         if (!fields.TryGetValue(fieldName, out var field)
-            || field.ArrayValue is null
-            || field.ArrayValue.Values.Count == 0)
+            || field?.ArrayValue?.Values is null
+            || (!allowEmpty && field.ArrayValue.Values.Count == 0))
         {
             throw new InvalidOperationException(
                 $"O documento de rota não contém o campo obrigatório '{fieldName}'.");
@@ -846,6 +861,9 @@ public sealed class FirebaseRouteService : IRouteService
         {
             days.Add(ParseCanonicalDay(value?.StringValue, fieldName, documentId));
         }
+
+        if (allowEmpty && days.Distinct().Count() != days.Count)
+            throw CreateInvalidDocumentException(documentId, $"{fieldName} contém duplicados");
 
         return days
             .Distinct()
@@ -1158,6 +1176,7 @@ public sealed class FirebaseRouteService : IRouteService
             "seatCapacity",
             "weeklyAvailableSeats",
             "oneTimeReservations",
+            "weeklyAcceptedDays",
             "estimatedDistanceKm"
         };
         var updateMask = string.Join(

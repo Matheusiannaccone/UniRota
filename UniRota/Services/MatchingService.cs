@@ -54,7 +54,7 @@ public sealed class MatchingService : IMatchingService
             return [];
         }
 
-        var passengerDays = passengerRoute.DaysOfWeek.ToHashSet();
+        var passengerDays = passengerRoute.DaysOfWeek.Except(passengerRoute.WeeklyAcceptedDays).ToHashSet();
         var candidates = new List<CandidateContext>();
 
         foreach (var driverRoute in candidateRoutes)

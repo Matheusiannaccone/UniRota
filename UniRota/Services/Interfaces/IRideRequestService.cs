@@ -29,9 +29,13 @@ public interface IRideRequestService
     Task<IReadOnlyList<RideRequest>> GetMyAcceptedRequestsAsync(
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyDictionary<string, WeeklyRoute>> GetPassengerRoutesAsync(
+        IReadOnlyList<RideRequest> requests, CancellationToken cancellationToken = default);
+
     Task AcceptAsync(
         string requestId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<DayOfWeek>? confirmedDays = null);
 
     Task RejectAsync(
         string requestId,

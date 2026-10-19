@@ -20,7 +20,14 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             if (id == "request-B" && attempt == 1) await service.AcceptAsync("request-A");
         };
 
-        if (partial) await service.AcceptAsync("request-B");
+        if (partial)
+        {
+            var changed = await Assert.ThrowsAsync<InvalidOperationException>(() => service.AcceptAsync("request-B"));
+            Assert.Equal(UniRota.Services.RideRequestRules.ConfirmedDaysChangedMessage, changed.Message);
+            Assert.Equal("pending", store.Status("request-B"));
+            Assert.Equal(1, store.Seats(DayOfWeek.Tuesday));
+            await service.AcceptAsync("request-B", confirmedDays: [DayOfWeek.Tuesday]);
+        }
         else await Assert.ThrowsAsync<InvalidOperationException>(() => service.AcceptAsync("request-B"));
 
         Assert.Equal("accepted", store.Status("request-A"));
@@ -30,8 +37,8 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         Assert.Equal(0, store.Seats(DayOfWeek.Monday));
         Assert.Equal(partial ? 0 : 1, store.Seats(DayOfWeek.Tuesday));
         Assert.Equal(1, store.RequestReads["request-A"]);
-        Assert.Equal(2, store.RequestReads["request-B"]);
-        Assert.Equal(3, store.RouteReads);
+        Assert.Equal(partial ? 3 : 2, store.RequestReads["request-B"]);
+        Assert.Equal(partial ? 4 : 3, store.RouteReads);
         Assert.Equal(1, store.Conflicts);
         if (partial)
         {
@@ -93,7 +100,13 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             if (id == "request-B" && attempt == 1) await service.AcceptAsync("request-A");
         };
 
-        if (partial) await service.AcceptAsync("request-B");
+        if (partial)
+        {
+            var changed = await Assert.ThrowsAsync<InvalidOperationException>(() => service.AcceptAsync("request-B"));
+            Assert.Equal(UniRota.Services.RideRequestRules.ConfirmedDaysChangedMessage, changed.Message);
+            Assert.Equal("pending", store.Status("request-B"));
+            await service.AcceptAsync("request-B", confirmedDays: [DayOfWeek.Tuesday]);
+        }
         else await Assert.ThrowsAsync<InvalidOperationException>(() => service.AcceptAsync("request-B"));
 
         Assert.Equal("accepted", store.Status("request-A"));
@@ -168,7 +181,14 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             return Task.CompletedTask;
         };
 
-        await service.AcceptAsync("request-B");
+        if (change == "capacity") await service.AcceptAsync("request-B");
+        else
+        {
+            var changed = await Assert.ThrowsAsync<InvalidOperationException>(() => service.AcceptAsync("request-B"));
+            Assert.Equal(UniRota.Services.RideRequestRules.ConfirmedDaysChangedMessage, changed.Message);
+            Assert.Equal("pending", store.Status("request-B"));
+            await service.AcceptAsync("request-B", confirmedDays: [DayOfWeek.Tuesday]);
+        }
 
         var attempts = store.AttemptsFor("request-B");
         Assert.Equal(2, attempts.Length);
@@ -184,8 +204,8 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         Assert.Equal(change == "capacity" ? "2" : "1", store.RouteFields["seatCapacity"]!["integerValue"]!.GetValue<string>());
         Assert.Equal("7", store.RouteFields["requestRevision"]!["integerValue"]!.GetValue<string>());
         Assert.Equal(change == "reservation" ? 1 : 0, store.Reservations.Count);
-        Assert.Equal(2, store.RequestReads["request-B"]);
-        Assert.Equal(2, store.RouteReads);
+        Assert.Equal(change == "capacity" ? 2 : 3, store.RequestReads["request-B"]);
+        Assert.Equal(change == "capacity" ? 2 : 3, store.RouteReads);
         store.AssertConsistent();
     }
 
@@ -310,6 +330,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     {
         var document = JsonNode.Parse(CreateRideRequestDocumentJson(id, "passenger-" + id, 3.45m))!.AsObject();
         var fields = document["fields"]!;
+        fields["passengerRouteId"]!["stringValue"] = "passenger-route-" + id;
         fields["type"]!["stringValue"] = type == RideRequestType.Weekly ? "weekly" : "once";
         fields["compatibleDays"] = DaysField(days.Select(day => day.ToString()));
         if (type == RideRequestType.Once)
@@ -330,7 +351,10 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         private int _revision;
         public StatefulAcceptanceHandler(JsonObject route, params JsonObject[] requests)
         {
-            _documents = requests.Append(route).ToDictionary(document =>
+            var passengers = requests.Select(request => JsonNode.Parse(CreatePassengerRouteDocumentJson(
+                "passenger-route-" + request["name"]!.GetValue<string>().Split('/').Last(),
+                request["fields"]!["passengerUserId"]!["stringValue"]!.GetValue<string>()))!.AsObject());
+            _documents = requests.Concat(passengers).Append(route).ToDictionary(document =>
                 document["name"]!.GetValue<string>().Split("/documents/", StringSplitOptions.None)[1]);
         }
 
@@ -340,6 +364,9 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         public Dictionary<string, int> RequestReads { get; } = [];
         public List<(string Before, string After)> FailedCommits { get; } = [];
         public int RouteReads { get; private set; }
+        public Dictionary<string, int> DocumentReads { get; } = [];
+        public JsonObject Fields(string key) => _documents[key]["fields"]!.AsObject();
+        public void AddDocument(JsonObject document) => _documents.Add(document["name"]!.GetValue<string>().Split("/documents/", StringSplitOptions.None)[1], document);
         public int Conflicts => FailedCommits.Count;
         public JsonObject RouteFields => _documents["weeklyRoutes/driver-route"]["fields"]!.AsObject();
         public JsonArray Reservations => RouteFields["oneTimeReservations"]!["arrayValue"]!["values"]!.AsArray();
@@ -366,17 +393,19 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             if (request.Method == HttpMethod.Get)
             {
                 var key = request.RequestUri!.AbsolutePath.Split("/documents/", StringSplitOptions.None)[1];
+                DocumentReads[key] = DocumentReads.GetValueOrDefault(key) + 1;
                 if (key.StartsWith("rideRequests/", StringComparison.Ordinal))
                 {
                     var id = key.Split('/')[1];
                     RequestReads[id] = RequestReads.GetValueOrDefault(id) + 1;
                 }
-                else RouteReads++;
+                else if (key.StartsWith("weeklyRoutes/driver-route", StringComparison.Ordinal)) RouteReads++;
                 return JsonResponse(_documents[key].ToJsonString());
             }
             Assert.EndsWith(":commit", request.RequestUri!.AbsoluteUri);
             var writes = JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!["writes"]!.AsArray();
-            Assert.Equal(2, writes.Count);
+            var weekly = writes[1]!["update"]!["fields"]!.AsObject().ContainsKey("weeklyAvailableSeats");
+            Assert.Equal(weekly ? 3 : 2, writes.Count);
             var requestId = writes[0]!["update"]!["name"]!.GetValue<string>().Split('/').Last();
             var attempt = new CommitAttempt(requestId, writes);
             Attempts.Add(attempt);
@@ -425,6 +454,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                 Assert.InRange(Seats(Enum.Parse<DayOfWeek>(day.Key)), 0, capacity);
                 var weeklyOccupants = _documents.Where(entry => entry.Key.StartsWith("rideRequests/", StringComparison.Ordinal))
                     .Count(entry => entry.Value["fields"]!["type"]!["stringValue"]!.GetValue<string>() == "weekly"
+                        && entry.Value["fields"]!["driverRouteId"]!["stringValue"]!.GetValue<string>() == "driver-route"
                         && Status(entry.Key.Split('/')[1]) == "accepted"
                         && AcceptedDays(entry.Key.Split('/')[1]).Contains(day.Key));
                 Assert.True(Seats(Enum.Parse<DayOfWeek>(day.Key)) + weeklyOccupants <= capacity);

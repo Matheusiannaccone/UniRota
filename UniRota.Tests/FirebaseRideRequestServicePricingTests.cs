@@ -17,6 +17,9 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         {
             var url = request.RequestUri?.AbsoluteUri ?? string.Empty;
 
+            if (request.Method == HttpMethod.Get && url.Contains("/weeklyRoutes/passenger-route", StringComparison.Ordinal))
+                return JsonResponse(CreatePassengerRouteDocumentJson());
+
             if (request.Method == HttpMethod.Get
                 && url.Contains("/weeklyRoutes/driver-route", StringComparison.Ordinal))
             {
@@ -133,6 +136,9 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                     3.45m));
             }
 
+            if (request.Method == HttpMethod.Get && url.Contains("/weeklyRoutes/passenger-route", StringComparison.Ordinal))
+                return JsonResponse(CreatePassengerRouteDocumentJson());
+
             if (request.Method == HttpMethod.Get
                 && url.Contains("/weeklyRoutes/driver-route", StringComparison.Ordinal))
             {
@@ -160,7 +166,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         Assert.NotNull(commitBody);
         using var document = JsonDocument.Parse(commitBody);
         var writes = document.RootElement.GetProperty("writes");
-        Assert.Equal(2, writes.GetArrayLength());
+        Assert.Equal(3, writes.GetArrayLength());
         Assert.Equal("accepted", GetWrittenStringField(writes[0], "status"));
         Assert.Equal("0", writes[1].GetProperty("update").GetProperty("fields")
             .GetProperty("weeklyAvailableSeats").GetProperty("mapValue").GetProperty("fields")
@@ -242,6 +248,9 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                         3.45m)));
             }
 
+            if (request.Method == HttpMethod.Get && url.Contains("/weeklyRoutes/passenger-route", StringComparison.Ordinal))
+                return Task.FromResult(JsonResponse(CreatePassengerRouteDocumentJson()));
+
             if (request.Method == HttpMethod.Get
                 && url.Contains("/weeklyRoutes/driver-route", StringComparison.Ordinal))
             {
@@ -257,7 +266,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             service.AcceptAsync("request-1"));
 
         Assert.Contains("Não há vagas", exception.Message);
-        Assert.Equal(2, handler.RequestCount);
+        Assert.Equal(3, handler.RequestCount);
     }
 
     private static FirebaseRideRequestService CreateService(
@@ -287,7 +296,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             Role = RouteRole.Passenger,
             Origin = "Centro",
             Destination = "Facens",
-            DaysOfWeek = [DayOfWeek.Monday],
+            DaysOfWeek = Enum.GetValues<DayOfWeek>(),
             DepartureTimeMinutes = 480
         };
     }
@@ -323,6 +332,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                 "daysOfWeek": { "arrayValue": { "values": [ { "stringValue": "Monday" } ] } },
                 "seatCapacity": { "integerValue": "3" },
                 "weeklyAvailableSeats": { "mapValue": { "fields": { "Monday": { "integerValue": "{{weeklySeats}}" } } } },
+                "weeklyAcceptedDays": { "arrayValue": { "values": [] } },
                 "oneTimeReservations": { "arrayValue": { "values": [] } },
                 "requestRevision": { "integerValue": "0" }
               },

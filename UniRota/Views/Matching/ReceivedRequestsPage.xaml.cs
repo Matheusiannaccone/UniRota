@@ -31,16 +31,13 @@ public partial class ReceivedRequestsPage : ContentPage
 
         try
         {
-            var confirmed = await DisplayAlert(
-                "Aceitar solicitação?",
-                "Serão confirmados apenas os dias ou a data com vaga disponível.",
-                "Aceitar",
-                "Voltar");
-
-            if (confirmed)
+            if (item!.PassengerDaysUnavailable)
             {
-                await _viewModel.AcceptCommand.ExecuteAsync(item);
+                await DisplayAlert("Aceitar solicitação", UniRota.Services.RideRequestRules.PassengerDaysUnavailableMessage, "OK");
+                return;
             }
+            await _viewModel.ConfirmAndAcceptAsync(item, message => DisplayAlert(
+                "Aceitar solicitação?", message, "Aceitar", "Voltar"));
         }
         finally
         {

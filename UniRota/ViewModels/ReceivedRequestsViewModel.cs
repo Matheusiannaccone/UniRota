@@ -133,6 +133,12 @@ public partial class ReceivedRequestsViewModel : ObservableObject
             return;
         }
 
+        if (accept && item.PassengerDaysUnavailable)
+        {
+            SetError(RideRequestRules.PassengerDaysUnavailableMessage, string.Empty);
+            return;
+        }
+
         IsBusy = true;
         ClearMessages();
 
@@ -142,7 +148,8 @@ public partial class ReceivedRequestsViewModel : ObservableObject
             {
                 await _rideRequestService.AcceptAsync(
                     item.Request.Id,
-                    cancellationToken);
+                    cancellationToken,
+                    confirmedDays: item.AcceptableDays);
             }
             else
             {
@@ -208,21 +215,52 @@ public partial class ReceivedRequestsViewModel : ObservableObject
             ? new Dictionary<string, WeeklyRoute>()
             : (await _routeService.GetMyRoutesAsync(cancellationToken))
                 .ToDictionary(route => route.Id);
+        var passengerRoutes = await _rideRequestService.GetPassengerRoutesAsync(requests, cancellationToken);
         var today = _clock.Today;
 
         Requests.Clear();
 
         foreach (var request in requests)
         {
+            IReadOnlyList<DayOfWeek> acceptableDays = [];
+            var passengerUnavailable = false;
+            var canAccept = routes.TryGetValue(request.DriverRouteId, out var route)
+                && RideRequestRules.CanAccept(request, route, today);
+            if (request.Type == RideRequestType.Weekly)
+            {
+                canAccept = false;
+                if (passengerRoutes.TryGetValue(request.PassengerRouteId, out var passenger))
+                {
+                    var freeDays = RideRequestRules.GetPassengerAvailableWeeklyDays(passenger, request.CompatibleDays);
+                    passengerUnavailable = freeDays.Count == 0;
+                    if (route is not null)
+                    {
+                        acceptableDays = RideRequestRules.GetAcceptableWeeklyDays(route.WeeklyAvailableSeats,
+                            route.OneTimeReservations, freeDays.Where(route.DaysOfWeek.Contains).ToArray(), today);
+                        canAccept = route.Role == RouteRole.Driver && route.UserId == request.DriverUserId
+                            && acceptableDays.Count > 0;
+                    }
+                }
+            }
             Requests.Add(new RideRequestItemViewModel(
                 request,
                 request.PassengerUserName,
                 "Passageiro",
-                routes.TryGetValue(request.DriverRouteId, out var route)
-                    && RideRequestRules.CanAccept(request, route, today)));
+                canAccept || passengerUnavailable, acceptableDays, passengerUnavailable));
         }
 
         IsEmpty = Requests.Count == 0;
+    }
+
+    public async Task ConfirmAndAcceptAsync(RideRequestItemViewModel item, Func<string, Task<bool>> confirm)
+    {
+        if (!CanAcceptRequest(item)) return;
+        if (item.PassengerDaysUnavailable)
+        {
+            SetError(RideRequestRules.PassengerDaysUnavailableMessage, string.Empty);
+            return;
+        }
+        if (await confirm(item.AcceptanceConfirmationMessage)) await AcceptCommand.ExecuteAsync(item);
     }
 
     private void ClearMessages()

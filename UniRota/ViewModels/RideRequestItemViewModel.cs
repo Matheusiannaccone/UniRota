@@ -11,10 +11,14 @@ public sealed class RideRequestItemViewModel
         RideRequest request,
         string counterpartyName,
         string counterpartyFallback,
-        bool canAccept = false)
+        bool canAccept = false,
+        IReadOnlyList<DayOfWeek>? acceptableDays = null,
+        bool passengerDaysUnavailable = false)
     {
         Request = request ?? throw new ArgumentNullException(nameof(request));
         CanAccept = canAccept && request.Status == RideRequestStatus.Pending;
+        AcceptableDays = acceptableDays ?? [];
+        PassengerDaysUnavailable = passengerDaysUnavailable;
         CounterpartyNameText = string.IsNullOrWhiteSpace(counterpartyName)
             ? counterpartyFallback
             : counterpartyName;
@@ -23,6 +27,15 @@ public sealed class RideRequestItemViewModel
     public RideRequest Request { get; }
 
     public bool CanAccept { get; }
+
+    public IReadOnlyList<DayOfWeek> AcceptableDays { get; }
+
+    public bool PassengerDaysUnavailable { get; }
+
+    public string AcceptanceConfirmationMessage => Request.Type == RideRequestType.Weekly
+        && !AcceptableDays.OrderBy(day => day).SequenceEqual(Request.CompatibleDays.OrderBy(day => day))
+            ? $"Os dias ainda pendentes para serem aceitos são: {RoutePresentationText.GetDaysText(AcceptableDays)}. Deseja aceitar a solicitação somente nesses dias?"
+            : "Serão confirmados apenas os dias ou a data com vaga disponível.";
 
     public string CounterpartyNameText { get; }
 

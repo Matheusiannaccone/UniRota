@@ -5,6 +5,22 @@ namespace UniRota.Tests;
 public sealed partial class MatchingServiceTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FindMatchesAsync_ExcludesOnlyPassengerConfirmedDays(bool allOccupied)
+    {
+        var map = new FakeMapRouteService();
+        var passenger = CreatePassenger(days: [DayOfWeek.Monday, DayOfWeek.Tuesday],
+            weeklyAcceptedDays: allOccupied ? [DayOfWeek.Monday, DayOfWeek.Tuesday] : [DayOfWeek.Monday]);
+        var driver = NewSchemaCandidate(new Dictionary<DayOfWeek, int>
+        { [DayOfWeek.Monday] = 1, [DayOfWeek.Tuesday] = 1 });
+        var result = await CreateService(map).FindMatchesAsync(passenger, [driver]);
+        if (allOccupied) { Assert.Empty(result); Assert.Empty(map.Requests); }
+        else Assert.Equal(new[] { DayOfWeek.Tuesday }, Assert.Single(result).CompatibleDays);
+        Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Tuesday }, passenger.DaysOfWeek);
+    }
+
+    [Theory]
     [InlineData("positive", true)]
     [InlineData("all-zero", false)]
     [InlineData("missing-day", false)]

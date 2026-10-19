@@ -9,6 +9,45 @@ public sealed class ReceivedRequestsViewModelTests
     private static readonly DateOnly Today = new(2026, 10, 19);
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PassengerPartialConfirmation_CancelDoesNotWriteAndConfirmUsesShownDays(bool confirm)
+    {
+        var service = new RequestService([Request()]) { PassengerAcceptedDays = [DayOfWeek.Monday] };
+        var vm = new ReceivedRequestsViewModel(service,
+            new RouteService([Route(new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 1, [DayOfWeek.Tuesday] = 1 })]), new Clock());
+        await vm.LoadCommand.ExecuteAsync(null);
+        var item = Assert.Single(vm.Requests);
+        Assert.Equal(new[] { DayOfWeek.Tuesday }, item.AcceptableDays);
+        string? message = null;
+
+        await vm.ConfirmAndAcceptAsync(item, text => { message = text; return Task.FromResult(confirm); });
+
+        Assert.Equal("Os dias ainda pendentes para serem aceitos são: Terça-feira. Deseja aceitar a solicitação somente nesses dias?", message);
+        Assert.Equal(confirm ? 1 : 0, service.Accepts);
+        if (confirm) Assert.Equal(new[] { DayOfWeek.Tuesday }, service.LastConfirmedDays);
+        else Assert.Single(vm.Requests);
+        Assert.Equal(0, service.Rejects);
+    }
+
+    [Fact]
+    public async Task PassengerAllDaysOccupied_ShowsExactReasonAndKeepsPending()
+    {
+        var service = new RequestService([Request()]) { PassengerAcceptedDays = [DayOfWeek.Monday, DayOfWeek.Tuesday] };
+        var vm = new ReceivedRequestsViewModel(service,
+            new RouteService([Route(new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 1, [DayOfWeek.Tuesday] = 1 })]), new Clock());
+        await vm.LoadCommand.ExecuteAsync(null);
+        var item = Assert.Single(vm.Requests);
+        Assert.True(item.CanAccept);
+        await vm.ConfirmAndAcceptAsync(item, _ => throw new InvalidOperationException("Não deve confirmar subconjunto vazio."));
+        Assert.Equal("Todos os dias dessa solicitação já foram aceitos por outro motorista.", vm.ErrorMessage);
+        Assert.Equal(0, service.Accepts);
+        Assert.Equal(0, service.Rejects);
+        Assert.Single(vm.Requests);
+        Assert.True(vm.RejectCommand.CanExecute(item));
+    }
+
+    [Theory]
     [InlineData(RideRequestType.Weekly, "partial", true)]
     [InlineData(RideRequestType.Weekly, "full", false)]
     [InlineData(RideRequestType.Weekly, "once-today", false)]
@@ -172,8 +211,15 @@ public sealed class ReceivedRequestsViewModelTests
         public int Rejects { get; private set; }
         public Action? BeforeAccept { get; init; }
         public Task<IReadOnlyList<RideRequest>> GetReceivedPendingRequestsAsync(CancellationToken cancellationToken = default) => Task.FromResult(Requests);
-        public Task AcceptAsync(string requestId, CancellationToken cancellationToken = default)
-        { Accepts++; BeforeAccept?.Invoke(); Requests = Requests.Where(request => request.Id != requestId).ToArray(); return Task.CompletedTask; }
+        public Task AcceptAsync(string requestId, CancellationToken cancellationToken = default, IReadOnlyList<DayOfWeek>? confirmedDays = null)
+        { Accepts++; LastConfirmedDays = confirmedDays; BeforeAccept?.Invoke(); Requests = Requests.Where(request => request.Id != requestId).ToArray(); return Task.CompletedTask; }
+        public IReadOnlyList<DayOfWeek> PassengerAcceptedDays { get; set; } = [];
+        public IReadOnlyList<DayOfWeek>? LastConfirmedDays { get; private set; }
+        public Task<IReadOnlyDictionary<string, WeeklyRoute>> GetPassengerRoutesAsync(IReadOnlyList<RideRequest> requests, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<string, WeeklyRoute>>(requests.GroupBy(request => request.PassengerRouteId).ToDictionary(group => group.Key,
+                group => new WeeklyRoute { Id = group.Key, UserId = group.First().PassengerUserId, Role = RouteRole.Passenger,
+                    DaysOfWeek = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday], WeeklyAcceptedDays = PassengerAcceptedDays }));
+
         public Task RejectAsync(string requestId, CancellationToken cancellationToken = default)
         { Rejects++; Requests = Requests.Where(request => request.Id != requestId).ToArray(); return Task.CompletedTask; }
         public Task<RideRequest> CreateAsync(string passengerRouteId, MatchResult match, RideRequestType type,

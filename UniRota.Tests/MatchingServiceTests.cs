@@ -738,7 +738,8 @@ public sealed partial class MatchingServiceTests
         string destination = "Destino do passageiro",
         string destinationPlaceId = "passenger-destination",
         IReadOnlyList<DayOfWeek>? days = null,
-        int departureTimeMinutes = DefaultDepartureTimeMinutes)
+        int departureTimeMinutes = DefaultDepartureTimeMinutes,
+        IReadOnlyList<DayOfWeek>? weeklyAcceptedDays = null)
     {
         return new WeeklyRoute
         {
@@ -751,6 +752,7 @@ public sealed partial class MatchingServiceTests
             Destination = destination,
             DestinationPlaceId = destinationPlaceId,
             DaysOfWeek = days ?? [DayOfWeek.Monday],
+            WeeklyAcceptedDays = weeklyAcceptedDays ?? [],
             DepartureTimeMinutes = departureTimeMinutes,
             CreatedAtUtc = DateTimeOffset.UnixEpoch
         };
