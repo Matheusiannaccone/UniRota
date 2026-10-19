@@ -261,7 +261,8 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     private static FirebaseRideRequestService CreateService(
         HttpMessageHandler handler,
         IReadOnlyList<WeeklyRoute> routes,
-        string currentUserId = "passenger-user")
+        string currentUserId = "passenger-user",
+        DateOnly? today = null)
     {
         return new FirebaseRideRequestService(
             new HttpClient(handler),
@@ -271,7 +272,8 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                 ProjectId = "test-project"
             },
             new FakeAuthService(currentUserId),
-            new FakeRouteService(routes));
+            new FakeRouteService(routes),
+            new FixedAppClock(today ?? TestToday));
     }
 
     private static WeeklyRoute CreatePassengerRoute()
@@ -434,6 +436,11 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             RequestCount++;
             return _sendAsync(request, cancellationToken);
         }
+    }
+
+    private sealed class FixedAppClock(DateOnly today) : IAppClock
+    {
+        public DateOnly Today => today;
     }
 
     private sealed class FakeAuthService : IAuthService

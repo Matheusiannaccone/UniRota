@@ -7,6 +7,55 @@ namespace UniRota.Tests;
 
 public sealed partial class FirebaseRideRequestServicePricingTests
 {
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task CreateAsync_OnceValidatesDateAgainstInjectedClock(int offset)
+    {
+        // Referência intencionalmente distante da data real da execução.
+        var today = new DateOnly(2040, 1, 2);
+        var date = today.AddDays(offset);
+        var routeJson = CreateCreationDriverRouteDocumentJson(
+            new Dictionary<DayOfWeek, int> { [date.DayOfWeek] = 1 });
+        string? commitBody = null;
+        var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            var url = request.RequestUri!.AbsoluteUri;
+            if (request.Method == HttpMethod.Get) return JsonResponse(routeJson);
+            if (url.EndsWith(":runQuery", StringComparison.Ordinal)) return JsonResponse("[]");
+            if (url.EndsWith(":commit", StringComparison.Ordinal))
+            {
+                commitBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+                return JsonResponse("{}");
+            }
+            throw new InvalidOperationException("Requisição inesperada: " + url);
+        });
+        var service = CreateService(handler, [CreatePassengerRoute()], today: today);
+        var match = new MatchResult(new WeeklyRoute
+        {
+            Id = "driver-route", UserId = "driver-user", Role = RouteRole.Driver
+        }, [date.DayOfWeek], 0);
+
+        if (offset < 0)
+        {
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.CreateAsync(
+                "passenger-route", match, RideRequestType.Once, date, 3.45m));
+            Assert.Equal(0, handler.RequestCount);
+            Assert.Null(commitBody);
+        }
+        else
+        {
+            var created = await service.CreateAsync(
+                "passenger-route", match, RideRequestType.Once, date, 3.45m);
+            Assert.Equal(date, created.RequestedDate);
+            Assert.Equal(RideRequestStatus.Pending, created.Status);
+            var fields = JsonNode.Parse(commitBody!)!["writes"]![0]!["update"]!["fields"]!;
+            Assert.Equal(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                fields["requestedDate"]!["stringValue"]!.GetValue<string>());
+        }
+    }
+
     [Fact]
     public async Task CreateAsync_WeeklyUsesNewSchemaAndCommitsOnlyPendingAndRevision()
     {
@@ -43,7 +92,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     public async Task CreateAsync_OnceCountsOnlyReservationsOnRequestedDate(
         int sameDateCount, int otherDateCount, bool allowed)
     {
-        var date = DateOnly.FromDateTime(DateTime.Today).AddDays(7);
+        var date = TestToday.AddDays(7);
         var otherDay = (DayOfWeek)(((int)date.DayOfWeek + 1) % 7);
         var weekly = new Dictionary<DayOfWeek, int>
         {
@@ -70,7 +119,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     [InlineData(RideRequestType.Once)]
     public async Task CreateAsync_NewSchemaStillBlocksDuplicatePending(RideRequestType type)
     {
-        var date = DateOnly.FromDateTime(DateTime.Today).AddDays(7);
+        var date = TestToday.AddDays(7);
         var weekly = new Dictionary<DayOfWeek, int> { [date.DayOfWeek] = 2 };
 
         await AssertCreationAsync(type, weekly, [], type == RideRequestType.Once ? date : null,

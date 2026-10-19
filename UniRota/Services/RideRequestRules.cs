@@ -28,7 +28,8 @@ public static class RideRequestRules
     public static IReadOnlyDictionary<DayOfWeek, int> ApplyWeeklyAcceptance(
         IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
         IReadOnlyList<OneTimeReservation> reservations,
-        IReadOnlyList<DayOfWeek> days)
+        IReadOnlyList<DayOfWeek> days,
+        DateOnly today)
     {
         if (!HasWeeklySeats(weeklySeats, days))
         {
@@ -41,8 +42,8 @@ public static class RideRequestRules
             updated[day]--;
         }
 
-        // Proteção conservadora inclui todas as datas armazenadas; vigência Weekly (P2) pendente.
-        if (reservations.Where(reservation => days.Contains(reservation.DayOfWeek))
+        if (reservations.Where(reservation => reservation.Date >= today
+                && days.Contains(reservation.DayOfWeek))
             .GroupBy(reservation => reservation.Date)
             .Any(group => updated[group.Key.DayOfWeek] - group.Count() < 0))
         {
@@ -56,8 +57,14 @@ public static class RideRequestRules
         IReadOnlyDictionary<DayOfWeek, int> weeklySeats,
         IReadOnlyList<OneTimeReservation> reservations,
         string requestId,
-        DateOnly date)
+        DateOnly date,
+        DateOnly today)
     {
+        if (date < today)
+        {
+            throw new InvalidOperationException("A data da carona não pode estar no passado.");
+        }
+
         if (reservations.Any(reservation => reservation.RequestId == requestId))
         {
             throw new InvalidOperationException("Esta solicitação já possui reserva pontual.");

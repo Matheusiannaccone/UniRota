@@ -52,6 +52,7 @@ namespace UniRota
             builder.Services.AddSingleton(new MatchingOptions());
             builder.Services.AddSingleton<IMatchingService, MatchingService>();
             builder.Services.AddSingleton<IPricingService, PricingService>();
+            builder.Services.AddSingleton<IAppClock>(_ => new AppClock(TimeProvider.System));
             builder.Services.AddSingleton<IRideRequestService, FirebaseRideRequestService>();
 
             builder.Services.AddSingleton<AppShell>();

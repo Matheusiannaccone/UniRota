@@ -104,13 +104,76 @@ public sealed class RideRequestRulesTests
         var weekly = new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 1 };
         var reservations = new[] { new OneTimeReservation
         {
-            RequestId = "once", Date = new DateOnly(2020, 1, 6), DayOfWeek = DayOfWeek.Monday
+            RequestId = "once", Date = new DateOnly(2026, 9, 7), DayOfWeek = DayOfWeek.Monday
         } };
 
         Assert.Throws<InvalidOperationException>(() => RideRequestRules.ApplyWeeklyAcceptance(
-            weekly, reservations, [DayOfWeek.Monday]));
+            weekly, reservations, [DayOfWeek.Monday], CurrentDate));
 
         Assert.Equal(1, weekly[DayOfWeek.Monday]);
         Assert.Single(reservations);
+    }
+
+    [Theory]
+    [InlineData(-7, true)]
+    [InlineData(0, false)]
+    [InlineData(7, false)]
+    public void ApplyWeeklyAcceptance_ConsidersOnlyTodayAndFutureReservations(int offset, bool allowed)
+    {
+        var today = new DateOnly(2026, 10, 19);
+        var weekly = new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 1 };
+        var date = today.AddDays(offset);
+        var reservations = new[] { new OneTimeReservation
+        {
+            RequestId = "once", Date = date, DayOfWeek = date.DayOfWeek
+        } };
+
+        if (allowed)
+        {
+            var updated = RideRequestRules.ApplyWeeklyAcceptance(
+                weekly, reservations, [DayOfWeek.Monday], today);
+            Assert.Equal(0, updated[DayOfWeek.Monday]);
+        }
+        else
+        {
+            Assert.Throws<InvalidOperationException>(() => RideRequestRules.ApplyWeeklyAcceptance(
+                weekly, reservations, [DayOfWeek.Monday], today));
+        }
+
+        Assert.Equal(1, weekly[DayOfWeek.Monday]);
+        Assert.Single(reservations);
+    }
+
+    [Fact]
+    public void ApplyWeeklyAcceptance_DoesNotSumDifferentDatesOfSameWeekday()
+    {
+        var today = new DateOnly(2026, 10, 19);
+        var weekly = new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 2 };
+        var reservations = new[] { today, today.AddDays(7), today.AddDays(14) }
+            .Select((date, index) => new OneTimeReservation
+            {
+                RequestId = "once-" + index, Date = date, DayOfWeek = date.DayOfWeek
+            }).ToArray();
+
+        var updated = RideRequestRules.ApplyWeeklyAcceptance(
+            weekly, reservations, [DayOfWeek.Monday], today);
+
+        Assert.Equal(1, updated[DayOfWeek.Monday]);
+        Assert.Equal(3, reservations.Length);
+    }
+
+    [Fact]
+    public void HasSeatsOnDate_CountsOnlyExactDateIncludingWhenOtherDatesArePast()
+    {
+        var date = new DateOnly(2026, 10, 19);
+        var weekly = new Dictionary<DayOfWeek, int> { [DayOfWeek.Monday] = 1 };
+        var reservations = new[] { date.AddDays(-7), date.AddDays(7) }
+            .Select((otherDate, index) => new OneTimeReservation
+            {
+                RequestId = "once-" + index, Date = otherDate, DayOfWeek = otherDate.DayOfWeek
+            }).ToArray();
+
+        Assert.True(RideRequestRules.HasSeatsOnDate(weekly, reservations, date));
+        Assert.False(RideRequestRules.HasSeatsOnDate(weekly, reservations, date.AddDays(7)));
     }
 }

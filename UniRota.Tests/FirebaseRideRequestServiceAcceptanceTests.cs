@@ -6,13 +6,26 @@ namespace UniRota.Tests;
 
 public sealed partial class FirebaseRideRequestServicePricingTests
 {
-    private static readonly DateOnly AcceptanceDate = new(2026, 10, 19);
+    private static readonly DateOnly TestToday = new(2026, 10, 19);
+
+    [Theory]
+    [InlineData(-1, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    public async Task AcceptAsync_OnceValidatesDateAgainstInjectedClock(int offset, bool allowed)
+    {
+        // A solicitação mantém sua data civil; apenas a referência de hoje varia.
+        var commits = await RunAcceptanceAsync(RideRequestType.Once, AcceptanceWeeklySeats(), [],
+            [DayOfWeek.Monday], allowed: allowed, today: TestToday.AddDays(-offset));
+
+        if (allowed) AssertAcceptanceCommit(Assert.Single(commits), "oneTimeReservations");
+    }
 
     [Fact]
     public async Task AcceptAsync_WeeklyUpdatesOnlyRequestedDaysAndPreservesReservations()
     {
         var weekly = AcceptanceWeeklySeats();
-        var reservations = new[] { AcceptanceReservation("existing", AcceptanceDate) };
+        var reservations = new[] { AcceptanceReservation("existing", TestToday) };
 
         var commits = await RunAcceptanceAsync(RideRequestType.Weekly, weekly, reservations,
             [DayOfWeek.Monday, DayOfWeek.Tuesday]);
@@ -41,24 +54,25 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     }
 
     [Theory]
-    [InlineData(-364)]
-    [InlineData(0)]
-    [InlineData(7)]
-    public async Task AcceptAsync_WeeklyProtectsEveryStoredOnceDate(int offset)
+    [InlineData(-7, true)]
+    [InlineData(0, false)]
+    [InlineData(7, false)]
+    public async Task AcceptAsync_WeeklyIgnoresPastOnceAndProtectsTodayAndFuture(int offset, bool allowed)
     {
-        var date = AcceptanceDate.AddDays(offset);
-        await RunAcceptanceAsync(RideRequestType.Weekly, AcceptanceWeeklySeats(),
+        var date = TestToday.AddDays(offset);
+        var commits = await RunAcceptanceAsync(RideRequestType.Weekly, AcceptanceWeeklySeats(),
             [AcceptanceReservation("a", date), AcceptanceReservation("b", date)],
-            [DayOfWeek.Monday], allowed: false);
+            [DayOfWeek.Monday], allowed: allowed);
+        if (allowed) AssertAcceptanceCommit(Assert.Single(commits), "weeklyAvailableSeats");
     }
 
     [Fact]
     public async Task AcceptAsync_WeeklyCountsReservationsPerDateAndOnlyChangedWeekdays()
     {
         var commits = await RunAcceptanceAsync(RideRequestType.Weekly, AcceptanceWeeklySeats(),
-            [AcceptanceReservation("a", AcceptanceDate),
-             AcceptanceReservation("b", AcceptanceDate.AddDays(7)),
-             AcceptanceReservation("c", AcceptanceDate.AddDays(1))], [DayOfWeek.Monday]);
+            [AcceptanceReservation("a", TestToday),
+             AcceptanceReservation("b", TestToday.AddDays(7)),
+             AcceptanceReservation("c", TestToday.AddDays(1))], [DayOfWeek.Monday]);
 
         AssertAcceptanceCommit(Assert.Single(commits), "weeklyAvailableSeats");
     }
@@ -75,7 +89,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         var weekly = AcceptanceWeeklySeats();
         var reservations = Enumerable.Range(0, sameDateCount + otherDateCount)
             .Select(index => AcceptanceReservation("existing-" + index,
-                index < sameDateCount ? AcceptanceDate : AcceptanceDate.AddDays(7))).ToArray();
+                index < sameDateCount ? TestToday : TestToday.AddDays(7))).ToArray();
         var commits = await RunAcceptanceAsync(RideRequestType.Once, weekly, reservations,
             [DayOfWeek.Monday, DayOfWeek.Tuesday], allowed: allowed);
         Assert.Equal(2, weekly[DayOfWeek.Monday]);
@@ -100,7 +114,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
     public async Task AcceptAsync_OnceRejectsExistingRequestIdEvenOnAnotherDate()
     {
         await RunAcceptanceAsync(RideRequestType.Once, AcceptanceWeeklySeats(),
-            [AcceptanceReservation("request-1", AcceptanceDate.AddDays(7))],
+            [AcceptanceReservation("request-1", TestToday.AddDays(7))],
             [DayOfWeek.Monday], allowed: false);
     }
 
@@ -195,7 +209,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         RideRequestType type, IReadOnlyDictionary<DayOfWeek, int> weekly,
         IReadOnlyList<OneTimeReservation> reservations, IReadOnlyList<DayOfWeek> days,
         bool allowed = true, bool conflict = false, bool existingAfterConflict = false,
-        string? invalidField = null)
+        string? invalidField = null, DateOnly? today = null)
     {
         var requestReads = 0;
         var routeReads = 0;
@@ -230,7 +244,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
                 if (retry)
                 {
                     if (type == RideRequestType.Weekly) currentWeekly[DayOfWeek.Monday]--;
-                    else currentReservations.Add(AcceptanceReservation(existingAfterConflict ? "request-1" : "concurrent", AcceptanceDate));
+                    else currentReservations.Add(AcceptanceReservation(existingAfterConflict ? "request-1" : "concurrent", TestToday));
                 }
                 var document = JsonNode.Parse(CreateCreationDriverRouteDocumentJson(currentWeekly, currentReservations))!;
                 if (retry) document["updateTime"] = "2026-09-03T12:00:01Z";
@@ -254,7 +268,7 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             // Aceite não deve consultar nem escrever outras Pending.
             throw new InvalidOperationException("Requisição inesperada: " + url);
         });
-        var service = CreateService(handler, [], "driver-user");
+        var service = CreateService(handler, [], "driver-user", today);
         if (allowed) await service.AcceptAsync("request-1");
         else
         {

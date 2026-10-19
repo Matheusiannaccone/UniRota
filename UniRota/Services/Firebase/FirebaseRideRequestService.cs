@@ -22,17 +22,20 @@ public sealed class FirebaseRideRequestService : IRideRequestService
     private readonly FirebaseOptions _options;
     private readonly IAuthService _authService;
     private readonly IRouteService _routeService;
+    private readonly IAppClock _clock;
 
     public FirebaseRideRequestService(
         HttpClient httpClient,
         FirebaseOptions options,
         IAuthService authService,
-        IRouteService routeService)
+        IRouteService routeService,
+        IAppClock clock)
     {
         _httpClient = httpClient;
         _options = options;
         _authService = authService;
         _routeService = routeService;
+        _clock = clock;
     }
 
     public async Task<RideRequest> CreateAsync(
@@ -72,7 +75,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             type,
             match.CompatibleDays,
             requestedDate,
-            DateOnly.FromDateTime(DateTime.Today));
+            _clock.Today);
 
         await EnsurePassengerRouteBelongsToUserAsync(
             normalizedPassengerRouteId,
@@ -395,15 +398,16 @@ public sealed class FirebaseRideRequestService : IRideRequestService
                 rideRequest,
                 userId);
 
+            var today = _clock.Today;
             var availabilityWrite = rideRequest.Type == RideRequestType.Weekly
                 ? CreateWeeklySeatsWrite(routeSnapshot, RideRequestRules.ApplyWeeklyAcceptance(
                     routeSnapshot.WeeklyAvailableSeats, routeSnapshot.OneTimeReservations,
-                    rideRequest.CompatibleDays))
+                    rideRequest.CompatibleDays, today))
                 : CreateOneTimeReservationsWrite(routeSnapshot, RideRequestRules.ApplyOnceAcceptance(
                     routeSnapshot.WeeklyAvailableSeats, routeSnapshot.OneTimeReservations,
-                    rideRequest.Id, rideRequest.RequestedDate!.Value));
+                    rideRequest.Id, rideRequest.RequestedDate!.Value, today));
 
-            // P5 pendente: outras Pending serão revalidadas ao processar cada solicitação.
+            // Outras Pending serão revalidadas ao processar cada solicitação.
             var writes = new List<object>
             {
                 CreateStatusWrite(requestDocument, RideRequestStatus.Accepted),
