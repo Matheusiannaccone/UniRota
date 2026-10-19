@@ -1,14 +1,14 @@
 # UniRota — Controle de vagas por dia da semana e data
 
-Estado em 15/10/2026: Blocos 0 e 1 aprovados; Bloco 2 integra criação, edição e visão semanal do motorista. P4 e P6 estão resolvidas conforme as decisões abaixo. P1, P2, P3 e P5 continuam pendentes. O inventário da seção 15 preserva a auditoria histórica do commit indicado; não representa as linhas atuais após implementação.
+Atualização documental em 19/10/2026: todas as decisões P1–P6 estão RESOLVIDAS. O plano incorpora matching simplificado, vigência Weekly a partir do aceite, autoridade temporal do servidor e aceite parcial por `AcceptedDays`. Blocos 1 e 2 mantêm seu histórico; a implementação das decisões finais segue o planejamento das seções seguintes. Esta atualização não altera código, testes, Rules ou seed. As seções 1 e 15 preservam a auditoria histórica do commit indicado, e a seção 17 registra a entrega original do Bloco 0; esses registros não descrevem o estado atual do código.
 
-## 1. Problema do modelo atual e resultado da auditoria
+## 1. Problema do modelo global — auditoria histórica do Bloco 0
 
 Bloco 0: arquitetura e documentação, sem implementação funcional. Auditoria em 14/10/2026, sobre o commit `13103b7`, na branch `feature/corrige-vagas`, que já existia e estava ativa. O repositório estava limpo antes do trabalho. Este documento revisa e substitui o plano anteriormente chamado `docs/Plano_Controle_Vagas_Por_Dia.md`, sem manter cópia paralela.
 
-O código atual ainda utiliza `WeeklyRoute.AvailableSeats` (`int?`) e o campo Firestore `availableSeats`. Existe um único saldo por rota, sem distinção de dia ou data. Embora o AGENTS.md já descreva o modelo aprovado, ele ainda não corresponde ao comportamento implementado.
+No estado auditado em 14/10/2026, o código utilizava `WeeklyRoute.AvailableSeats` (`int?`) e o campo Firestore `availableSeats`. Existe um único saldo por rota, sem distinção de dia ou data. Embora o AGENTS.md já descreva o modelo aprovado, ele ainda não corresponde ao comportamento implementado.
 
-Consequências verificadas no código:
+Consequências verificadas naquele estado histórico do código:
 
 - `MatchingService` exige saldo global positivo antes da interseção dos dias, sem disponibilidade individual por dia/data.
 - `MatchResult` contém `DriverRoute` e `CompatibleDays`, mas não contém um saldo calculado para esses dias. A apresentação lê o saldo global de `DriverRoute`.
@@ -24,11 +24,11 @@ Nenhum desses comportamentos é alterado no Bloco 0.
 
 ## 2. Objetivos e limites
 
-Definir o contrato dos novos campos, suas representações, cálculos e invariantes; inventariar as dependências atuais; separar os próximos blocos e registrar decisões funcionais ainda necessárias.
+Definir o contrato dos campos, suas representações, cálculos e invariantes; preservar o inventário histórico; consolidar as decisões finais P1–P6 e organizar os blocos de implementação restantes. Decisão resolvida não significa implementação concluída.
 
 Preservar .NET MAUI/.NET 8, MVVM, DI, Firebase, integração de mapas, matching geográfico, preço e snapshot de `SuggestedPrice`, autenticação e estados Pending/Accepted/Rejected.
 
-No Bloco 0, somente este documento foi alterado. O Bloco 1 implementou modelos e serialização. O Bloco 2 modifica apenas criação/edição e sua apresentação ao motorista, mantendo matching, solicitações, aceite/recusa, Rules, Functions e concorrência de aceite para os blocos próprios.
+No Bloco 0, somente este documento foi alterado. O Bloco 1 implementou modelos e serialização. O Bloco 2 tratou de criação/edição e sua apresentação ao motorista. O planejamento restante consolida disponibilidade e referência temporal, aceite parcial, concorrência, Rules, integração, seed e visão do passageiro. Não planejar mudança funcional do matching neste ciclo.
 
 ## 3. Schema aprovado
 
@@ -54,7 +54,7 @@ Campos finais em `weeklyRoutes/{routeId}`, mantendo os demais campos existentes:
 }
 ```
 
-Este exemplo representa uma Weekly aceita para Monday/Tuesday e uma Once aceita para 20/10/2026. Na criação, antes dos aceites, todos os três saldos seriam 3 e a lista seria vazia. Os exemplos mostram os valores lógicos, sem os wrappers da API REST do Firestore.
+Este exemplo representa uma Weekly com `AcceptedDays = [Monday, Tuesday]` e uma Once aceita para 20/10/2026. Na criação, antes dos aceites, todos os três saldos seriam 3 e a lista seria vazia. Os exemplos mostram os valores lógicos, sem os wrappers da API REST do Firestore.
 
 Contrato para passageiro, que não possui capacidade:
 
@@ -71,7 +71,7 @@ Representar explicitamente a ausência de capacidade com `null`, mapa vazio e li
 
 ## 4. Significado e tipos dos campos
 
-| Campo persistido | Tipo Firestore | Representação C# futura | Significado |
+| Campo persistido | Tipo Firestore | Representação C# / contrato final | Significado |
 | --- | --- | --- | --- |
 | `seatCapacity` | integer para driver; null para passenger | `int? SeatCapacity` | Capacidade única informada pelo motorista; base comum aos dias selecionados. |
 | `weeklyAvailableSeats` | map de nome do dia para integer | `IReadOnlyDictionary<DayOfWeek, int> WeeklyAvailableSeats` | Saldo recorrente de cada dia após ocupações semanais aceitas. |
@@ -84,9 +84,36 @@ Representar explicitamente a ausência de capacidade com `null`, mapa vazio e li
 
 Chaves e valores de dias usam nomes canônicos de `System.DayOfWeek`: `Sunday`, `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, `Saturday`. Não usar rótulos traduzidos ou índices numéricos na persistência. Serializar a data em cultura invariável, como já ocorre com `requestedDate`.
 
-Na API REST futura: inteiros usam `integerValue`; o mapa usa `mapValue.fields`; reservas usam `arrayValue.values` de `mapValue.fields`; data e nomes dos dias usam `stringValue`. Os DTOs atuais de valores dos dois serviços Firebase não possuem `mapValue` e precisarão ser adaptados no Bloco 1.
+Na API REST: inteiros usam `integerValue`; o mapa usa `mapValue.fields`; reservas usam `arrayValue.values` de `mapValue.fields`; data e nomes dos dias usam `stringValue`. O suporte a esses wrappers pertence ao schema dos serviços Firebase, sem fallback para o saldo global antigo.
 
-Não adicionar campo de capacidade, saldo ou reserva à RideRequest neste bloco. O modelo existente já tem `Type`, `CompatibleDays` e `DateOnly? RequestedDate` para identificar o compromisso.
+### Contrato final de RideRequest — AcceptedDays (P5)
+
+Planejar no Bloco 5 o novo campo, sem implementar nesta atualização documental:
+
+| Campo persistido | Tipo Firestore | Tipo conceitual C# | Significado |
+| --- | --- | --- | --- |
+| `acceptedDays` | array de nomes canônicos de `DayOfWeek` | `IReadOnlyList<DayOfWeek> AcceptedDays` | Dias efetivamente concedidos no aceite Weekly. |
+
+`CompatibleDays` preserva os dias originalmente compatíveis/solicitados e nunca é sobrescrito pelo aceite parcial. `AcceptedDays` representa apenas os dias concedidos, sem duplicação, dentro da mesma relação/solicitação.
+
+- Pending: `AcceptedDays = []`.
+- Rejected: `AcceptedDays = []`.
+- Weekly Accepted: `AcceptedDays` contém exatamente os dias concedidos e tem ao menos um elemento.
+- Once, em qualquer status: `AcceptedDays = []`; `RequestedDate` continua representando o compromisso pontual.
+
+Exemplo lógico de Weekly aceita parcialmente:
+
+```json
+{
+  "type": "weekly",
+  "status": "accepted",
+  "compatibleDays": ["Monday", "Tuesday", "Wednesday"],
+  "acceptedDays": ["Tuesday", "Wednesday"],
+  "requestedDate": null
+}
+```
+
+Não adicionar capacidade, saldo ou reserva à RideRequest. O novo campo registra a concessão de dias, sem duplicar o saldo da rota.
 
 ## 5. Invariantes
 
@@ -94,23 +121,28 @@ Não adicionar campo de capacidade, saldo ou reserva à RideRequest neste bloco.
 2. As chaves de `weeklyAvailableSeats` correspondem exatamente aos dias selecionados da rota, sem dias extras nem faltantes. Ausência de chave não significa capacidade zero válida.
 3. Na criação, cada dia selecionado recebe exatamente `seatCapacity`, com lista de reservas vazia.
 4. Cada saldo semanal é inteiro e está entre zero e `seatCapacity`.
-5. Uma Weekly aceita consome uma vaga em cada dia da solicitação, uma única vez. Dias fora dela permanecem iguais.
+5. Uma Weekly aceita consome uma vaga em cada dia efetivamente aceito, registrado em `AcceptedDays`, uma única vez. Os demais dias permanecem iguais.
 6. Uma Once aceita acrescenta exatamente uma reserva; não altera os saldos semanais.
 7. O mesmo `requestId` não pode aparecer duas vezes na lista da rota, mesmo com datas distintas. Retry não pode consumir novamente a mesma solicitação.
 8. Cada reserva deve corresponder à RideRequest Once Accepted da mesma rota, com a mesma data; `dayOfWeek == date.DayOfWeek`, e o dia deve pertencer à rota.
 9. Em toda data vigente afetada, as reservas pontuais não podem superar o saldo semanal daquele dia. Não aceitar saldo efetivo negativo nem ocultar inconsistência usando truncamento para zero.
-10. Pending e Rejected não consomem vagas. O status Accepted e seu consumo correspondente são gravados atomicamente.
+10. Pending e Rejected não consomem vagas e possuem `AcceptedDays` vazio. Status Accepted, `AcceptedDays` e consumo correspondente são gravados atomicamente.
 11. Passageiros usam capacidade nula, mapa vazio e lista vazia; não oferecem vagas.
 12. Edição não reinicializa ocupações existentes nem sobrescreve reservas concorrentes. Mudanças que afetem compromissos exigem validação do estado atualizado.
 13. Datas passadas não influenciam disponibilidade atual ou futura; continuam armazenadas até uma evolução específica de limpeza.
 14. Não existe compatibilidade automática com o campo global antigo.
+15. `AcceptedDays` é subconjunto de `CompatibleDays`; Weekly Accepted exige pelo menos um dia aceito, sem duplicação.
+16. Once sempre possui `AcceptedDays` vazio. Seu compromisso é exclusivamente `RequestedDate`.
+17. O consumo Weekly corresponde exatamente a `AcceptedDays`; preservar `CompatibleDays` original no aceite parcial.
+18. Nenhuma Pending é rejeitada automaticamente apenas porque um dia/data ficou sem vaga. Sem dia Weekly aceitável ou sem vaga na data Once, Aceitar fica desabilitado e somente Recusar permanece disponível.
+19. O calendário oficial é `America/Sao_Paulo`. A referência de hoje e as validações temporais de segurança têm autoridade de servidor; `RequestedDate` é a data civil escolhida pelo passageiro.
 
 ## 6. Disponibilidade semanal
 
 Para um dia selecionado `d`:
 
 ```text
-ocupacaoWeekly(d) = quantidade de solicitações Weekly aceitas contendo d
+ocupacaoWeekly(d) = quantidade de solicitações Weekly Accepted com d em AcceptedDays
 weeklyAvailableSeats[d] = seatCapacity - ocupacaoWeekly(d)
 ```
 
@@ -118,7 +150,7 @@ O mapa é o saldo persistido, atualizado atomicamente no aceite; a equação é 
 
 ```text
 Inicial:                  Seg 3 / Ter 3 / Qua 3
-Weekly Seg + Ter aceita:  Seg 2 / Ter 2 / Qua 3
+AcceptedDays Seg + Ter:   Seg 2 / Ter 2 / Qua 3
 ```
 
 Reservas Once não entram nessa subtração recorrente. Para um dia que não pertence à rota, não há oferta; não inventar uma entrada no mapa.
@@ -140,52 +172,52 @@ Tuesday semanal = 2
 27/10/2026: zero reserva => 2 vagas efetivas
 ```
 
-Uma data anterior à referência de hoje não é elegível para nova carona e suas reservas não entram na oferta vigente. A referência de calendário/fuso está pendente na seção 11.1. Não aplicar comparações entre instantes UTC a strings de data civil.
+Uma data anterior à referência de hoje não é elegível para nova carona e suas reservas não entram na oferta vigente. Usar a referência confiável de hoje no calendário `America/Sao_Paulo`, conforme P3 na seção 11.1. Não aplicar comparações entre instantes UTC a strings de data civil.
 
-## 8. Solicitações Weekly
+## 8. Solicitações Weekly — aceite parcial
 
-- `CompatibleDays` da solicitação representa todos os dias a consumir, sem duplicação; `RequestedDate` permanece nulo.
-- A criação mantém a solicitação Pending e não reserva vagas.
-- No aceite, reler a rota e a solicitação e recalcular a disponibilidade de todos os dias envolvidos.
-- Aceitar tudo ou nada: se qualquer dia não tiver capacidade, nenhuma vaga ou status pode mudar.
-- No sucesso, decrementar exatamente uma vaga por dia solicitado e gravar Accepted no mesmo commit atômico.
-- Proteger compromissos Once já confirmados: o novo saldo semanal não pode produzir disponibilidade negativa em uma data vigente afetada pela recorrência.
-- A mesma solicitação não pode ser aceita duas vezes. Concorrência deve impedir overbooking mesmo entre Weekly e Once.
+- `CompatibleDays` preserva os dias originalmente compatíveis/solicitados, sem duplicação; `RequestedDate` permanece nulo.
+- A criação revalida o saldo semanal dos dias solicitados, mantém Pending com `AcceptedDays = []` e não reserva vagas. A concessão parcial é decidida no aceite.
+- No aceite, reler a solicitação Pending e a rota. Para cada `CompatibleDay`, conferir saldo semanal atual e conflitos com Once futuras já confirmadas; reservas da data de hoje também continuam válidas.
+- Incluir em `AcceptedDays` somente os dias que comportarem o passageiro. Se o saldo do dia for zero, o dia não existir na oferta atual ou seu decremento provocar sobreocupação em alguma data vigente afetada, ignorar esse dia.
+- Para cada dia candidato `d`, exigir saldo semanal positivo e, para cada data `D >= hoje` com reserva Once daquele dia, `weeklyAvailableSeats[d] - 1 - reservasOnce(D) >= 0`. Contar cada data separadamente e ignorar reservas passadas nesta decisão de disponibilidade.
+- Se `AcceptedDays` ficar vazio, não aceitar nem consumir vagas; Aceitar fica desabilitado e a única ação disponível é Recusar. Não rejeitar automaticamente.
+- Se restar pelo menos um dia, decrementar uma vaga somente em cada dia de `AcceptedDays`, persistir esse campo e mudar o status para Accepted, tudo no mesmo commit atômico.
+- Não sobrescrever `CompatibleDays`, não alterar `seatCapacity` nem `oneTimeReservations`, e não consumir dias não concedidos.
+- Informar ao passageiro exatamente os dias concedidos e os dias solicitados que não foram concedidos; a revisão de apresentação está no Bloco 9.
+- A mesma solicitação não pode ser aceita duas vezes. Concorrência deve impedir overbooking entre Weekly e Once.
 
-O início temporal da recorrência e a política para conflitos com reservas futuras exigem decisão explícita antes da implementação correspondente, conforme seção 11.1. A existência de saldo semanal positivo isoladamente não prova que todas as datas afetadas comportam uma nova Weekly.
+Exemplo: solicitação Monday/Tuesday/Wednesday; Monday sem vaga, Tuesday e Wednesday com vaga e sem conflito com Once vigente. Resultado: Accepted com `AcceptedDays = [Tuesday, Wednesday]`; apenas esses dois dias consomem vaga.
+
+P2 define que a Weekly começa a valer no momento do aceite, não possui data final automática neste MVP e permanece válida enquanto a relação existir. Não provocar overbooking em Once futuras já confirmadas. Reservas passadas não bloqueiam disponibilidade atual/futura. Cancelamento, vigência por semestre, data final e histórico temporal completo permanecem fora do MVP.
 
 ## 9. Solicitações Once
 
-- `RequestedDate` é a fonte de verdade e deve ser uma data elegível compatível com a rota.
+- `RequestedDate` é a fonte de verdade: data civil escolhida pelo passageiro, nunca calculada pelo servidor. Deve ser elegível no calendário oficial e compatível com a rota; `AcceptedDays` permanece vazio.
 - Usar `RequestedDate.DayOfWeek`, nunca o primeiro item de `CompatibleDays`.
 - `CompatibleDays` pode conter outros dias do match; a Once consome somente a data solicitada.
 - No aceite, reler estado atualizado e exigir `vagasEfetivas(RequestedDate) >= 1`.
 - No sucesso, adicionar `{ requestId, date, dayOfWeek }` e gravar Accepted atomicamente.
 - `weeklyAvailableSeats` permanece igual. Outra data do mesmo dia da semana mantém seu saldo próprio.
 - Não inserir novamente uma reserva cujo `requestId` já exista.
+- Com vaga na data e solicitação elegível, Aceitar fica habilitado. Sem vaga, Aceitar fica desabilitado e somente Recusar permanece disponível. Não rejeitar automaticamente.
+- Hoje e datas futuras são válidos; data anterior a hoje é passada. A decisão usa referência temporal de servidor, conforme P3.
 
-## 10. Matching e apresentação futura
+## 10. Matching simplificado — P1 resolvida
 
-Preservar os filtros geográficos, Place IDs, tolerância de horário, métricas de trajeto e ordenação existentes. A etapa de vagas deve:
+Manter o matching simplificado nesta implementação, preservando seus filtros geográficos, Place IDs, tolerância de horário, métricas de trajeto e ordenação. Não planejar alteração funcional do matching neste ciclo nem exigir contexto temporal na busca.
 
-1. Obter os dias compatíveis existentes entre as rotas.
-2. Calcular a disponibilidade efetiva de cada dia no contexto temporal definido para a busca.
-3. Eliminar os dias com disponibilidade zero; dados inválidos não são candidatos válidos.
-4. Eliminar a rota se não restar nenhum dia.
-5. Expor os dias restantes e o menor saldo entre eles como vagas restantes.
+O fluxo permanece:
 
 ```text
-Saldos aplicáveis:       Monday = 3 / Tuesday = 0 / Wednesday = 2
-Compatibilidade inicial: Monday + Tuesday + Wednesday
-Compatibilidade final:   Monday + Wednesday
-Vagas restantes:         2
+buscar rota compatível → escolher rota → escolher Weekly ou Once → enviar solicitação
 ```
 
-O futuro `MatchResult` deverá transportar o saldo calculado, sem a UI recalcular regras nem voltar a ler um valor global da rota. O nome da propriedade de resultado será definido no Bloco 4; ela é derivada, sem nova persistência.
+Isso vale igualmente para Weekly e Once. O matching não antecipa disponibilidade de Once em data futura, disponibilidade futura de Weekly, horizonte temporal, próxima ocorrência ou semana futura. Não selecionar reservas Once por uma data inferida a partir de `DayOfWeek`.
 
-**Pendência de contexto temporal:** hoje `FindMatchesAsync` recebe rotas semanais e não recebe uma data; a escolha Once/Weekly e de `RequestedDate` ocorre depois, em `RideRequestViewModel`. Não é possível selecionar reservas por data apenas com `DayOfWeek`. A regra de filtragem/mínimo está aprovada, mas a data ou horizonte a usar nessa busca deve ser decidido antes dos Blocos 3–4. Não assumir silenciosamente próxima ocorrência, semana atual ou mínimo de todas as datas futuras. Um resultado de busca também não garante disponibilidade até o aceite.
+A disponibilidade real é revalidada na criação da solicitação e novamente no aceite; o resultado da busca não garante vaga. O Bloco 4 limita-se a regressão e coerência com P1, sem introduzir cálculo temporal, novo saldo previsto em `MatchResult` ou exigência de exibir um mínimo de disponibilidades futuras. A apresentação não deve fabricar saldo a partir da capacidade ou do primeiro dia.
 
-## 11. Edição e decisões arquiteturais pendentes
+## 11. Edição e decisões arquiteturais resolvidas
 
 O motorista continua informando uma única capacidade na UI.
 
@@ -202,7 +234,7 @@ O motorista continua informando uma única capacidade na UI.
 
 ### Visão semanal do motorista — P6 resolvida
 
-Cada card de rota Driver em Minhas Rotas exibe sete datas consecutivas, **domingo a sábado**, com intervalo e botões de semana anterior/próxima. A ordem foi confirmada explicitamente pelo usuário. A semana inicial contém a data local do dispositivo apenas para navegação visual; isso não resolve P3 nem fornece relógio para matching ou aceite.
+Cada card de rota Driver em Minhas Rotas exibe sete datas consecutivas, **domingo a sábado**, com intervalo e botões de semana anterior/próxima. A ordem foi confirmada explicitamente pelo usuário. A semana inicial contém a data local do dispositivo apenas para navegação visual; isso não fornece autoridade temporal para disponibilidade ou aceite. P3 está resolvida separadamente pela referência de servidor.
 
 Para cada data `D` da semana exibida:
 
@@ -216,18 +248,26 @@ O número representa passageiros programados, não vagas restantes. `0` identifi
 
 Exemplo: semana 25/10/2026–31/10/2026; Thursday com capacidade 3 e saldo semanal 2 tem 1 Weekly; uma Once em 29/10/2026 faz o dia exibir `2`. A grade e a navegação são exclusivas do motorista; Passenger e MatchResults não mudam neste bloco. Não adotar resumo de intervalo de vagas como `0–2 de 3`.
 
-### 11.1. Pendências que exigem decisão antes do bloco afetado
+### 11.1. Decisões P1–P6 encerradas
 
-| ID | Ambiguidade observada | Decisão necessária / bloco afetado |
+| ID / estado | Decisão definitiva | Implementação / bloco afetado |
 | --- | --- | --- |
-| P1 | Matching semanal não possui data nem tipo de solicitação no momento da busca. | Definir data/horizonte e como reservas Once afetam cada dia no resultado. Bloqueia integração nos Blocos 3–4. |
-| P2 | Weekly não tem início/fim de vigência persistidos; uma Once futura pode ocupar a última vaga numa ocorrência. | Definir início da recorrência e política de conflito para nova Weekly sem invalidar reservas aceitas. Não inferir aceite só do mapa semanal. Blocos 3 e 6. |
-| P3 | Serviços usam `DateTime.Today`, dependente do dispositivo. | Definir calendário/fuso de referência e origem confiável de hoje, incluindo virada de dia e validação de aceite de Once vencida. Blocos 3, 5–7. |
-| P4 — RESOLVIDA | Edição preserva ocupações e reservas; Role é imutável. | Redução permitida somente sem sobreocupação Weekly ou Weekly + Once em qualquer data armazenada, inclusive histórica. Dia com Weekly ou qualquer Once não pode ser removido. Serviço usa estado relido e `updateTime`; nenhuma restauração/cancelamento implícitos. Bloco 2. |
-| P5 | Atualmente saldo global zero rejeita todas as outras pendências da rota. Isso não distingue dias nem datas. | Definir se e quais pendências serão rejeitadas quando um dia/data lotar, preservando solicitações ainda viáveis; incluir pedidos Weekly parcialmente inviáveis. Bloco 6. |
-| P6 — RESOLVIDA | Visão semanal do motorista por data, domingo a sábado. | Exibir Weekly confirmados do dia + Once da data exata. `-` para dia não oferecido, `0` para oferecido sem passageiros; Once somente na sua semana. Navegação anterior/próxima e referência local inicial exclusivamente visual. Bloco 2. |
+| P1 — RESOLVIDA | Matching simplificado, sem previsão futura, horizonte, próxima ocorrência ou semana futura, igualmente para Weekly e Once. Escolha do tipo/data continua após selecionar a rota; disponibilidade revalidada na criação e no aceite. | Bloco 4 apenas verifica regressão e coerência, sem alteração funcional do matching. |
+| P2 — RESOLVIDA | Weekly começa no momento do aceite, sem data final automática, enquanto a relação existir. Respeitar Once futuras confirmadas; reservas passadas não bloqueiam disponibilidade atual/futura. | Blocos 3, 5 e 6. Cancelamento, semestre, data final e histórico temporal completo fora do MVP. |
+| P3 — RESOLVIDA | Calendário oficial America/Sao_Paulo; servidor é autoridade para data/hora atual, passado/presente/futuro, timestamps técnicos e segurança temporal. RequestedDate é a data civil escolhida pelo passageiro. | Centralizar referência temporal no Bloco 3; integrar validações nos Blocos 5–7; usar request.time nas Rules finais quando tecnicamente aplicável. |
+| P4 — RESOLVIDA | Edição preserva ocupações e reservas; Role é imutável. | Redução permitida somente sem sobreocupação Weekly ou Weekly + Once em qualquer data armazenada, inclusive histórica. Dia com Weekly ou qualquer Once não pode ser removido. Serviço usa estado relido e updateTime; nenhuma restauração/cancelamento implícitos. Bloco 2. |
+| P5 — RESOLVIDA | Sem rejeição automática de Pending por falta de vaga. Weekly aceita parcialmente por AcceptedDays se houver ao menos um dia viável; Once aceita somente se sua data tiver vaga. Sem disponibilidade, Aceitar desabilitado e somente Recusar disponível. | Blocos 5–6: preservar CompatibleDays; conceder/consumir somente AcceptedDays e gravar junto com Accepted atomicamente. Bloco 9 comunica a concessão parcial. |
+| P6 — RESOLVIDA | Visão semanal do motorista por data, domingo a sábado. | Exibir Weekly confirmados do dia + Once da data exata. '-' para dia não oferecido, '0' para oferecido sem passageiros; Once somente na sua semana. Navegação anterior/próxima e referência local inicial exclusivamente visual. Bloco 2. |
 
-P4 e P6 foram aprovadas e implementadas no Bloco 2. P1, P2, P3 e P5 seguem sem definição e não são resolvidas implicitamente pela validação estrutural da edição ou pela referência visual de semana. Não iniciar os blocos seguintes automaticamente.
+**Todas as pendências P1–P6 estão encerradas.** P4 e P6 mantêm as decisões aprovadas e implementadas no Bloco 2. A validação estrutural histórica da edição, inclusive para reservas passadas (P4), não define a elegibilidade temporal de novos aceites (P2/P3). As decisões finais orientam os próximos blocos; não iniciar implementação automaticamente.
+
+### 11.2. Referência temporal oficial — P3
+
+Planejar um serviço/abstração próprio para centralizar a referência temporal confiável, evitando `DateTime.Today` espalhado pelo código. O servidor fornece autoridade sobre o instante atual; a data civil de hoje é interpretada em `America/Sao_Paulo`. O relógio do celular serve apenas à apresentação/UI, como a navegação visual de semanas.
+
+`RequestedDate` não é calculada pelo servidor: permanece a data civil escolhida pelo passageiro. A autoridade de servidor se aplica à validação de passado/presente/futuro, aos timestamps técnicos e às validações de segurança relacionadas ao tempo. Nas Firestore Rules finais, usar `request.time` quando tecnicamente aplicável; comprovar essas verificações na integração do Bloco 7.
+
+Para disponibilidade: `data < hoje` é passada; hoje e datas futuras continuam válidos. Uma OneTimeReservation passada permanece armazenada para rastreabilidade, mas não reduz disponibilidade atual/futura. Não converter RequestedDate em um instante UTC nem depender do relógio do celular para autorizar operações.
 
 ## 12. Concorrência e atomicidade
 
@@ -235,11 +275,11 @@ A referência atual é o commit REST com `currentDocument.updateTime` nas escrit
 
 Requisitos obrigatórios:
 
-- Revalidar status Pending, propriedade, dias, data, saldo e unicidade do `requestId` no estado usado pelo aceite.
-- Escrever o consumo e Accepted como uma única operação atômica; falha em qualquer precondição deixa todos os documentos inalterados.
-- Em conflito, reler documentos e recalcular; não reaplicar um saldo ou uma lista calculados sobre versão antiga.
+- Revalidar status Pending, propriedade, dias, data, saldo e unicidade do `requestId` no estado usado pelo aceite, com referência temporal de servidor no calendário oficial.
+- Escrever status Accepted, `AcceptedDays` e consumo como uma única operação atômica; falha em qualquer precondição deixa todos os documentos inalterados. Na Once, `AcceptedDays` fica vazio e a reserva da data exata participa do mesmo commit.
+- Em conflito/retry, reler a solicitação e a rota, recalcular quais `CompatibleDays` ainda são aceitáveis e reconstruir `AcceptedDays`. Não reutilizar subconjunto, saldo ou lista de reservas calculados sobre uma versão antiga.
 - Serializar disputas Weekly/Weekly, Once/Once na mesma data e Weekly/Once. Datas distintas não compartilham consumo pontual, embora modifiquem o mesmo documento.
-- Impedir saldo negativo, duplicação lógica, Accepted sem consumo correspondente e consumo sem Accepted.
+- Impedir overbooking, saldo negativo, duplicação lógica, consumo parcial fora do commit, `AcceptedDays` inconsistentes, Accepted sem consumo correspondente e consumo sem Accepted.
 - Coordenar edição com aceite para impedir perda de reservas e violação de capacidade.
 - Preservar a finalidade de `requestRevision` no controle de criação de pendências; ele não é um saldo nem substitui a validação de disponibilidade.
 - As Rules futuras precisam validar as mudanças autorizadas e sua relação com a solicitação. Precondição de versão isolada não prova correção do cliente.
@@ -248,9 +288,9 @@ Não alterar estratégias, limites de retry, Rules ou Functions neste bloco. Nã
 
 ## 13. Reservas passadas
 
-Manter registros antigos em `oneTimeReservations` para rastreabilidade, ignorando-os na oferta atual/futura conforme a política temporal ainda a definir. Exceções explicitamente aprovadas no Bloco 2: todas as datas armazenadas protegem redução de capacidade e remoção de dias; a visão semanal mostra reservas históricas somente quando a semana da data exata é selecionada. Não deduzir uma reserva antiga de todas as ocorrências do mesmo dia da semana. Hoje não equivale a passado: uma reserva da data atual ainda ocupa essa data conforme a referência temporal a definir.
+Manter registros antigos em `oneTimeReservations` para rastreabilidade, ignorando-os na oferta atual/futura conforme P2/P3, com hoje fornecido pela referência temporal de servidor em `America/Sao_Paulo`. Exceções explicitamente aprovadas no Bloco 2: todas as datas armazenadas protegem redução de capacidade e remoção de dias; a visão semanal mostra reservas históricas somente quando a semana da data exata é selecionada. Não deduzir uma reserva antiga de todas as ocorrências do mesmo dia da semana. Hoje não equivale a passado: uma reserva da data atual ainda ocupa essa data conforme essa referência temporal oficial.
 
-Não implementar limpeza no cliente nem Firebase Function de remoção automática. Essa possível evolução permanece fora dos Blocos 0–8 aqui definidos. O crescimento da lista deverá ser acompanhado futuramente sem introduzir limpeza neste trabalho.
+Não implementar limpeza no cliente nem Firebase Function de remoção automática. Essa possível evolução permanece fora dos Blocos 0–9 aqui definidos. O crescimento da lista deverá ser acompanhado futuramente sem introduzir limpeza neste trabalho.
 
 ## 14. Ausência de migração e compatibilidade
 
@@ -260,7 +300,9 @@ No formato novo, documento de motorista com campos obrigatórios ausentes ou inv
 
 Fixtures e `scripts/start-emulators-seeded.js` precisarão produzir o schema novo. A recriação do ambiente e eventual descarte de usuários/rotas/solicitações pertencem à transição futura; nenhum dado é apagado agora. Não executar o seed durante o Bloco 0.
 
-## 15. Inventário de dependências de AvailableSeats
+## 15. Inventário histórico de dependências de AvailableSeats
+
+> Registro histórico da auditoria de 14/10/2026 sobre o commit `13103b7`. As contagens, referências, comportamentos e pendências mencionados nesta seção descrevem aquele estado, sem substituir as decisões finais das seções 5–13 e 16. Preservado integralmente para rastreabilidade.
 
 ### 15.1. Método e contagem reproduzível
 
@@ -322,22 +364,25 @@ Caminhos relativos à raiz e números de linha referentes ao commit auditado. Ca
 - `NewRouteViewModelTests`, `RideRequestViewModelTests` e `RouteMapTests` precisarão de fixtures novas, preservando seus objetivos existentes de endereços, distância, preço e mapa.
 - Nenhuma ocorrência direta de `AvailableSeats`/`availableSeats` foi encontrada em `functions`. Nenhuma Function foi alterada ou executada.
 
-## 16. Divisão dos blocos 1–8
+## 16. Divisão dos blocos 1–9
 
-Plano incremental: Blocos 1 e 2 implementados nos respectivos commits. Não iniciar o Bloco 3 automaticamente. Cada bloco exige escopo próprio, commit separado e validação pertinente.
+Plano incremental atualizado com P1–P6 resolvidas. Preservar o histórico dos Blocos 1 e 2 abaixo. A reorganização dos blocos restantes consolida as decisões finais; não declara funcionalidades novas como já implementadas. Cada bloco exige escopo próprio, commit separado e validação pertinente. Não iniciar implementação nesta atualização documental.
 
 | Bloco | Entrega prevista | Critério de conclusão / dependências |
 | --- | --- | --- |
-| 1 — Modelo persistido e serialização | Alterar `WeeklyRoute`, definir tipo de reserva e DTOs REST, ler/escrever/validar o novo schema; sem fallback. | Testes de round-trip, driver/passenger e dados inválidos. Coordenar consumidores para manter compilação; não antecipar matching, aceite ou Rules. Não deixar adaptadores temporários como compatibilidade permanente. |
-| 2 — Criação, edição e visão semanal | Uma capacidade inicial replicada por dia; preservação de ocupações e reservas ao editar; dias novos; Role imutável; passageiros por data na semana do motorista. | P4 e P6 resolvidas: redução sem sobreocupação, remoção somente sem compromissos, inclusive históricos; visão domingo–sábado com Weekly + Once da data, `-`/`0` e navegação semanal. |
-| 3 — Cálculo de disponibilidade | Lógica pura e testável para saldo semanal, data exata, reservas passadas e elegibilidade de aceites. | Resolver P1–P3 conforme os cálculos envolvidos; testar datas distintas do mesmo dia, duplicação e Weekly/Once. Evitar camadas/dependências desnecessárias. |
-| 4 — Matching e apresentação | Filtrar dias, eliminar rota vazia e transportar/exibir o menor saldo em `MatchResult`. | P1 decidida; P6 já implementada no Bloco 2. Manter filtros geográficos, ordenação, preço e mapas; testar match parcial e lotação. |
-| 5 — Criação de RideRequests | Garantir dias Weekly e data Once válidos no contexto atual sem consumo na criação. | Preservar snapshot de preço e controle de duplicação/revisão; P3 resolvida; testes de datas e dias. |
-| 6 — Aceite e concorrência | Consumo Weekly tudo-ou-nada, reserva Once por data, idempotência e escrita atômica. | Resolver P2/P3/P5; testes de conflito, última vaga e edição concorrente. Validar política de pendências sem rejeições globais indevidas. |
-| 7 — Firestore Rules e integração | Validar novo schema, permissões e vínculos entre aceite e consumo; validar com emulador. | Cobrir adulteração, Weekly/Weekly, Once/Once e Weekly/Once; mesma data e datas distintas; preservação de preço e rejeição sem consumo. Nenhuma publicação automática. |
-| 8 — Encerramento e dados de teste | Remover resíduos antigos, atualizar seed/fixtures/documentação, preparar recriação controlada do ambiente e checklist manual. | Suíte completa pertinente e Android Release aprovados; teste manual de criação, edição, matching, Once/Weekly, caronas confirmadas e banco. Descarte/recriação e eventual PR dependem da autorização daquele bloco; sem push/merge automático. |
+| 1 — Modelo persistido e serialização (histórico) | Alterar WeeklyRoute, definir tipo de reserva e DTOs REST, ler/escrever/validar o novo schema; sem fallback. | Implementado no respectivo commit: testes de round-trip, driver/passenger e dados inválidos; consumidores compatibilizados para compilar. Não transformar adaptações temporárias em compatibilidade permanente. |
+| 2 — Criação, edição e visão semanal (histórico) | Uma capacidade inicial replicada por dia; preservação de ocupações e reservas ao editar; dias novos; Role imutável; passageiros por data na semana do motorista. | Implementado no respectivo commit, com P4 e P6 resolvidas: redução sem sobreocupação, remoção somente sem compromissos, inclusive históricos; visão domingo–sábado com Weekly + Once da data, '-'/'0' e navegação semanal. |
+| 3 — Disponibilidade e referência temporal | Consolidar cálculos de saldo semanal/por data, America/Sao_Paulo, referência confiável de hoje e tratamento de reservas passadas/futuras. | Centralizar referência temporal em serviço/abstração próprio com autoridade de servidor; testar hoje, passado, futuro, virada de dia e datas distintas do mesmo weekday. P1–P3 já resolvidas; sem camadas desnecessárias. |
+| 4 — Matching | Manter matching simplificado; apenas garantir regressão e coerência com P1. | Nenhuma alteração funcional ou previsão futura para Weekly/Once. Preservar fluxo de escolha posterior de tipo/data, filtros geográficos, ordenação, preço e mapas; revalidação real na criação e no aceite. |
+| 5 — RideRequest e aceite parcial | Introduzir acceptedDays; Weekly parcial; Once por RequestedDate; comportamento de Aceitar/Recusar. | Preservar CompatibleDays, preço, duplicação e requestRevision. Pending/Rejected/Once com AcceptedDays vazio; Weekly Accepted com subconjunto não vazio e consumo exato. Sem rejeição automática; sem disponibilidade, somente Recusar. |
+| 6 — Concorrência e idempotência | Revalidar Weekly/Once, retries, conflitos e atomicidade de status + AcceptedDays + consumo/reserva. | Reler rota e solicitação, reconstruir AcceptedDays em cada tentativa; testar disputas Weekly/Weekly, Once/Once, Weekly/Once e edição concorrente, sem overbooking, duplicação ou consumo fora do commit. |
+| 7 — Firestore Rules e integração | Schema final incluindo acceptedDays, segurança, request.time quando tecnicamente aplicável e integração no Emulator. | Validar autoridade temporal e vínculos de aceite/consumo, impedir adulteração e testar Weekly parcial/Once, mesma data/datas distintas e preservação de preço. Nenhuma publicação automática. |
+| 8 — Encerramento e seed | Atualizar seed para o schema final; remover resíduos; revisar fixtures/documentação; regressão completa e preparação de recriação controlada do ambiente. | Suíte pertinente completa e Android Release aprovados; teste manual do fluxo e banco. Descarte/recriação e eventual PR exigem autorização daquele bloco; sem push/merge automático. |
+| 9 — Revisão da visão do passageiro | Após estabilização do sistema de disponibilidade, revisar caronas/solicitações confirmadas para apresentar Weekly aceita parcialmente por dia e Once por data. | Mostrar claramente AcceptedDays, dias solicitados não concedidos (CompatibleDays menos AcceptedDays) e datas Once. Usar a mesma relação/solicitação, sem criar rota extra por dia. Evolução de apresentação/UX posterior aos blocos principais; não implementar agora. |
 
-A ordem é incremental. Se a dependência entre modelos e consumidores exigir compatibilização para compilar, explicitar a menor adaptação no escopo do bloco, sem implementar regras funcionais não autorizadas. Funções de limpeza, cancelamento/restauração, capacidade configurável por dia, chat, pagamento, reputação e nova precificação permanecem fora deste plano.
+A ordem é incremental. Adaptações anteriores de criação/aceite não substituem a implementação do contrato final de aceite parcial e referência temporal. Se modelos e consumidores exigirem compatibilização para compilar, explicitar a menor adaptação no escopo autorizado do bloco.
+
+Funções de limpeza, cancelamento/restauração, vigência por semestre, data final automática, histórico temporal completo, capacidade configurável por dia, chat, pagamento, reputação e nova precificação permanecem fora deste plano.
 
 ## 17. Definition of Done do Bloco 0
 
