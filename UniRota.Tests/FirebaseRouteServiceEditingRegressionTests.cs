@@ -112,6 +112,12 @@ public sealed partial class FirebaseRouteServiceTests
         existingFields["weeklyAvailableSeats"]!["mapValue"]!["fields"] = initialWeekly;
         // O emulador omite 'values' quando não há reservas: reproduzir sua resposta real.
         existingFields["oneTimeReservations"]!["arrayValue"] = new JsonObject();
+        if (passenger)
+        {
+            foreach (var field in DriverRouteFields) existingFields.Remove(field);
+            existingFields["weeklyAcceptedDays"] = Ledger([]);
+            existingFields["oneTimeAcceptedDates"] = Ledger([]);
+        }
         var selectedDays = new List<DayOfWeek> { DayOfWeek.Monday, DayOfWeek.Tuesday };
         if (!removeWednesday) selectedDays.Add(DayOfWeek.Wednesday);
         if (addThursday) selectedDays.Add(DayOfWeek.Thursday);
@@ -141,16 +147,17 @@ public sealed partial class FirebaseRouteServiceTests
         Assert.Equal("Nova origem", result.Origin);
         Assert.Equal(510, result.DepartureTimeMinutes);
         Assert.Empty(result.OneTimeReservations);
-        var weekly = patch["weeklyAvailableSeats"]!["mapValue"]!["fields"]!.AsObject();
 
         if (passenger)
         {
             Assert.Null(result.SeatCapacity);
-            Assert.True(patch["seatCapacity"]!.AsObject().ContainsKey("nullValue"));
-            Assert.Empty(weekly);
+            foreach (var field in DriverRouteFields) Assert.False(patch.ContainsKey(field));
+            Assert.False(patch.ContainsKey("weeklyAcceptedDays"));
+            Assert.False(patch.ContainsKey("oneTimeAcceptedDates"));
         }
         else
         {
+            var weekly = patch["weeklyAvailableSeats"]!["mapValue"]!["fields"]!.AsObject();
             Assert.Equal(capacity, result.SeatCapacity);
             Assert.Equal(capacity.ToString(CultureInfo.InvariantCulture),
                 patch["seatCapacity"]!["integerValue"]!.GetValue<string>());

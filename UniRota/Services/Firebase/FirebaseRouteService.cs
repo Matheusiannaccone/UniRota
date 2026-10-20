@@ -108,7 +108,7 @@ public sealed class FirebaseRouteService : IRouteService
         using var request = CreateJsonRequest(
             HttpMethod.Patch,
             BuildUpdateDocumentUrl(
-                routeId,
+                normalizedRoute,
                 GetRequiredUpdateTime(existingDocument)),
             requestBody);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", idToken);
@@ -441,11 +441,26 @@ public sealed class FirebaseRouteService : IRouteService
         var fields = CreateEditableFirestoreFields(route);
         fields["userId"] = new { stringValue = route.UserId };
         fields["userName"] = new { stringValue = route.UserName };
-        fields["requestRevision"] = new
+        fields["role"] = new { stringValue = SerializeRole(route.Role) };
+        if (route.Role == RouteRole.Driver)
         {
-            integerValue = route.RequestRevision.ToString(
-                CultureInfo.InvariantCulture)
-        };
+            fields["requestRevision"] = new
+            {
+                integerValue = route.RequestRevision.ToString(CultureInfo.InvariantCulture)
+            };
+        }
+        else
+        {
+            fields["weeklyAcceptedDays"] = new
+            {
+                arrayValue = new { values = route.WeeklyAcceptedDays.Select(day => new { stringValue = day.ToString() }).ToArray() }
+            };
+            fields["oneTimeAcceptedDates"] = new
+            {
+                arrayValue = new { values = route.OneTimeAcceptedDates.Select(date => new
+                { stringValue = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }).ToArray() }
+            };
+        }
         fields["createdAtUtc"] = new
         {
             timestampValue = route.CreatedAtUtc.ToUniversalTime().ToString("O")
@@ -454,58 +469,39 @@ public sealed class FirebaseRouteService : IRouteService
         return fields;
     }
 
-    private static Dictionary<string, object> CreateEditableFirestoreFields(
-        WeeklyRoute route)
+    private static Dictionary<string, object> CreateEditableFirestoreFields(WeeklyRoute route)
     {
         var fields = new Dictionary<string, object>
         {
-            ["role"] = new { stringValue = SerializeRole(route.Role) },
             ["origin"] = new { stringValue = route.Origin },
+            ["originPlaceId"] = new { stringValue = route.OriginPlaceId },
             ["destination"] = new { stringValue = route.Destination },
+            ["destinationPlaceId"] = new { stringValue = route.DestinationPlaceId },
             ["daysOfWeek"] = new
             {
-                arrayValue = new
-                {
-                    values = route.DaysOfWeek
-                        .Select(day => new { stringValue = day.ToString() })
-                        .ToArray()
-                }
-            },
-            ["weeklyAcceptedDays"] = new
-            {
-                arrayValue = new { values = route.WeeklyAcceptedDays.Select(day => new { stringValue = day.ToString() }).ToArray() }
-            },
-            ["oneTimeAcceptedDates"] = new
-            {
-                arrayValue = new { values = route.OneTimeAcceptedDates.Select(date => new
-                { stringValue = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }).ToArray() }
+                arrayValue = new { values = route.DaysOfWeek.Select(day => new { stringValue = day.ToString() }).ToArray() }
             },
             ["departureTimeMinutes"] = new
             {
-                integerValue = route.DepartureTimeMinutes.ToString(
-                    CultureInfo.InvariantCulture)
-            },
-            ["seatCapacity"] = route.SeatCapacity is not null
-                ? new
-                {
-                    integerValue = route.SeatCapacity.Value.ToString(
-                        CultureInfo.InvariantCulture)
-                }
-                : new { nullValue = (object?)null },
-            ["weeklyAvailableSeats"] = new
+                integerValue = route.DepartureTimeMinutes.ToString(CultureInfo.InvariantCulture)
+            }
+        };
+
+        if (route.Role == RouteRole.Driver)
+        {
+            fields["seatCapacity"] = new
+            {
+                integerValue = route.SeatCapacity!.Value.ToString(CultureInfo.InvariantCulture)
+            };
+            fields["weeklyAvailableSeats"] = new
             {
                 mapValue = new
                 {
-                    fields = route.WeeklyAvailableSeats.ToDictionary(
-                        entry => entry.Key.ToString(),
-                        entry => new
-                        {
-                            integerValue = entry.Value.ToString(
-                                CultureInfo.InvariantCulture)
-                        })
+                    fields = route.WeeklyAvailableSeats.ToDictionary(entry => entry.Key.ToString(),
+                        entry => new { integerValue = entry.Value.ToString(CultureInfo.InvariantCulture) })
                 }
-            },
-            ["oneTimeReservations"] = new
+            };
+            fields["oneTimeReservations"] = new
             {
                 arrayValue = new
                 {
@@ -516,45 +512,38 @@ public sealed class FirebaseRouteService : IRouteService
                             fields = new Dictionary<string, object>
                             {
                                 ["requestId"] = new { stringValue = reservation.RequestId },
-                                ["date"] = new
-                                {
-                                    stringValue = reservation.Date.ToString(
-                                        "yyyy-MM-dd",
-                                        CultureInfo.InvariantCulture)
-                                },
-                                ["dayOfWeek"] = new
-                                {
-                                    stringValue = reservation.DayOfWeek.ToString()
-                                }
+                                ["date"] = new { stringValue = reservation.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+                                ["dayOfWeek"] = new { stringValue = reservation.DayOfWeek.ToString() }
                             }
                         }
                     }).ToArray()
                 }
-            },
-            ["estimatedDistanceKm"] = new
-            {
-                doubleValue = (double)route.EstimatedDistanceKm
-            }
-        };
+            };
+            fields["estimatedDistanceKm"] = new { doubleValue = (double)route.EstimatedDistanceKm };
+        }
 
-        AddOptionalStringField(fields, "originPlaceId", route.OriginPlaceId);
-        AddOptionalStringField(
-            fields,
-            "destinationPlaceId",
-            route.DestinationPlaceId);
-
+        // A agenda do passageiro só pode ser gravada pelo aceite técnico de RideRequest.
         return fields;
     }
 
-    private static void AddOptionalStringField(
-        IDictionary<string, object> fields,
-        string fieldName,
-        string value)
+    private static void ValidatePersistedRoleFields(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields, RouteRole role, string documentId)
     {
-        if (!string.IsNullOrWhiteSpace(value))
+        string[] forbidden = role == RouteRole.Driver
+            ? ["weeklyAcceptedDays", "oneTimeAcceptedDates"]
+            : ["seatCapacity", "weeklyAvailableSeats", "oneTimeReservations", "estimatedDistanceKm", "requestRevision"];
+        foreach (var field in forbidden)
         {
-            fields[fieldName] = new { stringValue = value };
+            if (fields.ContainsKey(field))
+                throw CreateInvalidDocumentException(documentId, $"o campo '{field}' não pertence ao papel da rota");
         }
+    }
+
+    private static string GetRequiredStringValueField(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields, string fieldName)
+    {
+        if (fields.TryGetValue(fieldName, out var field) && field?.StringValue is { } value) return value;
+        throw new InvalidOperationException($"O documento de rota não contém o campo obrigatório '{fieldName}'.");
     }
 
     private static WeeklyRoute ConvertDocument(FirestoreDocumentDto document)
@@ -562,6 +551,7 @@ public sealed class FirebaseRouteService : IRouteService
         var id = GetDocumentId(document.Name);
         var fields = document.Fields;
         var role = ParseRole(GetRequiredStringField(fields, "role"));
+        ValidatePersistedRoleFields(fields, role, id);
         var daysOfWeek = GetRequiredDaysOfWeekField(fields, "daysOfWeek", id);
         var departureTimeMinutes = GetRequiredInt32Field(
             fields,
@@ -574,54 +564,31 @@ public sealed class FirebaseRouteService : IRouteService
                 "o campo 'departureTimeMinutes' está fora do intervalo permitido");
         }
 
-        int? seatCapacity;
-        var estimatedDistanceKm = 0m;
-
-        if (role == RouteRole.Driver)
-        {
-            seatCapacity = GetRequiredInt32Field(fields, "seatCapacity");
-            estimatedDistanceKm = GetRequiredPositiveDecimalField(
-                fields,
-                "estimatedDistanceKm",
-                id);
-        }
-        else
-        {
-            if (!fields.TryGetValue("seatCapacity", out var capacityField)
-                || capacityField?.NullValue.ValueKind != JsonValueKind.Null)
-            {
-                throw CreateInvalidDocumentException(
-                    id,
-                    "o campo 'seatCapacity' deve ser explicitamente null para passageiro");
-            }
-
-            seatCapacity = null;
-        }
-
         var route = new WeeklyRoute
         {
             Id = id,
             UserId = GetRequiredStringField(fields, "userId"),
-            UserName = GetOptionalStringField(fields, "userName"),
+            UserName = GetRequiredStringValueField(fields, "userName"),
             Role = role,
             Origin = GetRequiredStringField(fields, "origin"),
-            OriginPlaceId = GetOptionalStringField(fields, "originPlaceId"),
+            OriginPlaceId = GetRequiredStringValueField(fields, "originPlaceId"),
             Destination = GetRequiredStringField(fields, "destination"),
-            DestinationPlaceId = GetOptionalStringField(
+            DestinationPlaceId = GetRequiredStringValueField(
                 fields,
                 "destinationPlaceId"),
             DaysOfWeek = daysOfWeek,
             DepartureTimeMinutes = departureTimeMinutes,
-            SeatCapacity = seatCapacity,
-            WeeklyAcceptedDays = GetRequiredDaysOfWeekField(fields, "weeklyAcceptedDays", id, allowEmpty: true),
-            OneTimeAcceptedDates = GetRequiredOneTimeAcceptedDates(fields, id),
-            WeeklyAvailableSeats = GetRequiredWeeklyAvailableSeats(fields, id),
-            OneTimeReservations = GetRequiredOneTimeReservations(fields, id),
-            EstimatedDistanceKm = estimatedDistanceKm,
-            RequestRevision = GetOptionalNonNegativeInt64Field(
-                fields,
-                "requestRevision",
-                id),
+            SeatCapacity = role == RouteRole.Driver ? GetRequiredInt32Field(fields, "seatCapacity") : null,
+            WeeklyAcceptedDays = role == RouteRole.Passenger
+                ? GetRequiredDaysOfWeekField(fields, "weeklyAcceptedDays", id, allowEmpty: true) : [],
+            OneTimeAcceptedDates = role == RouteRole.Passenger ? GetRequiredOneTimeAcceptedDates(fields, id) : [],
+            WeeklyAvailableSeats = role == RouteRole.Driver
+                ? GetRequiredWeeklyAvailableSeats(fields, id) : new Dictionary<DayOfWeek, int>(),
+            OneTimeReservations = role == RouteRole.Driver ? GetRequiredOneTimeReservations(fields, id) : [],
+            EstimatedDistanceKm = role == RouteRole.Driver
+                ? GetRequiredPositiveDecimalField(fields, "estimatedDistanceKm", id) : 0m,
+            RequestRevision = role == RouteRole.Driver
+                ? GetRequiredNonNegativeInt64Field(fields, "requestRevision", id) : 0,
             CreatedAtUtc = GetRequiredTimestampField(fields, "createdAtUtc")
         };
 
@@ -914,15 +881,6 @@ public sealed class FirebaseRouteService : IRouteService
             $"O documento de rota não contém o campo obrigatório '{fieldName}'.");
     }
 
-    private static string GetOptionalStringField(
-        IReadOnlyDictionary<string, FirestoreValueDto> fields,
-        string fieldName)
-    {
-        return fields.TryGetValue(fieldName, out var field)
-            ? field.StringValue ?? string.Empty
-            : string.Empty;
-    }
-
     private static int GetRequiredInt32Field(
         IReadOnlyDictionary<string, FirestoreValueDto> fields,
         string fieldName)
@@ -991,14 +949,14 @@ public sealed class FirebaseRouteService : IRouteService
         return value;
     }
 
-    private static long GetOptionalNonNegativeInt64Field(
+    private static long GetRequiredNonNegativeInt64Field(
         IReadOnlyDictionary<string, FirestoreValueDto> fields,
         string fieldName,
         string documentId)
     {
         if (!fields.TryGetValue(fieldName, out var field))
         {
-            return 0;
+            throw CreateInvalidDocumentException(documentId, $"o campo obrigatório '{fieldName}' está ausente");
         }
 
         var integerValue = field.IntegerValue;
@@ -1191,31 +1149,11 @@ public sealed class FirebaseRouteService : IRouteService
         return BuildCollectionUrl() + $"/{Escape(routeId)}";
     }
 
-    private string BuildUpdateDocumentUrl(string routeId, string updateTime)
+    private string BuildUpdateDocumentUrl(WeeklyRoute route, string updateTime)
     {
-        var editableFields = new[]
-        {
-            "role",
-            "origin",
-            "originPlaceId",
-            "destination",
-            "destinationPlaceId",
-            "daysOfWeek",
-            "departureTimeMinutes",
-            "seatCapacity",
-            "weeklyAvailableSeats",
-            "oneTimeReservations",
-            "weeklyAcceptedDays",
-            "oneTimeAcceptedDates",
-            "estimatedDistanceKm"
-        };
-        var updateMask = string.Join(
-            "&",
-            editableFields.Select(
-                field => $"updateMask.fieldPaths={Escape(field)}"));
-
-        return $"{BuildDocumentUrl(routeId)}?{updateMask}" +
-               "&" + BuildUpdateVersionPrecondition(updateTime);
+        var updateMask = string.Join("&", CreateEditableFirestoreFields(route).Keys
+            .Select(field => $"updateMask.fieldPaths={Escape(field)}"));
+        return $"{BuildDocumentUrl(route.Id)}?{updateMask}&" + BuildUpdateVersionPrecondition(updateTime);
     }
 
     private string BuildUpdateVersionPrecondition(string updateTime)
@@ -1292,9 +1230,6 @@ public sealed class FirebaseRouteService : IRouteService
 
         [JsonPropertyName("integerValue")]
         public JsonElement IntegerValue { get; init; }
-
-        [JsonPropertyName("nullValue")]
-        public JsonElement NullValue { get; init; }
 
         [JsonPropertyName("doubleValue")]
         public JsonElement DoubleValue { get; init; }

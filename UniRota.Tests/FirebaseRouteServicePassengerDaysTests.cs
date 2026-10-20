@@ -14,8 +14,16 @@ public sealed partial class FirebaseRouteServiceTests
         var (route, fields, _) = await RoundTripSeatRouteAsync(input);
         Assert.Empty(route.WeeklyAcceptedDays);
         Assert.Empty(route.OneTimeAcceptedDates);
-        Assert.Empty(fields["oneTimeAcceptedDates"]!["arrayValue"]!["values"]!.AsArray());
-        Assert.Empty(fields["weeklyAcceptedDays"]!["arrayValue"]!["values"]!.AsArray());
+        if (role == RouteRole.Passenger)
+        {
+            Assert.Empty(fields["oneTimeAcceptedDates"]!["arrayValue"]!["values"]!.AsArray());
+            Assert.Empty(fields["weeklyAcceptedDays"]!["arrayValue"]!["values"]!.AsArray());
+        }
+        else
+        {
+            Assert.False(fields.ContainsKey("weeklyAcceptedDays"));
+            Assert.False(fields.ContainsKey("oneTimeAcceptedDates"));
+        }
     }
 
     [Theory]
@@ -49,8 +57,10 @@ public sealed partial class FirebaseRouteServiceTests
         {
             if (request.Method == HttpMethod.Get) return JsonResponse(document.ToJsonString());
             var fields = JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!["fields"]!;
-            Assert.Equal("Monday", fields["weeklyAcceptedDays"]!["arrayValue"]!["values"]![0]!["stringValue"]!.GetValue<string>());
-            Assert.Equal(new[] { "2026-11-05", "2026-10-28", "2020-01-01" }, fields["oneTimeAcceptedDates"]!["arrayValue"]!["values"]!.AsArray().Select(value => value!["stringValue"]!.GetValue<string>()));
+            Assert.Null(fields["weeklyAcceptedDays"]);
+            Assert.Null(fields["oneTimeAcceptedDates"]);
+            Assert.DoesNotContain("weeklyAcceptedDays", request.RequestUri!.Query);
+            Assert.DoesNotContain("oneTimeAcceptedDates", request.RequestUri.Query);
             foreach (var entry in fields.AsObject()) document["fields"]![entry.Key] = entry.Value!.DeepClone();
             return JsonResponse(document.ToJsonString());
         });

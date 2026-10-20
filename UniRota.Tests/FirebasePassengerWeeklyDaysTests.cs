@@ -223,9 +223,13 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             ["daysOfWeek"] = DaysField((days ?? Enum.GetValues<DayOfWeek>()).Select(day => day.ToString())),
             ["weeklyAcceptedDays"] = DaysField((accepted ?? []).Select(day => day.ToString())),
             ["oneTimeAcceptedDates"] = DaysField([]),
-            ["seatCapacity"] = new JsonObject { ["nullValue"] = null },
-            ["weeklyAvailableSeats"] = new JsonObject { ["mapValue"] = new JsonObject { ["fields"] = new JsonObject() } },
-            ["oneTimeReservations"] = new JsonObject { ["arrayValue"] = new JsonObject { ["values"] = new JsonArray() } }
+            ["userName"] = new JsonObject { ["stringValue"] = "Passageiro" },
+            ["origin"] = new JsonObject { ["stringValue"] = "Centro" },
+            ["originPlaceId"] = new JsonObject { ["stringValue"] = "passenger-origin" },
+            ["destination"] = new JsonObject { ["stringValue"] = "Facens" },
+            ["destinationPlaceId"] = new JsonObject { ["stringValue"] = "passenger-destination" },
+            ["departureTimeMinutes"] = new JsonObject { ["integerValue"] = "480" },
+            ["createdAtUtc"] = new JsonObject { ["timestampValue"] = "2026-09-03T12:00:00Z" }
         }
     }.ToJsonString();
 }

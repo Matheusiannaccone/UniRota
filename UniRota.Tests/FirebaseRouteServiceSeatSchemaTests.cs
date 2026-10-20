@@ -63,7 +63,7 @@ public sealed partial class FirebaseRouteServiceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task WriteAsync_RoundTripsExplicitPassengerSeatSchema(bool update)
+    public async Task WriteAsync_RoundTripsPassengerSchemaWithoutDriverFields(bool update)
     {
         var input = CreateSeatSchemaRoute(role: RouteRole.Passenger, capacity: null);
 
@@ -73,11 +73,8 @@ public sealed partial class FirebaseRouteServiceTests
         Assert.Null(output.SeatCapacity);
         Assert.Empty(output.WeeklyAvailableSeats);
         Assert.Empty(output.OneTimeReservations);
-        var capacity = fields["seatCapacity"]!.AsObject();
-        Assert.True(capacity.ContainsKey("nullValue"));
-        Assert.Null(capacity["nullValue"]);
-        Assert.Empty(fields["weeklyAvailableSeats"]!["mapValue"]!["fields"]!.AsObject());
-        Assert.Empty(fields["oneTimeReservations"]!["arrayValue"]!["values"]!.AsArray());
+        foreach (var field in new[] { "seatCapacity", "weeklyAvailableSeats", "oneTimeReservations", "estimatedDistanceKm", "requestRevision" })
+            Assert.False(fields.ContainsKey(field));
         Assert.False(fields.ContainsKey("availableSeats"));
     }
 
@@ -171,9 +168,10 @@ public sealed partial class FirebaseRouteServiceTests
     [InlineData(false, "seatCapacity")]
     [InlineData(false, "weeklyAvailableSeats")]
     [InlineData(false, "oneTimeReservations")]
-    [InlineData(true, "seatCapacity")]
-    [InlineData(true, "weeklyAvailableSeats")]
-    [InlineData(true, "oneTimeReservations")]
+    [InlineData(true, "weeklyAcceptedDays")]
+    [InlineData(true, "oneTimeAcceptedDates")]
+    [InlineData(false, "estimatedDistanceKm")]
+    [InlineData(false, "requestRevision")]
     public async Task GetMyRoutesAsync_RequiresEverySeatField(bool passenger, string missingField)
     {
         var document = CreateSeatDocument(passenger);
@@ -240,8 +238,8 @@ public sealed partial class FirebaseRouteServiceTests
     {
         var document = CreateSeatDocument(passenger: true);
         var fields = document["fields"]!.AsObject();
-        fields["weeklyAvailableSeats"] = JsonNode.Parse("{\"mapValue\":{}}");
-        fields["oneTimeReservations"] = JsonNode.Parse("{\"arrayValue\":{}}");
+        fields["weeklyAcceptedDays"] = JsonNode.Parse("{\"arrayValue\":{}}");
+        fields["oneTimeAcceptedDates"] = JsonNode.Parse("{\"arrayValue\":{}}");
 
         var route = Assert.Single(await ReadSeatDocumentAsync(document));
 
@@ -364,7 +362,7 @@ public sealed partial class FirebaseRouteServiceTests
     {
         var storedDocument = CreateSeatDocument(input.Role == RouteRole.Passenger);
 
-        if (update)
+        if (update && input.Role == RouteRole.Driver)
         {
             // A edição preserva a ocupação do documento relido, não a enviada pela tela.
             var storedFields = storedDocument["fields"]!.AsObject();
@@ -424,8 +422,10 @@ public sealed partial class FirebaseRouteServiceTests
         {
             var fields = document["fields"]!.AsObject();
             fields["role"]!["stringValue"] = "passenger";
-            fields["seatCapacity"] = new JsonObject { ["nullValue"] = null };
-            fields["weeklyAvailableSeats"]!["mapValue"]!["fields"] = new JsonObject();
+            foreach (var field in new[] { "seatCapacity", "weeklyAvailableSeats", "oneTimeReservations", "estimatedDistanceKm", "requestRevision" })
+                fields.Remove(field);
+            fields["weeklyAcceptedDays"] = Ledger([]);
+            fields["oneTimeAcceptedDates"] = Ledger([]);
         }
 
         return document;
@@ -499,6 +499,15 @@ public sealed partial class FirebaseRouteServiceTests
     {
         var document = CreateSeatDocument(scenario.StartsWith("passenger-", StringComparison.Ordinal));
         var fields = document["fields"]!.AsObject();
+        if (scenario.StartsWith("passenger-", StringComparison.Ordinal))
+        {
+            fields[scenario == "passenger-capacity" ? "seatCapacity"
+                : scenario == "passenger-weekly-seats" ? "weeklyAvailableSeats" : "oneTimeReservations"] =
+                scenario == "passenger-capacity" ? new JsonObject { ["nullValue"] = null }
+                : scenario == "passenger-weekly-seats" ? new JsonObject { ["mapValue"] = new JsonObject() }
+                : new JsonObject { ["arrayValue"] = new JsonObject() };
+            return document;
+        }
         var weekly = fields["weeklyAvailableSeats"]!["mapValue"]!["fields"]!.AsObject();
         var reservation = SeatReservationValue("once-A", "2026-10-19", "Monday");
         var reservationFields = reservation["mapValue"]!["fields"]!.AsObject();

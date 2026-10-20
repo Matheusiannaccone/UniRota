@@ -399,19 +399,42 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         return routes;
     }
 
+    private static void ValidateRouteSnapshotFields(
+        IReadOnlyDictionary<string, FirestoreValueDto> fields, RouteRole role, string documentId)
+    {
+        if (ParseRouteRole(GetRequiredStringField(fields, "role", documentId), documentId) != role)
+            throw CreateInvalidDocumentException(documentId, "o papel da rota é inválido");
+        string[] forbidden = role == RouteRole.Driver
+            ? ["weeklyAcceptedDays", "oneTimeAcceptedDates"]
+            : ["seatCapacity", "weeklyAvailableSeats", "oneTimeReservations", "estimatedDistanceKm", "requestRevision"];
+        foreach (var field in forbidden)
+        {
+            if (fields.ContainsKey(field))
+                throw CreateInvalidDocumentException(documentId, $"o campo '{field}' não pertence ao papel da rota");
+        }
+        foreach (var field in new[] { "userName", "originPlaceId", "destinationPlaceId" })
+        {
+            if (!fields.TryGetValue(field, out var value) || value?.StringValue is null)
+                throw CreateInvalidDocumentException(documentId, $"o campo obrigatório '{field}' está ausente ou inválido");
+        }
+        _ = GetRequiredStringField(fields, "origin", documentId);
+        _ = GetRequiredStringField(fields, "destination", documentId);
+        _ = GetRequiredTimestampField(fields, "createdAtUtc", documentId);
+        if (GetRequiredInt32Field(fields, "departureTimeMinutes", documentId) is < 0 or > 1439)
+            throw CreateInvalidDocumentException(documentId, "departureTimeMinutes está fora do intervalo permitido");
+    }
+
     private static WeeklyRoute ConvertPassengerRouteSnapshot(FirestoreDocumentDto document, RideRequest request)
     {
         var id = GetDocumentId(document.Name);
         var fields = document.Fields;
+        ValidateRouteSnapshotFields(fields, RouteRole.Passenger, id);
         var days = GetRequiredDaysOfWeekField(fields, "daysOfWeek", id);
         var accepted = GetRequiredAcceptedDays(fields, id, "weeklyAcceptedDays");
         var dates = GetRequiredOneTimeAcceptedDates(fields, id);
         if (id != request.PassengerRouteId || GetRequiredStringField(fields, "userId", id) != request.PassengerUserId
             || ParseRouteRole(GetRequiredStringField(fields, "role", id), id) != RouteRole.Passenger
-            || accepted.Distinct().Count() != accepted.Count || accepted.Any(day => !days.Contains(day))
-            || !fields.TryGetValue("seatCapacity", out var capacity) || capacity is null || capacity.NullValue.ValueKind != JsonValueKind.Null
-            || !fields.TryGetValue("weeklyAvailableSeats", out var weekly) || weekly?.MapValue?.Fields is not { Count: 0 }
-            || !fields.TryGetValue("oneTimeReservations", out var reservations) || reservations?.ArrayValue?.Values is not { Count: 0 })
+            || accepted.Distinct().Count() != accepted.Count || accepted.Any(day => !days.Contains(day)))
             throw CreateInvalidDocumentException(id, "o schema ou proprietário da rota do passageiro é inválido");
         return new WeeklyRoute { Id = id, UserId = request.PassengerUserId, Role = RouteRole.Passenger,
             DaysOfWeek = days, WeeklyAcceptedDays = accepted, OneTimeAcceptedDates = dates };
@@ -1180,12 +1203,10 @@ public sealed class FirebaseRideRequestService : IRideRequestService
     {
         var id = GetDocumentId(document.Name);
         var fields = document.Fields;
+        ValidateRouteSnapshotFields(fields, RouteRole.Driver, id);
+        _ = GetRequiredPositiveDecimalField(fields, "estimatedDistanceKm", id);
         var capacity = GetRequiredInt32Field(fields, "seatCapacity", id);
         var offeredDays = GetRequiredDaysOfWeekField(fields, "daysOfWeek", id);
-        if (GetRequiredOneTimeAcceptedDates(fields, id).Count != 0)
-            throw CreateInvalidDocumentException(id, "oneTimeAcceptedDates deve ser vazio para motorista");
-        if (GetRequiredAcceptedDays(fields, id, "weeklyAcceptedDays").Count != 0)
-            throw CreateInvalidDocumentException(id, "weeklyAcceptedDays deve ser vazio para motorista");
 
         if (capacity <= 0
             || !fields.TryGetValue("weeklyAvailableSeats", out var weeklyField)
@@ -1242,7 +1263,7 @@ public sealed class FirebaseRideRequestService : IRideRequestService
             capacity,
             weeklySeats,
             reservations,
-            GetOptionalNonNegativeInt64Field(fields, "requestRevision", id),
+            GetRequiredNonNegativeInt64Field(fields, "requestRevision", id),
             GetRequiredDocumentName(document),
             GetRequiredUpdateTime(document));
     }
@@ -1470,16 +1491,11 @@ public sealed class FirebaseRideRequestService : IRideRequestService
         return value;
     }
 
-    private static long GetOptionalNonNegativeInt64Field(
+    private static long GetRequiredNonNegativeInt64Field(
         IReadOnlyDictionary<string, FirestoreValueDto> fields,
         string fieldName,
         string documentId)
     {
-        if (!fields.ContainsKey(fieldName))
-        {
-            return 0;
-        }
-
         var value = GetRequiredInt64Field(fields, fieldName, documentId);
 
         if (value < 0)
@@ -1931,9 +1947,6 @@ public sealed class FirebaseRideRequestService : IRideRequestService
 
     private sealed class FirestoreValueDto
     {
-        [JsonPropertyName("nullValue")]
-        public JsonElement NullValue { get; init; }
-
         [JsonPropertyName("stringValue")]
         public string? StringValue { get; init; }
 

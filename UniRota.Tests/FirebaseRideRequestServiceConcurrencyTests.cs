@@ -406,6 +406,10 @@ public sealed partial class FirebaseRideRequestServicePricingTests
             var writes = JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!["writes"]!.AsArray();
             var weekly = writes[1]!["update"]!["fields"]!.AsObject().ContainsKey("weeklyAvailableSeats");
             Assert.Equal(3, writes.Count);
+            Assert.Equal(weekly ? "weeklyAvailableSeats" : "oneTimeReservations",
+                Assert.Single(writes[1]!["update"]!["fields"]!.AsObject()).Key);
+            Assert.Equal(weekly ? "weeklyAcceptedDays" : "oneTimeAcceptedDates",
+                Assert.Single(writes[2]!["update"]!["fields"]!.AsObject()).Key);
             var requestId = writes[0]!["update"]!["name"]!.GetValue<string>().Split('/').Last();
             var attempt = new CommitAttempt(requestId, writes);
             Attempts.Add(attempt);
@@ -448,6 +452,15 @@ public sealed partial class FirebaseRideRequestServicePricingTests
         public void AssertConsistent()
         {
             Assert.All(FailedCommits, commit => Assert.Equal(commit.Before, commit.After));
+            foreach (var document in _documents.Where(entry => entry.Key.StartsWith("weeklyRoutes/", StringComparison.Ordinal)))
+            {
+                var route = document.Value["fields"]!.AsObject();
+                var driver = route["role"]!["stringValue"]!.GetValue<string>() == "driver";
+                foreach (var field in new[] { "weeklyAcceptedDays", "oneTimeAcceptedDates" })
+                    Assert.Equal(!driver, route.ContainsKey(field));
+                foreach (var field in new[] { "seatCapacity", "weeklyAvailableSeats", "oneTimeReservations", "estimatedDistanceKm", "requestRevision" })
+                    Assert.Equal(driver, route.ContainsKey(field));
+            }
             var capacity = int.Parse(RouteFields["seatCapacity"]!["integerValue"]!.GetValue<string>(), CultureInfo.InvariantCulture);
             foreach (var day in RouteFields["weeklyAvailableSeats"]!["mapValue"]!["fields"]!.AsObject())
             {

@@ -84,7 +84,7 @@ public sealed partial class FirebaseRouteServiceTests
     }
 
     [Fact]
-    public async Task GetMyRoutesAsync_DeserializesNewSeatSchemaWithoutPlaceIds()
+    public async Task GetMyRoutesAsync_DeserializesNewSeatSchemaWithEmptyPlaceIds()
     {
         var handler = new StubHttpMessageHandler((request, cancellationToken) =>
             Task.FromResult(JsonResponse(
@@ -140,12 +140,8 @@ public sealed partial class FirebaseRouteServiceTests
         string? originPlaceId = null,
         string? destinationPlaceId = null)
     {
-        var originPlaceIdField = originPlaceId is null
-            ? string.Empty
-            : $",\"originPlaceId\":{{\"stringValue\":\"{originPlaceId}\"}}";
-        var destinationPlaceIdField = destinationPlaceId is null
-            ? string.Empty
-            : $",\"destinationPlaceId\":{{\"stringValue\":\"{destinationPlaceId}\"}}";
+        var originPlaceIdField = $",\"originPlaceId\":{{\"stringValue\":\"{originPlaceId}\"}}";
+        var destinationPlaceIdField = $",\"destinationPlaceId\":{{\"stringValue\":\"{destinationPlaceId}\"}}";
 
         return $$"""
             {
@@ -164,8 +160,6 @@ public sealed partial class FirebaseRouteServiceTests
                 "weeklyAvailableSeats": {
                   "mapValue": { "fields": { "Monday": { "integerValue": "2" } } }
                 },
-                "weeklyAcceptedDays": { "arrayValue": { "values": [] } },
-                "oneTimeAcceptedDates": { "arrayValue": { "values": [] } },
                 "oneTimeReservations": { "arrayValue": { "values": [] } },
                 "estimatedDistanceKm": { "doubleValue": 8.5 },
                 "requestRevision": { "integerValue": "0" },
